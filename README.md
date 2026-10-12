@@ -37,22 +37,22 @@ Benchmarked across 6 major Windows UI technologies (see [`bench/RESULTS.md`](ben
 
 ```mermaid
 flowchart TD
-    Claude["Anthropic Claude\n(Claude Code / Claude Desktop)"] -->|Model Context Protocol (FastMCP)| MCPServer["nexus-windows Server\n(src/nexus_windows/server.py)"]
+    Claude["Anthropic Claude<br/>Claude Code / Claude Desktop"] -->|"Model Context Protocol (FastMCP)"| MCPServer["nexus-windows Server<br/>FastMCP Runtime"]
     
     subgraph Engine ["Background Execution Engine"]
         Router{"UI Framework Detection"}
         
-        Router -->|Win32 Native| Win32["Direct Win32 Message Dispatch\n(BN_CLICKED, CB_SETCURSEL, EM_REPLACESEL)"]
-        Router -->|WinForms / WPF / WinUI| UIA["COM UI Automation Patterns\n(TogglePattern, ValuePattern, InvokePattern)"]
-        Router -->|Chromium / Electron| Chromium["Render Accessibility & DevTools Bridge\n(Zero Occlusion Calculation)"]
+        Router -->|"Win32 Native"| Win32["Direct Win32 Message Dispatch<br/>BN_CLICKED, CB_SETCURSEL, EM_REPLACESEL"]
+        Router -->|"WinForms / WPF / WinUI"| UIA["COM UI Automation Patterns<br/>TogglePattern, ValuePattern, InvokePattern"]
+        Router -->|"Chromium / Electron"| Chromium["Render Accessibility & DevTools Bridge<br/>Zero Occlusion Calculation"]
         
-        Capture["Offscreen GDI & PrintWindow\n(PW_RENDERFULLCONTENT, <= 1.15 Mpx)"]
-        RawInput["Hardware Raw Input Watcher\n(Yields in ~10ms on user activity)"]
-        Policy["Strict Policy Engine\n(Protects passwords, UAC, consoles, explorer)"]
+        Capture["Offscreen GDI & PrintWindow<br/>PW_RENDERFULLCONTENT"]
+        RawInput["Hardware Raw Input Watcher<br/>Yields in ~10ms on user activity"]
+        Policy["Strict Policy Engine<br/>Protects passwords, UAC, consoles, explorer"]
     end
     
     MCPServer --> Engine
-    Win32 --> Target["Target Application Window\n(Background / Occluded)"]
+    Win32 --> Target["Target Application Window<br/>Background / Occluded"]
     UIA --> Target
     Chromium --> Target
     
