@@ -1,0 +1,727 @@
+"""Instantané d'une fenêtre pour le modèle : liste d'éléments numérotés + image, et correspondance des coordonnées.
+
+Coordonnées : toujours en pixels de l'image envoyée pour la fenêtre (liste seule : ceux de la dernière image montrée,
+où les points "x,y" se résolvent). Les menus, listes déroulantes et boîtes de dialogue ouverts par l'application font
+partie de l'instantané (fenêtres surgissantes du même processus).
+"""
+
+from __future__ import annotations
+
+import ctypes
+import io
+import math
+import re
+import time
+from dataclasses import dataclass, field
+
+from PIL import Image, ImageDraw, ImageFont
+
+from . import capture, uia
+from . import win32 as w
+
+# Limites de vision de Claude : sans réduction côté serveur, les coordonnées lues sur l'image restent exactes.
+# normal : 1568 px et 1,15 Mpx (tous les modèles) ; high : 2000 px (au-delà de 20 images par requête, les modèles
+# haute résolution redescendent à 2000 px) et 3,75 Mpx.
+MAX_SIDE = {"normal": 1568, "high": 2000}
+MAX_PIXELS = {"normal": 1_150_000, "high": 3_750_000}
+
+ACTION_ROLES = {
+    "Button",
+    "CheckBox",
+    "RadioButton",
+    "ComboBox",
+    "Edit",
+    "Hyperlink",
+    "ListItem",
+    "MenuItem",
+    "TabItem",
+    "TreeItem",
+    "Slider",
+    "Spinner",
+    "SplitButton",
+    "DataItem",
+    "Document",
+    "HeaderItem",
+    "Calendar",
+}
+CONTAINER_ROLES = {
+    "List",
+    "Tree",
+    "Menu",
+    "MenuBar",
+    "Tab",
+    "Table",
+    "DataGrid",
+    "ToolBar",
+    "Group",
+    "Pane",
+    "StatusBar",
+    "Header",
+    "Window",
+    "Custom",
+    "AppBar",
+    "SemanticZoom",
+}
+TEXT_ROLES = {"Text", "Image"}
+SKIP_SUBTREE = {"TitleBar", "ScrollBar", "ToolTip"}
+SKIP_ROLES = {"Thumb", "Separator"}
+
+ROLE_ALIASES = {
+    "bouton": {"Button", "SplitButton"},
+    "button": {"Button", "SplitButton"},
+    "case": {"CheckBox"},
+    "checkbox": {"CheckBox"},
+    "radio": {"RadioButton"},
+    "champ": {"Edit", "Document", "ComboBox"},
+    "edit": {"Edit"},
+    "texte": {"Text", "Edit", "Document"},
+    "text": {"Text"},
+    "lien": {"Hyperlink"},
+    "link": {"Hyperlink"},
+    "menu": {"MenuItem", "Menu"},
+    "menuitem": {"MenuItem"},
+    "onglet": {"TabItem"},
+    "tab": {"TabItem"},
+    "liste": {"List", "ListItem", "ComboBox"},
+    "list": {"List"},
+    "listitem": {"ListItem", "DataItem"},
+    "élément": {"ListItem", "TreeItem", "DataItem"},
+    "option": {"ListItem", "RadioButton", "MenuItem"},
+    "combo": {"ComboBox"},
+    "combobox": {"ComboBox"},
+    "arbre": {"TreeItem", "Tree"},
+    "treeitem": {"TreeItem"},
+    "document": {"Document"},
+    "image": {"Image"},
+    "groupe": {"Group"},
+    "group": {"Group"},
+    "curseur": {"Slider"},
+    "slider": {"Slider"},
+    "cellule": {"DataItem"},
+}
+
+FRAMEWORK_BY_CLASS = [
+    ("Chrome_WidgetWin_", "Chromium"),
+    ("ApplicationFrameWindow", "UWP"),
+    ("Windows.UI.Core.CoreWindow", "UWP"),
+    ("WinUIDesktopWin32WindowClass", "WinUI"),
+    ("HwndWrapper", "WPF"),
+    ("WindowsForms10", "WinForms"),
+    ("Qt5", "Qt"),
+    ("Qt6", "Qt"),
+    ("QWidget", "Qt"),
+    ("SunAwt", "Java"),
+    ("TkTopLevel", "Tk"),
+    ("SALFRAME", "LibreOffice"),
+    ("CabinetWClass", "Explorateur"),
+    ("UnityWndClass", "Unity"),
+    ("UnrealWindow", "Unreal"),
+    ("SDL_app", "SDL"),
+    ("GLFW30", "GLFW"),
+    ("ConsoleWindowClass", "Console"),
+    ("CASCADIA_HOSTING_WINDOW_CLASS", "Terminal"),
+    ("Notepad", "WinUI"),
+    ("MozillaWindowClass", "Firefox"),
+    ("OpusApp", "Word"),
+    ("XLMAIN", "Excel"),
+    ("rctrl_renwnd32", "Outlook"),
+    ("PPTFrameClass", "PowerPoint"),
+]
+FRAMEWORK_BY_UIA = {
+    "win32": "Win32",
+    "winform": "WinForms",
+    "wpf": "WPF",
+    "xaml": "XAML",
+    "directui": "DirectUI",
+    "chrome": "Chromium",
+    "qt": "Qt",
+}
+
+
+def norm(text: str | None) -> str:
+    return re.sub(r"\s+", " ", (text or "")).strip()
+
+
+def clip(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+# --- Fenêtres -------------------------------------------------------------------------------------------------
+@dataclass
+class WindowInfo:
+    hwnd: int
+    title: str
+    process: str
+    cls: str
+    rect: w.Rect
+    minimized: bool
+    maximized: bool
+    foreground: bool
+    framework: str
+
+    def label(self) -> str:
+        return f"« {clip(self.title, 80)} » ({self.process}, {self.framework})"
+
+
+def framework_of(hwnd: int, cls: str | None = None) -> str:
+    cls = cls if cls is not None else w.class_name(hwnd)
+    for prefix, name in FRAMEWORK_BY_CLASS:
+        if cls.startswith(prefix):
+            return name
+    return "Win32"
+
+
+def window_info(hwnd: int) -> WindowInfo:
+    cls = w.class_name(hwnd)
+    return WindowInfo(
+        hwnd=hwnd,
+        title=w.window_text(hwnd),
+        process=w.process_name(w.window_pid(hwnd)),
+        cls=cls,
+        rect=w.frame_rect(hwnd),
+        minimized=bool(w.IsIconic(hwnd)),
+        maximized=bool(w.IsZoomed(hwnd)),
+        foreground=w.foreground() == hwnd,
+        framework=framework_of(hwnd, cls),
+    )
+
+
+def is_app_window(hwnd: int) -> bool:
+    """Fenêtres qu'Alt+Tab montrerait : visibles, non masquées, avec titre, pas des outils."""
+    if not w.IsWindowVisible(hwnd) or w.is_cloaked(hwnd):
+        return False
+    ex = w.ex_style(hwnd)
+    if ex & w.WS_EX_TOOLWINDOW and not ex & w.WS_EX_APPWINDOW:
+        return False
+    if w.owner(hwnd) and not ex & w.WS_EX_APPWINDOW:
+        return False
+    if not w.window_text(hwnd):
+        return False
+    rect = w.frame_rect(hwnd)
+    return w.IsIconic(hwnd) or (rect.width > 1 and rect.height > 1)
+
+
+def app_windows() -> list[WindowInfo]:
+    return [window_info(h) for h in w.enum_windows() if is_app_window(h)]
+
+
+SHELL_CLASSES = {
+    "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW", "NotifyIconOverflowWindow",
+    "TopLevelWindowForOverflowXamlIsland", "Shell_InputSwitchTopLevelWindow",
+}  # fmt: skip
+MENU_CLASSES = {"#32768", "ComboLBox", "DropDown"}
+
+
+def popups_of(hwnd: int) -> list[int]:
+    """Fenêtres surgissantes visibles de la cible au-dessus d'elle (menus, listes, dialogues) : possédées par elle,
+    ou créées par SON fil (menus, listes déroulantes, surgissantes WPF/Chromium sans propriétaire). Jamais une
+    fenêtre possédée par une autre fenêtre (une fenêtre de Julien du même programme), ni la barre des tâches ou le
+    bureau (même processus que l'Explorateur)."""
+    pid = w.window_pid(hwnd)
+    thread = w.window_thread(hwnd)
+    out: list[int] = []
+    for other in w.enum_windows():  # du haut vers le bas de l'empilement
+        if other == hwnd:
+            break
+        if w.window_pid(other) != pid or not w.IsWindowVisible(other) or w.is_cloaked(other):
+            continue
+        if w.class_name(other) in SHELL_CLASSES:
+            continue
+        rect = w.frame_rect(other)
+        if rect.width < 4 or rect.height < 4:
+            continue
+        owners: list[int] = []
+        cursor = w.owner(other)
+        for _ in range(8):
+            if not cursor:
+                break
+            owners.append(cursor)
+            cursor = w.owner(cursor)
+        if hwnd in owners:
+            out.append(other)
+            continue
+        if owners or w.window_thread(other) != thread:
+            continue  # possédée par une autre fenêtre, ou d'un autre fil (autre fenêtre de l'Explorateur…)
+        popup_style = bool(w.style(other) & w.WS_POPUP) and not w.window_text(other)
+        if popup_style or w.class_name(other) in MENU_CLASSES:
+            out.append(other)
+    out.reverse()  # du bas vers le haut, pour coller les images dans l'ordre
+    return out
+
+
+def restore_behind(hwnd: int) -> bool:
+    """Fenêtre réduite → restaurée sans activation, tout au fond de l'empilement (Julien ne la voit pas surgir)."""
+    if not w.IsIconic(hwnd):
+        return False
+    placement = w.WINDOWPLACEMENT()
+    placement.length = ctypes.sizeof(w.WINDOWPLACEMENT)
+    w.GetWindowPlacement(hwnd, ctypes.byref(placement))
+    placement.showCmd = w.SW_SHOWNOACTIVATE
+    w.SetWindowPlacement(hwnd, ctypes.byref(placement))
+    w.SetWindowPos(hwnd, w.HWND_BOTTOM, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+    deadline = time.monotonic() + 1.0
+    while w.IsIconic(hwnd) and time.monotonic() < deadline:
+        time.sleep(0.03)
+    time.sleep(0.15)  # laisser l'application se redessiner
+    return not w.IsIconic(hwnd)
+
+
+# --- Correspondance image ↔ écran ---------------------------------------------------------------------------
+@dataclass
+class Frame:
+    origin: tuple[int, int]  # position écran (pixels physiques) du pixel (0, 0) de l'image
+    size: tuple[int, int]  # taille physique couverte
+    scale: float  # pixels image par pixel physique
+    anchor: tuple[int, int] | None = None  # coin de la fenêtre principale à la capture
+    anchor_size: tuple[int, int] | None = None  # taille de la fenêtre principale à la capture
+
+    def resized(self, current: w.Rect) -> bool:
+        """La fenêtre a-t-elle changé de taille depuis l'image ? (les points de l'image n'y correspondent plus)"""
+        return self.anchor_size is not None and (current.width, current.height) != self.anchor_size
+
+    @property
+    def image_size(self) -> tuple[int, int]:
+        return max(1, math.floor(self.size[0] * self.scale)), max(1, math.floor(self.size[1] * self.scale))
+
+    def _shift(self, current: w.Rect | None) -> tuple[int, int]:
+        """Déplacement de la fenêtre depuis la capture : un point de l'image reste attaché à la fenêtre."""
+        if current is None or self.anchor is None:
+            return 0, 0
+        return current.left - self.anchor[0], current.top - self.anchor[1]
+
+    def to_image(self, x: int, y: int, current: w.Rect | None = None) -> tuple[int, int]:
+        dx, dy = self._shift(current)
+        return (
+            math.floor((x - dx - self.origin[0]) * self.scale),
+            math.floor((y - dy - self.origin[1]) * self.scale),
+        )
+
+    def to_screen(self, x: float, y: float, current: w.Rect | None = None) -> tuple[int, int]:
+        """Pixel image → centre du pixel écran correspondant (fenêtre déplacée depuis : suivie)."""
+        dx, dy = self._shift(current)
+        return (
+            self.origin[0] + dx + math.floor((x + 0.5) / self.scale),
+            self.origin[1] + dy + math.floor((y + 0.5) / self.scale),
+        )
+
+    def contains_image_point(self, x: float, y: float) -> bool:
+        width, height = self.image_size
+        return 0 <= x < width and 0 <= y < height
+
+
+def frame_for(
+    bounds: w.Rect,
+    detail: str = "normal",
+    anchor: tuple[int, int] | None = None,
+    anchor_size: tuple[int, int] | None = None,
+) -> Frame:
+    side = MAX_SIDE.get(detail, MAX_SIDE["normal"])
+    pixels = MAX_PIXELS.get(detail, MAX_PIXELS["normal"])
+    width, height = max(bounds.width, 1), max(bounds.height, 1)
+    scale = min(1.0, side / max(width, height), math.sqrt(pixels / (width * height)))
+    return Frame((bounds.left, bounds.top), (bounds.width, bounds.height), scale, anchor, anchor_size)
+
+
+# --- Éléments -----------------------------------------------------------------------------------------------
+@dataclass
+class Element:
+    id: int
+    node: uia.Node
+    depth: int
+    window: int
+
+    @property
+    def role(self) -> str:
+        return self.node.control_type
+
+    @property
+    def name(self) -> str:
+        return norm(self.node.name)
+
+    @property
+    def rect(self) -> w.Rect | None:
+        return self.node.rect
+
+    @property
+    def props(self) -> dict:
+        return self.node.props
+
+    @property
+    def actionable(self) -> bool:
+        p = self.props
+        return self.role in ACTION_ROLES or any(
+            p.get(k) for k in ("has_invoke", "has_toggle", "has_selection_item", "has_expand", "has_value", "has_range")
+        )
+
+    def describe(self) -> str:
+        label = f"{self.role} « {clip(self.name, 50)} »" if self.name else self.role
+        return f"[{self.id}] {label}" if self.id else label  # élément temporaire (sous un point) : pas de numéro
+
+
+@dataclass
+class View:
+    hwnd: int
+    info: WindowInfo
+    windows: list[int]
+    elements: list[Element]
+    frame: Frame
+    taken: float = field(default_factory=time.monotonic)
+    hidden: int = 0
+    node_count: int = 0
+    framework: str = ""
+    detail: str = "normal"
+    notes: list[str] = field(default_factory=list)
+    displayed: dict[int, tuple] = field(default_factory=dict)  # [N] réellement montrés → identité à l'affichage
+    # Lecture incomplète : un texte absent de l'arbre n'y est pas prouvé absent (ni présent ni absent).
+    truncated: bool = False  # arbre coupé à max_nodes
+    web_missing: bool = False  # Chromium n'a pas publié le contenu de la page
+    roots: dict[int, uia.Node] = field(default_factory=dict)  # fenêtre → racine de son arbre (nœuds non listés compris)
+
+    @property
+    def by_id(self) -> dict[int, Element]:
+        return {e.id: e for e in self.elements}
+
+
+def identity(props: dict) -> tuple:
+    """Ce qui fait qu'un élément est « le même » pour le modèle : rôle, nom, identifiant d'automatisation."""
+    return props.get("control_type"), norm(props.get("name")), str(props.get("automation_id") or "")
+
+
+def _visible(node: uia.Node, bounds: w.Rect) -> bool:
+    rect = node.rect
+    if rect is None or node.props.get("offscreen"):
+        return False
+    return rect.intersect(bounds) is not None
+
+
+def _listable(node: uia.Node, parent_name: str) -> bool:
+    role = node.control_type
+    if role in SKIP_ROLES:
+        return False
+    name = norm(node.name)
+    p = node.props
+    if role in ACTION_ROLES or any(
+        p.get(k) for k in ("has_invoke", "has_toggle", "has_selection_item", "has_value", "has_range")
+    ):
+        return True
+    if p.get("has_expand") and role not in ("Pane", "Window"):
+        return True
+    if role in TEXT_ROLES:
+        return bool(name) and name != parent_name
+    if role in CONTAINER_ROLES:
+        return bool(name) and role != "Window" and name != parent_name
+    return bool(name) and p.get("focusable", False)
+
+
+def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_nodes: int = 6000) -> View:
+    info = window_info(hwnd)
+    windows = [hwnd] + popups_of(hwnd)
+    bounds = info.rect
+    for other in windows[1:]:
+        r = w.frame_rect(other)
+        bounds = w.Rect(
+            min(bounds.left, r.left), min(bounds.top, r.top), max(bounds.right, r.right), max(bounds.bottom, r.bottom)
+        )
+    frame = frame_for(bounds, detail, (info.rect.left, info.rect.top), (info.rect.width, info.rect.height))
+    elements: list[Element] = []
+    node_count = 0
+    root_framework = ""
+    notes: list[str] = []
+    truncated = web_missing = False
+    roots: dict[int, uia.Node] = {}
+    for win in windows:
+        try:
+            tree = auto.tree(win, max_nodes=max_nodes)
+            if win == hwnd and info.framework == "Chromium" and not _has_web_content(tree):
+                tree, ready = _wait_web_content(auto, win, tree, max_nodes)
+                if not ready:
+                    web_missing = True
+                    notes.append(
+                        "Contenu web absent de l'arbre UI Automation (Chromium cesse de le publier quand sa fenêtre est "
+                        "recouverte) : se fier à l'image et aux clics par coordonnées ; pour Chrome, préférer Claude in "
+                        "Chrome ; une application lancée par launch n'a pas ce problème."
+                    )
+        except uia.UIAError:
+            continue
+        truncated = truncated or tree.truncated
+        roots[win] = tree
+        if win == hwnd:
+            root_framework = FRAMEWORK_BY_UIA.get(str(tree.props.get("framework", "")).lower(), "")
+        win_bounds = w.frame_rect(win)
+
+        def visit(node: uia.Node, depth: int, parent_name: str) -> None:
+            nonlocal node_count
+            node_count += 1
+            role = node.control_type
+            if role in SKIP_SUBTREE:
+                return
+            listed = node is not tree and _visible(node, win_bounds) and _listable(node, parent_name)
+            if listed:
+                elements.append(Element(len(elements) + 1, node, depth, win))
+            next_name = norm(node.name) if listed else parent_name
+            for child in node.children:
+                visit(child, depth + (1 if listed else 0), next_name)
+
+        visit(tree, 0, norm(tree.name))
+    framework = info.framework if info.framework != "Win32" or not root_framework else root_framework
+    return View(
+        hwnd, info, windows, elements, frame, node_count=node_count, framework=framework, detail=detail, notes=notes,
+        truncated=truncated, web_missing=web_missing, roots=roots,
+    )  # fmt: skip
+
+
+def _has_web_content(tree: uia.Node) -> bool:
+    return any(node.control_type == "Document" and node.children for node in tree.walk())
+
+
+_NO_WEB_CONTENT: dict[int, float] = {}  # hwnd → instant du dernier constat « contenu web absent »
+
+
+def _wait_web_content(auto: uia.Automation, hwnd: int, tree: uia.Node, max_nodes: int) -> tuple[uia.Node, bool]:
+    """Chromium construit son arbre d'accessibilité à la première demande : on lui laisse jusqu'à 1,5 s
+    (une seule fois par minute et par fenêtre, pour ne pas ralentir chaque look d'un Chrome recouvert)."""
+    if time.monotonic() - _NO_WEB_CONTENT.get(hwnd, -1e9) < 60:
+        return tree, False
+    deadline = time.monotonic() + 1.5
+    while time.monotonic() < deadline:
+        time.sleep(0.25)
+        tree = auto.tree(hwnd, max_nodes=max_nodes)
+        if _has_web_content(tree):
+            _NO_WEB_CONTENT.pop(hwnd, None)
+            return tree, True
+    _NO_WEB_CONTENT[hwnd] = time.monotonic()
+    return tree, False
+
+
+# --- Rendu texte ----------------------------------------------------------------------------------------------
+def flags(e: Element) -> str:
+    p = e.props
+    out = []
+    value = p.get("value")
+    if value is None and e.role in ("Slider", "Spinner", "ProgressBar"):
+        value = p.get("range_value")
+    if value is not None and str(value) != "" and norm(str(value)) != e.name:
+        shown = "••••" if p.get("password") else clip(norm(str(value)), 60)
+        out.append(f" = « {shown} »")
+    toggle = p.get("toggle") if p.get("has_toggle") else None
+    if toggle is not None and e.role in ("CheckBox", "RadioButton", "Button", "MenuItem", "ListItem", "TreeItem"):
+        out.append({0: " [décoché]", 1: " [coché]", 2: " [mixte]"}.get(toggle, ""))
+    expand = p.get("expand")
+    if (
+        expand in (0, 1)
+        and p.get("has_expand")
+        and e.role in ("ComboBox", "MenuItem", "TreeItem", "SplitButton", "Button", "Group", "DataItem", "ListItem")
+    ):
+        out.append(" [fermé]" if expand == 0 else " [ouvert]")
+    if p.get("selected"):
+        out.append(" [sélectionné]")
+    if p.get("focused"):
+        out.append(" [focus]")
+    if p.get("enabled") is False:
+        out.append(" [désactivé]")
+    if p.get("readonly") and e.role in ("Edit", "Document", "ComboBox"):
+        out.append(" [lecture seule]")
+    return "".join(out)
+
+
+def listed(view: View, query: str | None = None, max_elements: int = 200) -> tuple[list[Element], int]:
+    """Éléments réellement listés (filtre query, au plus max_elements) et nombre d'éléments cachés."""
+    picked = view.elements
+    if query:
+        q = query.lower()
+        picked = [
+            e
+            for e in picked
+            if q in e.name.lower() or q in str(e.props.get("value") or "").lower() or q in e.role.lower()
+        ]
+    hidden = max(0, len(picked) - max_elements)
+    if hidden:
+        actionable = [e for e in picked if e.actionable]
+        others = [e for e in picked if not e.actionable]
+        keep = set(id(e) for e in (actionable + others)[:max_elements])
+        picked = [e for e in picked if id(e) in keep]
+    return picked, hidden
+
+
+def lines(
+    view: View, query: str | None = None, max_elements: int = 200, frame: Frame | None = None, coords: bool = True
+) -> tuple[list[str], int]:
+    """Lignes « [N] Rôle « nom » = valeur [états] @x,y », filtrées par query, au plus max_elements.
+
+    frame : cadre des coordonnées, celui où les points "x,y" du modèle se résolvent (par défaut celui de la vue) ;
+    la fenêtre a pu bouger depuis (suivie). coords=False : aucune coordonnée (pas de cadre valable)."""
+    picked, hidden = listed(view, query, max_elements)
+    frame = frame or view.frame
+    out: list[str] = []
+    current_window = view.hwnd
+    for e in picked:
+        if e.window != current_window:
+            current_window = e.window
+            title = w.window_text(e.window)
+            out.append(f"— fenêtre surgissante « {clip(title, 60)} » —" if title else "— menu / liste surgissante —")
+        indent = "  " * min(e.depth, 8) if not query else ""
+        rect = e.rect
+        where = ""
+        if rect is not None and coords:
+            cx, cy = frame.to_image(*rect.center, view.info.rect)
+            if not frame.contains_image_point(cx, cy):
+                where = " (hors de l'image)"
+            else:
+                where = f" @{cx},{cy}"
+                if e.role in CONTAINER_ROLES or e.role in ("Document", "List", "Tree", "Table", "DataGrid"):
+                    where += f" {round(rect.width * frame.scale)}×{round(rect.height * frame.scale)}"
+        name = f" « {clip(e.name, 80)} »" if e.name else ""
+        out.append(f"{indent}[{e.id}] {e.role}{name}{flags(e)}{where}")
+    return out, hidden
+
+
+# --- Image ----------------------------------------------------------------------------------------------------
+def capture_view(view: View) -> tuple[Image.Image, list[str]]:
+    """Image physique composée (fenêtre + surgissantes), recalée sur view.frame.
+
+    PrintWindow pour TOUTES les fenêtres (une fenêtre non adaptée au DPI est dessinée à sa taille logique puis
+    agrandie : capture_printwindow). Windows.Graphics.Capture seulement en dernier recours, quand PrintWindow échoue ou
+    rend une image vide : WGC a perdu ~1 handle noyau par capture dans un régime intermittent (recheck6 : +120 à +161
+    handles par série de 120), cause native non identifiée — un serveur qui vit longtemps ne doit pas en dépendre."""
+    notes: list[str] = []
+    width, height = view.frame.size
+    canvas = Image.new("RGB", (width, height), (32, 32, 32))
+    for win in view.windows:
+        shot = None
+        for method in (capture.capture_printwindow, capture.capture_wgc):
+            try:
+                shot = method(win)
+            except Exception as error:  # noqa: BLE001
+                notes.append(f"capture {method.__name__.removeprefix('capture_')} : {error}")
+                continue
+            if capture.blank_ratio(shot.image) < 1.0:
+                break
+            notes.append(f"capture {shot.method} vide")
+        if shot is None:
+            continue
+        canvas.paste(shot.image, (shot.origin[0] - view.frame.origin[0], shot.origin[1] - view.frame.origin[1]))
+    return canvas, notes
+
+
+_FONT_CACHE: dict[int, ImageFont.ImageFont] = {}
+
+
+def _font(size: int):
+    if size not in _FONT_CACHE:
+        try:
+            _FONT_CACHE[size] = ImageFont.truetype("segoeuib.ttf", size)
+        except OSError:
+            _FONT_CACHE[size] = ImageFont.load_default(size=size)
+    return _FONT_CACHE[size]
+
+
+def marked(view: View, marks: str = "auto") -> list[Element]:
+    """Éléments dont le numéro est dessiné sur l'image."""
+    if marks == "none":
+        return []
+    return [e for e in view.elements if e.actionable and e.rect is not None and not (marks == "auto" and e.name)]
+
+
+def render_image(view: View, physical: Image.Image, marks: str = "auto") -> Image.Image:
+    image = (
+        physical.resize(view.frame.image_size, Image.Resampling.LANCZOS) if view.frame.scale < 1 else physical.copy()
+    )
+    if marks == "none":
+        return image
+    draw = ImageDraw.Draw(image, "RGBA")
+    font = _font(11)
+    for e in marked(view, marks):
+        x, y = view.frame.to_image(e.rect.left, e.rect.top)
+        label = str(e.id)
+        box = draw.textbbox((0, 0), label, font=font)
+        tw, th = box[2] - box[0] + 4, box[3] - box[1] + 3
+        x = min(max(0, x), image.width - tw)
+        y = min(max(0, y), image.height - th)
+        draw.rectangle((x, y, x + tw, y + th), fill=(200, 30, 120, 215))
+        draw.text((x + 2, y + 1 - box[1]), label, font=font, fill=(255, 255, 255, 255))
+    return image
+
+
+def png_bytes(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", compress_level=3)
+    return buffer.getvalue()
+
+
+# --- Résolution d'une cible -----------------------------------------------------------------------------------
+class TargetError(ValueError):
+    pass
+
+
+_POINT = re.compile(r"^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)\s*\)?\s*$")
+_ID = re.compile(r"^\s*(?:#|\[)?\s*(\d+)\s*\]?\s*$")
+
+
+def parse_point(spec) -> tuple[float, float] | None:
+    if isinstance(spec, (list, tuple)) and len(spec) == 2 and all(isinstance(v, (int, float)) for v in spec):
+        return float(spec[0]), float(spec[1])
+    if isinstance(spec, str):
+        match = _POINT.match(spec)
+        if match and not _ID.match(spec):
+            return float(match.group(1)), float(match.group(2))
+    return None
+
+
+class AmbiguousTarget(TargetError):
+    pass
+
+
+def _split_role(spec: str) -> tuple[set[str] | None, str]:
+    text = spec.strip()
+    match = re.match(r"^([A-Za-zéèÉ]+)\s*[:]\s*(.+)$", text) or re.match(r"^([A-Za-zéèÉ]+)\s+[«\"'](.+?)[»\"']$", text)
+    known = {r.lower(): {r} for r in ACTION_ROLES | CONTAINER_ROLES | TEXT_ROLES}
+    if match and match.group(1).lower() in ("nom", "name"):
+        return None, match.group(2).strip()  # « nom:15 » : un nom, même s'il ressemble à un numéro
+    if match and (match.group(1).lower() in ROLE_ALIASES or match.group(1).lower() in known):
+        key = match.group(1).lower()
+        return ROLE_ALIASES.get(key) or known[key], match.group(2).strip()
+    return None, text
+
+
+def _rank(e: Element, prefer: set[str] | None) -> tuple:
+    return (
+        bool(prefer) and e.role not in prefer,
+        not e.actionable,
+        e.role in TEXT_ROLES,
+        e.props.get("enabled") is False,
+    )
+
+
+def _matches(view: View, spec: str) -> tuple[list[Element], list[Element]]:
+    roles, text = _split_role(spec)
+    wanted = norm(text).strip("«»\"' ").lower()
+    pool = [e for e in view.elements if roles is None or e.role in roles]
+    exact = [e for e in pool if e.name.lower() == wanted]
+    if not exact:
+        exact = [e for e in pool if str(e.props.get("automation_id") or "").lower() == wanted]
+    partial = [e for e in pool if wanted and wanted in e.name.lower() and e not in exact]
+    return exact, partial
+
+
+def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element, str]:
+    """L'élément désigné par son nom (« Valider », « bouton:Valider », « button Valider »), ou une erreur explicite :
+    jamais un choix au hasard entre homonymes.
+
+    prefer : rôles attendus par l'action (une liste pour select, un champ pour set…) classés en tête ; les
+    étiquettes (Text) passent après les contrôles du même nom. Renvoie (élément, note) ; la note signale une
+    correspondance partielle.
+    """
+    exact, partial = _matches(view, spec)
+    group, kind = (exact, "exact") if exact else (partial, "partial")
+    if not group:
+        raise TargetError(f"Aucun élément « {spec} » dans la fenêtre (look pour voir la liste).")
+    group = sorted(group, key=lambda e: _rank(e, prefer))
+    best = _rank(group[0], prefer)
+    tied = [e for e in group if _rank(e, prefer) == best]
+    if len(tied) > 1:
+        listed = ", ".join(e.describe() for e in tied[:8])
+        raise AmbiguousTarget(
+            f"« {spec} » désigne plusieurs éléments : {listed}. Viser par [N] ou préciser (rôle:nom)."
+        )
+    note = f"correspondance partielle : {group[0].describe()}" if kind == "partial" else ""
+    return group[0], note

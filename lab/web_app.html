@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Labo Web — prêt</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 12px; background: #fafafa; color: #222; }
+  label { display: inline-block; width: 80px; }
+  .row { margin: 6px 0; }
+  #zone { border: 1px solid #888; background: #fff; display: block; }
+  #editeur { border: 1px solid #888; min-height: 40px; max-height: 60px; overflow: auto; padding: 4px; background: #fff; width: 420px; }
+  /* Éditeur riche (structure ProseMirror, Lexical, Quill, Gmail) : paragraphes <p>, vide = <p><br></p> (UIA lit « \n »). */
+  #paragraphes { border: 1px solid #888; min-height: 24px; max-height: 60px; overflow: auto; padding: 0 4px; background: #fff; width: 420px; }
+  #paragraphes p { margin: 0; }
+  [role=listbox] { border: 1px solid #888; width: 200px; display: inline-block; vertical-align: top; }
+  [role=option] { padding: 2px 6px; cursor: pointer; }
+  [role=option][aria-selected=true] { background: #cde; }
+  #statut { font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="row"><label for="nom">Nom</label><input id="nom" style="width:420px"></div>
+<div class="row"><label for="notes">Notes</label><textarea id="notes" rows="3" style="width:420px"></textarea></div>
+<div class="row"><label for="gel">Gel</label><textarea id="gel" rows="2" style="width:420px"></textarea></div>
+<div class="row"><label for="gel2">Gel2</label><textarea id="gel2" rows="2" style="width:420px"></textarea></div>
+<div class="row"><label for="lent">Lent</label><textarea id="lent" rows="1" style="width:420px"></textarea></div>
+<div class="row"><label for="lourd">Lourd</label><textarea id="lourd" rows="1" style="width:420px"></textarea></div>
+<ul id="liste-lourde" aria-label="Liste lourde" style="max-height:30px;overflow:auto;font-size:8px;margin:0"></ul>
+<div class="row"><button id="valider">Valider</button>
+  <label style="width:auto"><input type="checkbox" id="option"> Option</label></div>
+<div class="row"><label for="couleur">Couleur</label>
+  <select id="couleur"><option>Rouge</option><option>Vert</option><option>Bleu</option></select></div>
+<div class="row"><label id="liste-label">Liste</label>
+  <div role="listbox" aria-labelledby="liste-label" id="liste" tabindex="0">
+    <div role="option" id="o1" aria-selected="false">Alpha</div>
+    <div role="option" id="o2" aria-selected="false">Bravo</div>
+    <div role="option" id="o3" aria-selected="false">Charlie</div>
+  </div></div>
+<div class="row"><label for="lecture">Lecture</label><input id="lecture" value="abc" readonly></div>
+<div class="row"><label>Éditeur</label><div id="editeur" contenteditable="true" aria-label="Éditeur" role="textbox" aria-multiline="true"></div></div>
+<div class="row"><label>Paragraphes</label><div id="paragraphes" contenteditable="true" aria-label="Paragraphes" role="textbox" aria-multiline="true"><p><br></p></div></div>
+<div class="row"><label>Statut</label><span id="statut" role="status" aria-live="polite">prêt</span></div>
+<canvas id="zone" width="430" height="110" aria-label="Zone"></canvas>
+<ol id="journal" aria-label="Journal" style="font-size:9px;color:#999;max-height:60px;overflow:auto;margin:4px 0"></ol>
+<script>
+  let clics = 0;
+  const statut = (t) => {
+    document.getElementById('statut').textContent = t; document.title = 'Labo Web — ' + t;
+    const li = document.createElement('li'); li.textContent = t; document.getElementById('journal').appendChild(li);
+  };
+  document.getElementById('valider').addEventListener('click', () => statut('clic ' + (++clics)));
+  document.getElementById('option').addEventListener('change', (e) => statut('coche ' + (e.target.checked ? 'on' : 'off')));
+  document.getElementById('couleur').addEventListener('change', (e) => statut('couleur ' + e.target.value));
+  document.getElementById('nom').addEventListener('input', (e) => statut('nom ' + e.target.value));
+  // Empreinte FNV-1a 32 bits du texte (sauts de ligne « \n ») : le banc vivant prouve le contenu exact, sans doublon
+  // ni saut de ligne déplacé, indépendamment de la relecture UIA de l'outil.
+  const empreinte = (t) => {
+    let h = 0x811c9dc5;
+    for (const c of new TextEncoder().encode(t)) { h ^= c; h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  };
+  // Saisie au clavier : un événement par pause de 250 ms, pas un par caractère (un texte de 700 caractères ferait
+  // 700 lignes de journal, et autant d'éléments UIA à relire).
+  const apresPause = (fn) => { let t = 0; return () => { clearTimeout(t); t = setTimeout(fn, 250); }; };
+  const notes = document.getElementById('notes');
+  notes.addEventListener('input', apresPause(() => statut('notes ' + notes.value.length + ' #' + empreinte(notes.value))));
+  // Sonde recheck8 : tâche JS longue (moteur de rendu figé) une seule fois par saisie, quand le champ atteint SEUIL
+  // caractères (Gel : 1500 ms ; Gel2 : 700 ms) ; réarmée quand le champ est vidé. Les frappes reçues pendant le gel
+  // restent dans la file du moteur de rendu.
+  const gele = (id, ms, seuil) => {
+    const el = document.getElementById(id); let fait = false;
+    el.addEventListener('input', () => {
+      if (el.value.length === 0) { fait = false; return; }
+      if (!fait && el.value.length >= seuil) { fait = true; const t = performance.now(); while (performance.now() - t < ms) {} }
+    });
+    el.addEventListener('input', apresPause(() => statut(id + ' ' + el.value.length + ' #' + empreinte(el.value))));
+  };
+  gele('gel', 1500, 100);
+  gele('gel2', 700, 100);
+  // Lent : 12 ms de travail JS par saisie (application lente, file traitée en retard, sans gel).
+  const lent = document.getElementById('lent');
+  lent.addEventListener('input', () => { const t = performance.now(); while (performance.now() - t < 12) {} });
+  lent.addEventListener('input', apresPause(() => statut('lent ' + lent.value.length + ' #' + empreinte(lent.value))));
+  // Lourd : 1500 éléments de liste reconstruits à chaque saisie (arbre d'accessibilité lourd : fil UI du navigateur
+  // occupé, relectures UIA lentes).
+  const lourd = document.getElementById('lourd');
+  const liste = document.getElementById('liste-lourde');
+  lourd.addEventListener('input', () => {
+    const frag = document.createDocumentFragment(); const tete = lourd.value.slice(-12);
+    for (let i = 0; i < 1500; i++) { const li = document.createElement('li'); li.textContent = tete + ' ' + i; frag.appendChild(li); }
+    liste.replaceChildren(frag);
+  });
+  lourd.addEventListener('input', apresPause(() => statut('lourd ' + lourd.value.length + ' #' + empreinte(lourd.value))));
+  const editeur = document.getElementById('editeur');
+  editeur.addEventListener('input', apresPause(() => statut('editeur ' + editeur.textContent)));
+  const paragraphes = document.getElementById('paragraphes');
+  const insecable = String.fromCharCode(0xa0);
+  paragraphes.addEventListener('focus', () => document.execCommand('defaultParagraphSeparator', false, 'p'));
+  paragraphes.addEventListener('input', apresPause(() => {
+    // Texte des paragraphes joints par « \n » : ce qui a été tapé, Entrée = nouveau paragraphe (espace insécable de
+    // l'édition en espace).
+    const lignes = Array.from(paragraphes.querySelectorAll('p')).map((p) => p.textContent.replaceAll(insecable, ' '));
+    const texte = lignes.join('\n');
+    statut('paragraphes ' + lignes.length + ' lignes ' + texte.length + ' car. #' + empreinte(texte));
+  }));
+  for (const opt of document.querySelectorAll('[role=option]')) {
+    opt.addEventListener('click', () => {
+      for (const o of document.querySelectorAll('[role=option]')) o.setAttribute('aria-selected', 'false');
+      opt.setAttribute('aria-selected', 'true');
+      statut('liste ' + opt.textContent);
+    });
+  }
+  const zone = document.getElementById('zone');
+  zone.addEventListener('mousedown', (e) => statut('zone ' + (e.button === 0 ? 'gauche' : 'droit') + ' ' + e.offsetX + ',' + e.offsetY));
+  zone.addEventListener('contextmenu', (e) => e.preventDefault());
+  zone.addEventListener('wheel', (e) => { e.preventDefault(); statut('molette ' + Math.round(-e.deltaY)); }, { passive: false });
+  document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); statut('raccourci ctrl+k'); } });
+  const ctx = zone.getContext('2d'); ctx.fillStyle = '#eef'; ctx.fillRect(0, 0, 430, 110); ctx.fillStyle = '#336'; ctx.fillText('Zone (canevas)', 8, 16);
+</script>
+</body>
+</html>

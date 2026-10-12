@@ -1,0 +1,44 @@
+[project]
+name = "claude-windows-computer-use"
+version = "1.0.0"
+description = "Native Windows OS Computer Use & FastMCP Server for Anthropic Claude (Opus 5.5 & Sonnet 3.5). Background UI Automation & Raw Input."
+authors = [
+    { name = "Julien Piron", email = "contact@julienpiron.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "comtypes>=1.4.17",
+    "mcp>=2.3.0",
+    "pillow>=12.3.0",
+    "websockets>=17.2",
+    "windows-capture>=2.0.1",
+]
+
+[project.scripts]
+claude-windows-computer-use = "nexus_windows.server:main"
+nexus-windows = "nexus_windows.server:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+# Caches hors de OneDrive (sources synchronisées) : rien de généré dans le dépôt.
+cache-dir = "~/.claude/nexus-claude/cache/ruff"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "E731", "B023"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: tests sur de vraies fenêtres (labo), lents"]
+addopts = "-m 'not live' -p no:cacheprovider"

@@ -1,0 +1,826 @@
+"""Techniques d'entrée en arrière-plan, une par fonction (le choix entre elles est fait ailleurs).
+
+Aucune de ces fonctions ne touche la vraie souris, le vrai clavier ni le premier plan, sauf type_in_slices, qui
+enchaîne des activations brèves contrôlées (foreground.brief_activation) pour les applications qui ne lisent le
+clavier que fenêtre active (Chromium sans DevTools).
+"""
+
+from __future__ import annotations
+
+import ctypes
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from . import foreground, worker
+from . import win32 as w
+
+BUTTON_CLASSES = ("button",)
+EDIT_CLASSES = ("edit", "richedit", "richedit20w", "richedit50w", "richeditd2dpt")
+COMBO_CLASSES = ("combobox",)
+LISTBOX_CLASSES = ("listbox",)
+TAB_CLASSES = ("systabcontrol32",)
+TCM_GETITEMCOUNT, TCM_GETCURSEL, TCM_SETCURFOCUS = 0x1304, 0x130B, 0x1330
+
+BS_TYPEMASK = 0xF
+BS_PUSHBUTTON, BS_DEFPUSHBUTTON, BS_CHECKBOX, BS_AUTOCHECKBOX = 0x0, 0x1, 0x2, 0x3
+BS_RADIOBUTTON, BS_3STATE, BS_AUTO3STATE, BS_AUTORADIOBUTTON = 0x4, 0x5, 0x6, 0x9
+CB_GETCOUNT, CB_GETCURSEL, CB_SETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN = 0x146, 0x147, 0x14E, 0x148, 0x149
+LB_GETCOUNT, LB_SETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_GETCURSEL = 0x18B, 0x186, 0x189, 0x18A, 0x188
+CBN_SELCHANGE, LBN_SELCHANGE = 1, 1
+
+
+class MethodError(RuntimeError):
+    """La technique ne s'applique pas à cette cible (essayer la suivante)."""
+
+
+def win_class(hwnd: int) -> str:
+    return w.class_name(hwnd).lower()
+
+
+def _is_class(hwnd: int, names: tuple[str, ...]) -> bool:
+    cls = win_class(hwnd)
+    # WinForms : « WindowsForms10.BUTTON.app.0.… » ; on regarde le segment de classe Win32 sous-jacent.
+    if cls.startswith("windowsforms"):
+        parts = cls.split(".")
+        cls = parts[1] if len(parts) > 1 else cls
+    return cls in names
+
+
+# --- Souris par messages ------------------------------------------------------------------------------------
+_BUTTONS = {
+    "left": (w.WM_LBUTTONDOWN, w.WM_LBUTTONUP, w.MK_LBUTTON, w.WM_LBUTTONDBLCLK),
+    "right": (w.WM_RBUTTONDOWN, w.WM_RBUTTONUP, w.MK_RBUTTON, 0x0206),
+    "middle": (w.WM_MBUTTONDOWN, w.WM_MBUTTONUP, w.MK_MBUTTON, 0x0209),
+}
+
+
+ERROR_ACCESS_DENIED = 5
+
+
+def post(target: int, msg: int, wparam: int, lparam: int) -> None:
+    """PostMessage vérifié : un refus (fenêtre disparue, application élevée bloquée par UIPI) n'est jamais un succès."""
+    if not w.PostMessageW(target, msg, wparam, lparam):
+        error = ctypes.get_last_error()
+        if error == ERROR_ACCESS_DENIED:
+            raise MethodError("Windows bloque les messages vers cette application (élevée, UIPI).")
+        raise MethodError(f"PostMessage refusé (erreur {error}).")
+
+
+def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1) -> int:
+    """Clic par messages à la fenêtre enfant la plus profonde sous (x, y) écran. Renvoie le HWND visé."""
+    target = w.deepest_child_at(top, x, y)
+    cx, cy = w.screen_to_client(target, x, y)
+    lp = w.make_lparam(cx, cy)
+    down, up, mk, dbl = _BUTTONS[button]
+    post(target, w.WM_MOUSEMOVE, 0, lp)
+    for i in range(count):
+        post(target, dbl if i == 1 and dbl else down, mk, lp)
+        post(target, up, 0, lp)
+    return target
+
+
+def post_wheel(top: int, x: int, y: int, delta: int, horizontal: bool = False) -> int:
+    """Molette par message : WM_MOUSEWHEEL porte des coordonnées écran."""
+    target = w.deepest_child_at(top, x, y)
+    msg = w.WM_MOUSEHWHEEL if horizontal else w.WM_MOUSEWHEEL
+    post(target, msg, (delta & 0xFFFF) << 16, w.make_lparam(x, y))
+    return target
+
+
+# --- Contrôles Win32 standard : notifications directes au parent ----------------------------------------------
+def _notify_parent(control: int, code: int) -> None:
+    parent = w.handle(w.GetParent(control))
+    if not parent:
+        raise MethodError("Contrôle sans parent.")
+    ident = w.GetDlgCtrlID(control) & 0xFFFF
+    post(parent, w.WM_COMMAND, (code << 16) | ident, control)
+
+
+def _radio_group(control: int) -> list[int]:
+    """Autres boutons radio automatiques du même groupe (entre deux WS_GROUP), comme le ferait un vrai clic."""
+    parent = w.handle(w.GetParent(control))
+    out: list[int] = []
+    current = control
+    for _ in range(64):
+        current = w.handle(w.GetNextDlgGroupItem(parent, current, False))
+        if not current or current == control:
+            break
+        if _is_class(current, BUTTON_CLASSES) and w.style(current) & BS_TYPEMASK == BS_AUTORADIOBUTTON:
+            out.append(current)
+    return out
+
+
+def win32_button_click(control: int) -> str:
+    """Bouton Win32/WinForms : notifie le parent comme un vrai clic (BN_CLICKED), coche gérée pour les cases auto."""
+    if not _is_class(control, BUTTON_CLASSES):
+        raise MethodError("Pas un bouton Win32.")
+    if not w.IsWindowEnabled(control):
+        raise MethodError("Bouton désactivé.")
+    kind = w.style(control) & BS_TYPEMASK
+    if kind in (BS_AUTOCHECKBOX, BS_AUTO3STATE):
+        state = w.send_message(control, w.BM_GETCHECK)
+        if state is None:
+            raise MethodError("Bouton figé.")
+        nxt = (state + 1) % (3 if kind == BS_AUTO3STATE else 2)
+        w.send_message(control, w.BM_SETCHECK, nxt)
+    elif kind == BS_AUTORADIOBUTTON:
+        for other in _radio_group(control):
+            w.send_message(other, w.BM_SETCHECK, 0)
+        w.send_message(control, w.BM_SETCHECK, 1)
+    _notify_parent(control, w.BN_CLICKED)
+    return "bn_clicked"
+
+
+def win32_tab_select(control: int, index: int) -> str:
+    """Onglet Win32/WinForms : TCM_SETCURFOCUS change l'onglet choisi ET notifie le parent (TCN_SELCHANGING/CHANGE),
+    comme un clic, sans souris. (UIA Legacy DoDefaultAction y ferait un VRAI clic : curseur de Julien déplacé.)"""
+    if not _is_class(control, TAB_CLASSES):
+        raise MethodError("Pas un contrôle d'onglets Win32.")
+    count = w.send_message(control, TCM_GETITEMCOUNT)
+    if count is None or not 0 <= index < count:
+        raise MethodError("Onglet introuvable dans le contrôle.")
+    w.send_message(control, TCM_SETCURFOCUS, index)
+    if w.send_message(control, TCM_GETCURSEL) != index:
+        raise MethodError("L'onglet n'a pas été choisi (relu).")
+    return "relu ✓"
+
+
+def _item_texts(control: int, count_msg: int, len_msg: int, text_msg: int) -> list[str]:
+    count = w.send_message(control, count_msg) or 0
+    items = []
+    for i in range(min(count, 2000)):
+        length = w.send_message(control, len_msg, i)
+        if length is None or length > 0x7FFF:
+            items.append("")
+            continue
+        buf = ctypes.create_unicode_buffer(length + 2)
+        w.send_message(control, text_msg, i, ctypes.addressof(buf))
+        items.append(buf.value)
+    return items
+
+
+class AmbiguousOption(MethodError):
+    """Plusieurs options correspondent : on refuse plutôt que de choisir au hasard."""
+
+
+def match_option(items: list[str], wanted: str) -> tuple[int, bool]:
+    """Index de l'option voulue et vrai si la correspondance n'est que partielle (unique, sinon refus)."""
+    low = " ".join(wanted.split()).lower()
+    exact = [i for i, item in enumerate(items) if " ".join(item.split()).lower() == low]
+    if len(exact) == 1:
+        return exact[0], False
+    if exact:
+        raise AmbiguousOption(f"« {wanted} » apparaît {len(exact)} fois dans la liste : impossible de savoir laquelle.")
+    partial = [i for i, item in enumerate(items) if low and low in item.lower()]
+    if len(partial) == 1:
+        return partial[0], True
+    if partial:
+        names = ", ".join(f"« {items[i]} »" for i in partial[:8])
+        raise AmbiguousOption(f"« {wanted} » est ambigu : {names}. Préciser le libellé exact.")
+    raise MethodError(f"Option « {wanted} » absente ({', '.join(items[:20])}).")
+
+
+def _partial_note(items: list[str], index: int, partial: bool) -> str:
+    return f"correspondance partielle « {items[index]} »" if partial else ""
+
+
+LBS_MULTIPLESEL, LBS_EXTENDEDSEL = 0x0008, 0x0800
+
+
+def win32_combo_select(control: int, option: str) -> str:
+    if not _is_class(control, COMBO_CLASSES):
+        raise MethodError("Pas une liste déroulante Win32.")
+    items = _item_texts(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT)
+    index, partial = match_option(items, option)
+    w.send_message(control, CB_SETCURSEL, index)
+    if w.send_message(control, CB_GETCURSEL) != index:
+        raise MethodError("La liste déroulante n'a pas pris la sélection.")
+    _notify_parent(control, CBN_SELCHANGE)
+    return " ; ".join(filter(None, ["relu ✓", _partial_note(items, index, partial)]))
+
+
+def win32_listbox_select(control: int, option: str) -> str:
+    if not _is_class(control, LISTBOX_CLASSES):
+        raise MethodError("Pas une liste Win32.")
+    if w.style(control) & (LBS_MULTIPLESEL | LBS_EXTENDEDSEL):
+        raise MethodError("Liste à sélection multiple : LB_SETCURSEL ne s'y applique pas.")
+    items = _item_texts(control, LB_GETCOUNT, LB_GETTEXTLEN, LB_GETTEXT)
+    index, partial = match_option(items, option)
+    w.send_message(control, LB_SETCURSEL, index)
+    if w.send_message(control, LB_GETCURSEL) != index:
+        raise MethodError("La liste n'a pas pris la sélection.")
+    _notify_parent(control, LBN_SELCHANGE)
+    return " ; ".join(filter(None, ["relu ✓", _partial_note(items, index, partial)]))
+
+
+def win32_edit_replace(control: int, text: str, append: bool = False) -> str:
+    """Champ Edit/RichEdit : remplace (ou complète) le texte comme une saisie (EN_CHANGE, annulation possible)."""
+    if not _is_class(control, EDIT_CLASSES):
+        raise MethodError("Pas un champ Edit Win32.")
+    if w.style(control) & w.ES_READONLY:
+        raise MethodError("Champ en lecture seule.")
+    if append:
+        w.send_message(control, w.EM_SETSEL, 0x7FFFFFFF, 0x7FFFFFFF)
+    else:
+        w.send_message(control, w.EM_SETSEL, 0, -1)
+    buf = ctypes.create_unicode_buffer(text.replace("\r\n", "\n").replace("\n", "\r\n"))
+    if w.send_message(control, w.EM_REPLACESEL, 1, ctypes.addressof(buf), timeout_ms=2000) is None:
+        raise MethodError("Le champ ne répond pas.")
+    return "em_replacesel"
+
+
+# --- Menus Win32 (HMENU) ------------------------------------------------------------------------------------
+_GetMenu = w._fn(w.user32, "GetMenu", w.w.HMENU, w.w.HWND)
+_GetMenuItemCount = w._fn(w.user32, "GetMenuItemCount", ctypes.c_int, w.w.HMENU)
+_GetMenuItemID = w._fn(w.user32, "GetMenuItemID", w.w.UINT, w.w.HMENU, ctypes.c_int)
+_GetSubMenu = w._fn(w.user32, "GetSubMenu", w.w.HMENU, w.w.HMENU, ctypes.c_int)
+_GetMenuStringW = w._fn(
+    w.user32, "GetMenuStringW", ctypes.c_int, w.w.HMENU, w.w.UINT, w.w.LPWSTR, ctypes.c_int, w.w.UINT
+)
+_GetMenuState = w._fn(w.user32, "GetMenuState", w.w.UINT, w.w.HMENU, w.w.UINT, w.w.UINT)
+MF_BYPOSITION, MF_GRAYED, MF_DISABLED = 0x400, 0x1, 0x2
+
+
+def _menu_label(menu, pos: int) -> str:
+    buf = ctypes.create_unicode_buffer(256)
+    _GetMenuStringW(menu, pos, buf, 256, MF_BYPOSITION)
+    return buf.value.replace("&", "").split("\t")[0].strip()
+
+
+def win32_menu_items(top: int) -> list[tuple[str, int]]:
+    """Chemins « Fichier > Enregistrer » → identifiant de commande, pour une barre de menus Win32 classique."""
+    out: list[tuple[str, int]] = []
+
+    def walk(menu, prefix: str, depth: int) -> None:
+        for pos in range(max(0, _GetMenuItemCount(menu))):
+            label = _menu_label(menu, pos)
+            path = f"{prefix} > {label}" if prefix else label
+            sub = _GetSubMenu(menu, pos)
+            if sub and depth < 6:
+                walk(sub, path, depth + 1)
+            else:
+                ident = _GetMenuItemID(menu, pos)
+                state = _GetMenuState(menu, pos, MF_BYPOSITION)
+                if ident not in (0, 0xFFFFFFFF) and label and not state & (MF_GRAYED | MF_DISABLED):
+                    out.append((path, ident))
+
+    menu = _GetMenu(top)
+    if menu:
+        walk(menu, "", 0)
+    return out
+
+
+def win32_menu_command(top: int, path: str) -> str:
+    items = win32_menu_items(top)
+    if not items:
+        raise MethodError("Pas de barre de menus Win32.")
+    wanted = [p.strip().lower() for p in path.replace("/", ">").split(">")]
+    for label, ident in items:
+        parts = [p.strip().lower() for p in label.split(">")]
+        if parts[-len(wanted) :] == wanted or (len(wanted) == 1 and parts[-1] == wanted[0]):
+            post(top, w.WM_COMMAND, ident & 0xFFFF, 0)
+            return "wm_command_menu"
+    raise MethodError(f"Commande de menu « {path} » introuvable.")
+
+
+# --- Clavier par messages -----------------------------------------------------------------------------------
+def _key_lparam(vk: int, up: bool, extended: bool = False) -> int:
+    scan = w.MapVirtualKeyW(vk, 0) & 0xFF
+    lp = 1 | (scan << 16) | ((1 << 24) if extended else 0)
+    if up:
+        lp |= (1 << 30) | (1 << 31)
+    return lp
+
+
+CHECK_EVERY = 16  # arrêt d'urgence et délai dépassé contrôlés tous les CHECK_EVERY caractères (lecture de fichier)
+
+
+def _post_char(target: int, ch: str, enter_as_key: bool) -> None:
+    if ch == "\n" and enter_as_key:
+        post_key(target, 0x0D)
+    elif ch == "\n":
+        post(target, w.WM_CHAR, 0x0D, 1)
+    elif ch == "\t":
+        post(target, w.WM_CHAR, 0x09, 1)
+    else:
+        data = ch.encode("utf-16-le")
+        for i in range(0, len(data), 2):
+            post(target, w.WM_CHAR, int.from_bytes(data[i : i + 2], "little"), 1)
+
+
+def post_chars(target: int, text: str, check: Callable[[], None] | None = None) -> int:
+    """Texte par WM_CHAR (unités UTF-16), Tab et Entrée en WM_CHAR (Edit, RichEdit, WPF ; texte court sans saut de
+    ligne en Chromium, qui n'insère le saut de ligne qu'à partir de la touche : un texte Chromium passe par
+    type_in_slices, qui relit chaque Entrée et confirme chaque tranche).
+
+    check : contrôle appelé avant CHAQUE caractère ; par défaut celui de l'activation brève en cours sur ce fil (à la
+    première entrée physique de Julien : premier plan rendu, puis foreground.UserInterrupted).
+    """
+    checkpoint = check or foreground.check_activation
+    sent = 0
+    for ch in text.replace("\r\n", "\n"):
+        if sent % CHECK_EVERY == 0:
+            worker.check_cancelled()  # arrêt d'urgence ou délai dépassé : rien de plus n'est envoyé
+        checkpoint()
+        _post_char(target, ch, False)
+        sent += 1
+    return sent
+
+
+def post_key(target: int, vk: int) -> None:
+    """Touche par messages : WM_KEYDOWN puis WM_KEYUP. Pas de WM_CHAR en plus : la boucle de messages de
+    l'application le fabrique elle-même (TranslateMessage), l'ajouter doublerait Entrée, Tab ou la lettre."""
+    post(target, w.WM_KEYDOWN, vk, _key_lparam(vk, False))
+    post(target, w.WM_KEYUP, vk, _key_lparam(vk, True))
+
+
+class fake_modifiers:
+    """Fait croire au thread cible que des touches de modification sont enfoncées (Ctrl, Alt, Maj).
+
+    GetKeyState lit l'état clavier de la file d'entrée du thread : on s'attache brièvement à la file du thread
+    cible (jamais à celui de Julien), on y pose l'état voulu, puis on restaure et on se détache.
+    """
+
+    def __init__(self, target: int, vks: list[int]) -> None:
+        self.thread = w.window_thread(target)
+        self.own = w.GetCurrentThreadId()
+        self.vks = vks
+        self.saved = (ctypes.c_ubyte * 256)()
+        self.attached = False
+
+    def __enter__(self):
+        fg_thread = w.window_thread(w.foreground()) if w.foreground() else 0
+        if self.thread == fg_thread:
+            raise MethodError("Le thread cible est celui du premier plan : modificateurs simulés refusés.")
+        self.attached = bool(w.AttachThreadInput(self.own, self.thread, True))
+        if not self.attached:
+            raise MethodError("AttachThreadInput refusé.")
+        w.GetKeyboardState(ctypes.byref(self.saved))
+        state = (ctypes.c_ubyte * 256)(*self.saved)
+        for vk in self.vks:
+            state[vk] = 0x80
+        w.SetKeyboardState(ctypes.byref(state))
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self.attached:
+            time.sleep(0.15)  # laisser la cible traiter les messages pendant que l'état est posé
+            w.SetKeyboardState(ctypes.byref(self.saved))
+            w.AttachThreadInput(self.own, self.thread, False)
+
+
+def post_combo(target: int, vks: list[int], modifiers: list[int]) -> None:
+    """Raccourci par messages : modificateurs simulés le temps du traitement, touches postées."""
+    with fake_modifiers(target, modifiers):
+        for vk in modifiers:
+            post(target, w.WM_KEYDOWN, vk, _key_lparam(vk, False))
+        for vk in vks:
+            post(target, w.WM_KEYDOWN, vk, _key_lparam(vk, False))
+            post(target, w.WM_KEYUP, vk, _key_lparam(vk, True))
+        for vk in reversed(modifiers):
+            post(target, w.WM_KEYUP, vk, _key_lparam(vk, True))
+
+
+def keyboard_target(top: int, windows: set[int] | None = None) -> int:
+    """Fenêtre qui reçoit le clavier dans la cible : focus du thread de la cible s'il est dans une de ses fenêtres
+    (fenêtre principale, enfant, dialogue possédé), sinon la fenêtre principale elle-même. Jamais une fenêtre de
+    Julien, même si elle partage le thread."""
+    allowed = windows or {top}
+    info = w.focus_info(top)
+    if info is not None:
+        focus = w.handle(info.hwndFocus)
+        if focus and (focus in allowed or w.root(focus) in allowed or w.IsChild(top, focus)):
+            return focus
+    return top
+
+
+# --- Frappe par tranches d'activation brève ------------------------------------------------------------------
+# Chromium sans DevTools ne lit le clavier que fenêtre active et publie sa valeur UIA en retard, par paquets (paliers
+# de 50 à 420 ms mesurés), d'autant plus tard que sa page est occupée. Règle unique, qui rend un doublon impossible :
+# un lot de caractères n'est envoyé que si TOUT ce qui le précède a été relu dans le champ, et rien n'est jamais
+# renvoyé (un caractère pas encore relu a pu n'être que retardé).
+# Chaque tranche envoie ce qu'elle peut relire avant son échéance et rend le premier plan à l'échéance ; ce qui n'est
+# pas encore relu est attendu hors activation ; s'il ne vient pas, la frappe s'arrête et le dit (texte partiel, ✗).
+SLICE_S = 0.5  # activation la plus longue d'une tranche, restitution comprise : le premier plan de Julien jamais plus
+GIVE_BACK_S = 0.2  # fin de tranche réservée au départ à la restitution (mesuré en charge : jusqu'à 0,29 s)
+MIN_POST_S = 0.1  # reste de tranche en deçà duquel rien n'est envoyé (préparation trop longue)
+CHAR_COST_S = 0.003  # coût initial d'un caractère : traitement par l'application (mesuré en Chromium : 0,7 à 2 ms)
+PHI = 1.618  # marge sur les estimations (constante harmonique)
+# Coût le plus haut retenu : le retard fixe de publication UIA, rapporté à un petit lot, gonflerait sinon le coût
+# d'un caractère jusqu'à des lots d'un caractère.
+MAX_COST_S = CHAR_COST_S * PHI * PHI * PHI
+READ_POLL_S = 0.02  # relecture pendant une tranche
+WAIT_POLL_S = 0.05  # relecture hors activation
+WAIT_IDLE_S = 3.0  # hors activation : attente la plus longue SANS progrès de ce qui a été envoyé
+WAIT_MAX_S = 8.0  # hors activation : attente la plus longue au total
+STARVED_SLICES = 2  # arrêt après deux tranches sans le temps d'envoyer quoi que ce soit
+VK_DELETE = 0x2E
+
+
+class Unreadable(MethodError):
+    """La valeur du champ ne se relit pas : la frappe ne peut être ni confirmée ni poursuivie."""
+
+
+def norm_text(value: str | None) -> str:
+    """Texte comparable d'un champ : sauts de ligne en « \\n », espaces insécables en espaces."""
+    return (value or "").replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+
+
+def _head(rest: str, want: str) -> int | None:
+    """Longueur du début de `want` égal à `rest`, ou None. Des sauts de ligne en trop à la fin sont un paragraphe vide
+    d'éditeur riche (« <p><br></p> » se lit « \\n ») : comptés seulement s'ils sont dans le texte à cet endroit.
+    L'appelant borne ce compte à ce qu'il a envoyé : un paragraphe vide n'est pas une Entrée tapée."""
+    if want.startswith(rest):
+        return len(rest)
+    core = rest.rstrip("\n")
+    if not want.startswith(core):
+        return None
+    tail = want[len(core) :]
+    return len(core) + min(len(rest) - len(core), len(tail) - len(tail.lstrip("\n")))
+
+
+def typed_prefix(value: str | None, text: str, before: str = "", append: bool = False) -> int | None:
+    """Combien du début de `text` le champ contient déjà. Remplacement : la valeur entière ; ajout : ce qui suit le
+    contenu d'avant, dont les paragraphes vides de la fin ont pu être remplis (un éditeur riche vide se lit « \\n »).
+    None : la valeur n'est pas un début du texte (autre contenu, doublon, ordre inversé)."""
+    got, want = norm_text(value), norm_text(text)
+    bases = [""]
+    if append:
+        old = norm_text(before)
+        core = old.rstrip("\n")
+        bases = [old[:end] for end in range(len(old), len(core) - 1, -1)]
+        if not old.strip() and "" not in bases:
+            bases.append("")
+    for base in bases:
+        if got.startswith(base):
+            head = _head(got[len(base) :], want)
+            if head is not None:
+                return head
+    return None
+
+
+@dataclass
+class Typed:
+    """Compte rendu d'une frappe par tranches (sauts de ligne normalisés en « \\n »). Rien n'y est supposé : confirmed
+    est le début du texte RELU dans le champ, sent ce qui a été envoyé (jamais renvoyé)."""
+
+    confirmed: int
+    total: int
+    slices: int = 0  # activations brèves utilisées
+    active_ms: int = 0  # durée cumulée de ces activations, restitution du premier plan comprise
+    slice_s: float = SLICE_S
+    stopped: str = ""  # cause d'un arrêt avant la fin : le texte n'est alors que partiellement tapé
+    longest_ms: int = 0  # tranche la plus longue, de la préparation à la restitution du premier plan
+    sent: int = 0
+    clear: bool = False  # remplacement d'un contenu d'origine
+    erased: bool = False  # contenu d'origine effacé
+
+    @property
+    def complete(self) -> bool:
+        """Tout le texte relu dans le champ par la dernière relecture."""
+        return not self.stopped and self.confirmed >= self.total
+
+    def state(self) -> str:
+        """Ce que contient le champ, d'après les relectures (pour un arrêt ou une interruption)."""
+        parts = [f"{self.confirmed}/{self.total} caractères relus dans le champ"]
+        if self.sent > self.confirmed:
+            parts.append(f"{self.sent - self.confirmed} autres envoyés mais pas relus (ils peuvent encore apparaître)")
+        if self.clear:
+            parts.append("contenu d'origine effacé" if self.erased else "contenu d'origine intact")
+        parts.append("aucun caractère renvoyé")
+        return ", ".join(parts)
+
+    def detail(self) -> str:
+        if self.stopped:
+            return f"frappe arrêtée ({self.state()}) : {self.stopped}"
+        if self.slices <= 1:
+            return f"frappes WM_CHAR, activation brève {self.active_ms} ms"
+        return (
+            f"frappes WM_CHAR en {self.slices} activations brèves (la plus longue {self.longest_ms} ms, {self.active_ms} "
+            "ms au total, premier plan rendu à Julien entre chacune) ; texte long : launch avec devtools=true l'écrit "
+            "sans aucune activation"
+        )
+
+
+def _seconds(value: float) -> str:
+    return f"{value:g} s".replace(".", ",")
+
+
+class _Stop(Exception):  # noqa: N818 - signal interne : arrêt de la frappe, avec sa cause
+    pass
+
+
+def type_in_slices(
+    hwnd: int,
+    windows: set[int],
+    text: str,
+    prepare: Callable[[bool], int],
+    read: Callable[[], str],
+    prefix: Callable[[str], int | None],
+    enter_as_key: bool = False,
+    slice_s: float = SLICE_S,
+    clear: bool = False,
+) -> Typed:
+    """Frappe WM_CHAR d'un texte dans une suite d'activations brèves d'au plus slice_s chacune, restitution comprise.
+
+    read() : valeur du champ (normalisée), Unreadable si elle ne se relit pas. prefix(valeur) : combien du début du
+    texte elle contient, -1 tant que le contenu d'origine n'est pas effacé (clear), None si elle n'est pas un début du
+    texte. prepare(True) : focus et sélection (remplacement) ou curseur en fin (ajout) ; prepare(False) : seulement
+    réactiver la cible ; renvoie la fenêtre qui reçoit le clavier, MethodError si elle ne peut pas.
+
+    Invariant : un lot n'est envoyé que si tout le texte avant lui est relu dans le champ ; rien n'est jamais renvoyé
+    (un caractère non relu a pu être seulement retardé). clear : le contenu d'origine sélectionné est effacé
+    (Suppr) et relu vide avant tout caractère. En Chromium (enter_as_key), chaque Entrée est relue (valeur changée)
+    avant la suite : son saut de ligne arrive en fin de file. Contrôle de Julien à chaque caractère et à chaque
+    relecture (premier plan rendu, UserInterrupted).
+
+    Arrêt (Typed.stopped, texte partiel) : ce qui a été envoyé n'est pas relu à temps hors activation, valeur
+    illisible, qui n'est pas un début du texte ou qui recule, tranches trop courtes pour envoyer, Julien occupé. Lève
+    BusyUser ou MethodError si aucune touche n'est partie (une autre technique peut être essayée), UserInterrupted
+    (avec l'état du champ) à une entrée physique de Julien, worker.Stopped / Cancelled.
+    """
+    return _SliceTyping(hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear).run()
+
+
+class _SliceTyping:
+    """État d'une frappe par tranches (type_in_slices)."""
+
+    def __init__(self, hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear) -> None:
+        self.hwnd, self.windows, self.prepare, self.read, self.prefix = hwnd, windows, prepare, read, prefix
+        self.text = text.replace("\r\n", "\n")
+        self.enter_as_key, self.slice_s, self.clear = enter_as_key, slice_s, clear
+        self.out = Typed(0, len(self.text), slice_s=slice_s, clear=clear)
+        self.min_post = min(MIN_POST_S, slice_s / 5)
+        self.k = -1 if clear else 0  # début relu dans le champ ; -1 : contenu d'origine pas encore effacé
+        self.sent = 0  # text[:sent] envoyé ; jamais diminué : rien n'est renvoyé
+        self.before_enter: str | None = None  # valeur relue avant la dernière Entrée pas encore vue
+        self.value = ""
+        self.cost = CHAR_COST_S
+        self.reserve = min(GIVE_BACK_S, slice_s / 2)
+        self.read_s = (
+            0.0  # durée de la dernière relecture : aucune relecture commencée si elle finirait après l'échéance
+        )
+        self.active = 0.0
+        self.touched = False  # une touche est partie : un empêchement n'est plus une exception, c'est un arrêt rendu
+
+    # --- Relecture --------------------------------------------------------------------------------------------------
+    def _look(self) -> int:
+        """Relit le champ ; met à jour k (borné à ce qui a été envoyé) ; lève _Stop sur une valeur inexploitable."""
+        begin = time.monotonic()
+        try:
+            value = self.read()
+        except Unreadable as error:
+            raise _Stop(f"la valeur du champ ne se relit plus ({error})") from None
+        finally:
+            self.read_s = time.monotonic() - begin
+        k = self.prefix(value)
+        if k is None:
+            raise _Stop("le champ contient autre chose qu'un début du texte (autre saisie ?)")
+        k = min(k, self.sent)  # un paragraphe vide n'est pas une Entrée tapée
+        if self.k >= 0 and k < self.k:
+            raise _Stop(f"le champ a perdu du texte déjà relu ({k} caractères au lieu de {self.k})")
+        if self.before_enter is not None and value != self.before_enter:
+            self.before_enter = None  # l'Entrée a fait son effet
+        self.k, self.value = max(self.k, k) if k >= 0 else k, value
+        return self.k
+
+    def _caught_up(self) -> bool:
+        return self.k >= self.sent and self.before_enter is None
+
+    def _wait_in_slice(self, deadline: float, check: Callable[[], None]) -> bool:
+        """Pendant une tranche : relit jusqu'à tout relire, ou jusqu'à l'échéance (premier plan à rendre)."""
+        while True:
+            worker.check_cancelled()  # arrêt d'urgence, appel abandonné
+            check()
+            if time.monotonic() + self.read_s >= deadline:
+                return self._caught_up()
+            self._look()
+            if self._caught_up():
+                return True
+            time.sleep(READ_POLL_S)
+
+    def _wait_outside(self) -> None:
+        """Premier plan rendu : attend que tout ce qui a été envoyé soit relu, tant que la relecture progresse
+        (WAIT_IDLE_S sans progrès, WAIT_MAX_S au plus). Sinon _Stop : rien n'est renvoyé par-dessus."""
+        start = progress_at = time.monotonic()
+        mark = (self.k, self.before_enter)
+        while not self._caught_up():
+            worker.check_cancelled()
+            self._look()
+            now = time.monotonic()
+            if (self.k, self.before_enter) != mark:
+                mark, progress_at = (self.k, self.before_enter), now
+            if self._caught_up():
+                return
+            if now - progress_at >= WAIT_IDLE_S or now - start >= WAIT_MAX_S:
+                if self.k < 0:
+                    raise _Stop("Suppr n'a pas effacé le contenu d'origine (sélection perdue ?)")
+                waited = _seconds(round(now - start, 1))
+                raise _Stop(f"ce qui a été envoyé n'est pas relu dans le champ après {waited} : suite non envoyée")
+            time.sleep(WAIT_POLL_S)
+
+    # --- Tranches ---------------------------------------------------------------------------------------------------
+    def run(self) -> Typed:
+        starved = 0
+        while True:
+            try:
+                posted = self._slice()
+                self._wait_outside()
+            except _Stop as stop_cause:
+                return self._finish(str(stop_cause))
+            except (foreground.BusyUser, MethodError) as error:
+                if not self.touched:
+                    raise
+                return self._finish(f"suite non envoyée ({error})")
+            except foreground.UserInterrupted as error:
+                self._sync_out()
+                raise foreground.UserInterrupted(f"{str(error).rstrip('.')} ; {self.out.state()}.") from None
+            if self.k >= self.out.total:
+                return self._finish()
+            starved = 0 if posted else starved + 1
+            if starved >= STARVED_SLICES:
+                limit = _seconds(round(self.slice_s - self.reserve - self.min_post, 3))
+                cause = f"la fenêtre met plus de {limit} à recevoir le clavier : tranches trop courtes pour envoyer"
+                if not self.touched:
+                    raise MethodError(f"{cause} ; rien n'a été tapé")
+                return self._finish(cause)
+
+    def _slice(self) -> bool:
+        """Une activation brève : préparation, effacement (remplacement), caractères, relecture jusqu'à l'échéance.
+        Renvoie vrai si la tranche a pu envoyer quelque chose."""
+        posted = False
+        with foreground.brief_activation(self.hwnd, self.windows) as activation:
+            started = time.monotonic()
+            self.out.slices += 1
+            target = self.prepare(self.out.slices == 1 or self.k < 0)
+            activation.check("rien de plus n'a été tapé" if self.touched else "rien n'a été tapé, l'action est annulée")
+            deadline = started + self.slice_s - self.reserve  # préparation comprise ; restitution dans la tranche
+            if self.k < 0:  # contenu d'origine sélectionné : effacé et relu vide avant tout caractère
+                post_key(target, VK_DELETE)
+                self.touched = posted = True
+                self._wait_in_slice(deadline, activation.checkpoint)
+            elif deadline - time.monotonic() >= self.min_post:
+                posted = self._post(target, deadline, activation.checkpoint)
+            work_end = time.monotonic()
+        ended = time.monotonic()
+        # Restitution plus lente que prévu : la réserve des tranches suivantes s'allonge (marge PHI), jusqu'à la moitié.
+        self.reserve = min(self.slice_s / 2, max(self.reserve, (ended - min(work_end, deadline)) * PHI))
+        self.active += ended - started
+        self.out.longest_ms = max(self.out.longest_ms, round((ended - started) * 1000))
+        return posted
+
+    def _post(self, target: int, deadline: float, check: Callable[[], None]) -> bool:
+        """Un lot de caractères, envoyé seulement si tout ce qui le précède est relu : autant que le débit mesuré
+        (envoi, traitement et publication) permet d'en relire avant l'échéance, au moins un. En Chromium, une Entrée
+        n'est envoyée qu'une fois relu tout ce qui la précède, et la suite seulement une fois la valeur changée par
+        elle : son saut de ligne arrive en fin de file, il serait sinon doublé par les caractères suivants."""
+        if not self._caught_up():
+            return False
+        text, first, begin = self.text, self.sent, time.monotonic()
+        end = min(len(text), first + max(1, int((deadline - begin) / PHI / self.cost)))
+        while self.sent < end:
+            if (self.sent - first) % CHECK_EVERY == 0:
+                worker.check_cancelled()
+                if time.monotonic() >= deadline:
+                    break
+            check()  # à chaque caractère : Julien reprend la main → premier plan rendu et arrêt sur-le-champ
+            ch = text[self.sent]
+            if self.enter_as_key and ch == "\n":
+                if not self._wait_in_slice(deadline, check):  # tout ce qui précède l'Entrée, relu d'abord
+                    break
+                self.before_enter = self.value  # valeur à jour : l'Entrée est vue quand elle change
+            _post_char(target, ch, self.enter_as_key)
+            self.sent += 1
+            self.touched = True
+            if self.enter_as_key and ch == "\n" and not self._wait_in_slice(deadline, check):
+                break  # Entrée pas encore vue à l'échéance : la suite attend
+        if self.sent == first:
+            return False
+        if self._wait_in_slice(deadline, check):
+            measured = (time.monotonic() - begin) / (self.sent - first)
+            self.cost = min(max(measured, self.cost / PHI), MAX_COST_S)  # la tranche grandit au plus de PHI à la fois
+        else:
+            self.cost = min(self.cost * PHI, MAX_COST_S)  # pas relu à temps : tranche suivante plus courte
+        return True
+
+    # --- Compte rendu -----------------------------------------------------------------------------------------------
+    def _sync_out(self) -> None:
+        self.out.confirmed = max(self.k, 0)
+        self.out.sent = self.sent
+        self.out.erased = self.clear and self.k >= 0
+        self.out.active_ms = round(self.active * 1000)
+
+    def _finish(self, cause: str = "") -> Typed:
+        if cause and not self.touched:
+            raise MethodError(f"{cause} ; rien n'a été tapé")
+        self._sync_out()
+        self.out.stopped = cause
+        return self.out
+
+
+# --- Élément de liste par son rang (homonymes) et liste déroulante ouverte (ComboLBox) ---------------------------
+# L'élément d'une liste servi par le pont MSAA n'a pas de fenêtre : UIA Invoke y ferait l'action MSAA par défaut, un
+# VRAI double-clic. On agit donc sur le contrôle qui le porte, par son rang, contrôlé par le libellé.
+COMBO_LIST_CLASSES = ("combolbox",)  # liste ouverte d'une liste déroulante : fenêtre de premier niveau à part
+CB_SHOWDROPDOWN, CB_GETDROPPEDSTATE = 0x14F, 0x157
+LB_SETSEL, LB_GETSEL, LB_SETCARETINDEX = 0x185, 0x187, 0x19E
+
+
+class COMBOBOXINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", w.w.DWORD), ("rcItem", w.RECT), ("rcButton", w.RECT), ("stateButton", w.w.DWORD),
+        ("hwndCombo", w.w.HWND), ("hwndItem", w.w.HWND), ("hwndList", w.w.HWND),
+    ]  # fmt: skip
+
+
+_GetComboBoxInfo = w._fn(w.user32, "GetComboBoxInfo", w.w.BOOL, w.w.HWND, ctypes.POINTER(COMBOBOXINFO))
+
+
+def combo_list_of(combo: int) -> int:
+    """Liste (ComboLBox) d'une liste déroulante Win32/WinForms, d'après GetComboBoxInfo (0 si illisible)."""
+    info = COMBOBOXINFO()
+    info.cbSize = ctypes.sizeof(COMBOBOXINFO)
+    if not _GetComboBoxInfo(combo, ctypes.byref(info)):
+        return 0
+    return w.handle(info.hwndList)
+
+
+def combo_owning(drop: int, tops: list[int]) -> int:
+    """Liste déroulante propriétaire d'une ComboLBox ouverte, cherchée parmi les contrôles des fenêtres `tops` (la
+    fenêtre principale et les dialogues de la cible) : rien d'autre ne relie la ComboLBox à sa liste déroulante."""
+    for top in tops:
+        for child in w.enum_children(top):
+            if _is_class(child, COMBO_CLASSES) and combo_list_of(child) == drop:
+                return child
+    return 0
+
+
+def _item_text(control: int, len_msg: int, text_msg: int, index: int) -> str | None:
+    length = w.send_message(control, len_msg, index)
+    if length is None or length > 0x7FFF:  # LB_ERR / CB_ERR (-1) relu non signé
+        return None
+    buf = ctypes.create_unicode_buffer(length + 2)
+    if w.send_message(control, text_msg, index, ctypes.addressof(buf)) is None:
+        return None
+    return buf.value
+
+
+def _checked_rank(control: int, count_msg: int, len_msg: int, text_msg: int, index: int, name: str) -> None:
+    """Le rang désigne-t-il bien l'élément vu (même libellé) ? Sinon refus, avant toute modification."""
+    count = w.send_message(control, count_msg)
+    if count is None or count > 0x7FFF or not 0 <= index < count:
+        raise MethodError("Rang hors de la liste : refaire look.")
+    label = _item_text(control, len_msg, text_msg, index)
+    if label is None or " ".join(label.split()) != " ".join(name.split()):
+        raise MethodError(f"l'élément n° {index + 1} de la liste n'est pas « {name} » : refaire look.")
+
+
+def win32_combo_select_index(control: int, index: int, name: str) -> str:
+    """Option n° index d'une liste déroulante Win32/WinForms (homonymes distingués par leur rang), contrôlée par son
+    libellé : CB_SETCURSEL relu, CBN_SELCHANGE au parent, puis la liste ouverte est refermée (CB_SHOWDROPDOWN).
+    Une fois la sélection posée, plus d'erreur : la liste refermée, une autre technique viserait un point périmé."""
+    if not _is_class(control, COMBO_CLASSES):
+        raise MethodError("Pas une liste déroulante Win32.")
+    _checked_rank(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT, index, name)
+    w.send_message(control, CB_SETCURSEL, index)
+    if w.send_message(control, CB_GETCURSEL) != index:
+        raise MethodError("La liste déroulante n'a pas pris la sélection.")
+    _notify_parent(control, CBN_SELCHANGE)
+    if w.send_message(control, CB_GETDROPPEDSTATE):
+        w.send_message(control, CB_SHOWDROPDOWN, 0)
+    if w.send_message(control, CB_GETCURSEL) != index:
+        return "sélection posée, non relue après la fermeture de la liste"
+    return "relu ✓"
+
+
+def _is_selected(control: int, index: int) -> bool:
+    state = w.send_message(control, LB_GETSEL, index)
+    return state is not None and 0 < state <= 0x7FFF
+
+
+def win32_listbox_select_index(control: int, index: int, name: str) -> str:
+    """Élément n° index d'une liste Win32/WinForms (homonymes distingués par leur rang), contrôlé par son libellé,
+    comme un clic : LB_SETCURSEL ; liste à sélection multiple : LB_SETSEL (bascule en sélection multiple simple, cet
+    élément seul en sélection étendue). Puis LBN_SELCHANGE au parent."""
+    if not _is_class(control, LISTBOX_CLASSES):
+        raise MethodError("Pas une liste Win32.")
+    _checked_rank(control, LB_GETCOUNT, LB_GETTEXTLEN, LB_GETTEXT, index, name)
+    style = w.style(control)
+    if style & LBS_MULTIPLESEL:
+        wanted = not _is_selected(control, index)
+        w.send_message(control, LB_SETSEL, int(wanted), index)
+        w.send_message(control, LB_SETCARETINDEX, index)
+        done = _is_selected(control, index) == wanted
+    elif style & LBS_EXTENDEDSEL:
+        w.send_message(control, LB_SETSEL, 0, -1)
+        w.send_message(control, LB_SETSEL, 1, index)
+        w.send_message(control, LB_SETCARETINDEX, index)
+        done = _is_selected(control, index)
+    else:
+        w.send_message(control, LB_SETCURSEL, index)
+        if w.send_message(control, LB_GETCURSEL) != index:
+            raise MethodError("La liste n'a pas pris la sélection.")
+        done = True
+    _notify_parent(control, LBN_SELCHANGE)
+    return "relu ✓" if done else "sélection posée, non relue"
