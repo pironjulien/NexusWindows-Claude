@@ -15,9 +15,9 @@
 
 ## ⚡ Why Claude Windows Computer Use?
 
-Anthropic introduced Computer Use primarily on Linux Docker containers and macOS. In enterprise engineering, developers work on Windows and cannot afford to have their physical mouse cursor hijacked, their active terminal interrupted, or their screen taken over.
+Anthropic introduced Computer Use in API beta primarily on Linux Docker containers and macOS. For developers and teams working on Windows — including Claude Desktop, Pro, and Team subscribers — no native out-of-the-box solution existed. In enterprise workflows, engineers cannot afford to have their physical mouse cursor hijacked, their active terminal interrupted, or their screen taken over.
 
-`claude-windows-computer-use` solves this with a **background-first architecture**:
+`claude-windows-computer-use` solves this with a native, **background-first architecture** via FastMCP:
 
 | Dimension | Conventional Screen-Capture Automation | **Claude Windows Computer Use (`nexus-windows`)** |
 | :--- | :--- | :--- |
