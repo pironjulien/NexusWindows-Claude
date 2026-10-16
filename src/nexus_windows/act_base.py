@@ -307,6 +307,12 @@ class ExecutorBase:
                 detail = fn()
             except NeedsForeground:
                 raise
+            except methods.ReadBackFailed as error:
+                # Transmis puis relu contraire : échec franc, rien d'autre n'est rejoué par-dessus.
+                attempts.append(f"{name} ✗ {_short(error)}")
+                return Outcome(
+                    False, f"{what} ({name} — ÉCHEC À LA RELECTURE : {_short(error)})", name, attempts, False
+                )
             except NoVisibleEffect as error:
                 attempts.append(f"{name} ✗ {_short(error)}")
                 if self.allow_foreground:

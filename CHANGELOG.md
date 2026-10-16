@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
+## [Unreleased]
+
+Drop-down list fixes measured by the cross-agent bench of 2026-10-16 (17/20 in the morning, 19/20 after).
+
+### Fixed
+- Win32/WinForms drop-down lists without an ExpandCollapse pattern: `expand`, `collapse` and `click` on the list now
+  open and close it with `CB_SHOWDROPDOWN`, read back with `CB_GETDROPPEDSTATE`; a list that does not open is `✗`;
+  `CBS_SIMPLE` is refused.
+- A choice made in an open WinForms list was lost behind a `~` (the application received an empty value): closing a
+  list with `CB_SHOWDROPDOWN FALSE` is a cancel and restores the previous selection. The list is now closed first,
+  then `CB_SETCURSEL`, then `CBN_SELCHANGE` and `CBN_SELENDOK` are sent (not posted) to the parent, then the
+  application is read back (`CB_GETCURSEL`, `CB_GETLBTEXT`); an empty or other value is `✗`, never `~`.
+- 22 s to report "no element" while a list was open: UI Automation chained from the open list to every top-level
+  window of the desktop. The tree is now read level by level along the ancestors of the open list only, its options
+  from the ComboLBox pop-up; target not found in an open list: 0.16 to 0.25 s (WinForms), 0.6 s (WPF).
+- WPF: a list left open after a choice is closed and the choice read back; an option published twice by WPF is one
+  target, not an ambiguity.
+
+### Added
+- `tests/test_fix_W.py`: 18 cases with a simulated ComboBox that cancels on close like Windows.
+- README: drop-down lists, cross-agent bench results.
+
 ## [0.7.0] - 2026-10-16
 
 ### Added

@@ -68,7 +68,14 @@ with the file name. Scripts, shortcuts and installers are refused.
 - **Native Win32**: direct messages to controls (`BN_CLICKED`, `CB_SETCURSEL`/`LB_SETCURSEL` with their notification,
   `EM_REPLACESEL`, menu `WM_COMMAND`, `TCM_SETCURFOCUS`), read back. UI Automation is avoided where it was measured to
   steal focus (button Invoke) or to fail silently (list Select).
-- **WinForms, WPF, UWP, WinUI**: UI Automation with `AutoSetFocus` disabled and bounded timeouts.
+- **Win32 and WinForms drop-down lists**: opened and closed with `CB_SHOWDROPDOWN`, read back with
+  `CB_GETDROPPEDSTATE` (`expand`, `collapse`, or `click` on the list). Choosing in an open list closes it first
+  (Windows treats that close as a cancel and would drop a choice made before it), then sends `CB_SETCURSEL`,
+  `CBN_SELCHANGE` and `CBN_SELENDOK` to the parent and reads the application back (index and label); an empty or other
+  value is `✗`. While a list is open its UI Automation tree is not walked (it chains to every top-level window of the
+  desktop): the options are read from the ComboLBox pop-up itself.
+- **WinForms, WPF, UWP, WinUI**: UI Automation with `AutoSetFocus` disabled and bounded timeouts. A WPF drop-down list
+  left open by a choice is closed and the choice read back.
 - **Chromium and Electron, without activation**: for an app already open without DevTools, multiline fields, rich
   editors, `<select>`, keys and Ctrl/Alt shortcuts go through a *simulated activation*: `WM_NCACTIVATE` and
   `WM_ACTIVATE` are sent to that window only (Chromium takes its activation state from these messages; Windows does
@@ -228,8 +235,25 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 | Same, Electron without switches, hidden | 17/18; the failure is a page that rebuilds 1,500 elements per keystroke, reported as ✗ |
 | Typing 700 characters on 6 lines, simulated activation | 0.85 to 1.1 s (Electron, Edge), 1.9 to 2 s when occluded |
 | Final render of an `act` (0.7.0 vs 0.6.1) | Win32 418 → 221 ms, Electron 341 → 205 ms (window-settle detection replaces a fixed 300 ms wait) |
+| Open drop-down list, choose in it (WinForms and WPF forms, real MCP server) | 8/8 scenarios, the application received the choice every time; `select` in an open WinForms list 113 ms (was 22 s and a failure); 0 foreground take sampled every 5 ms, cursor never moved |
 
-Offline test suite: 562 passed, 6 skipped (`test.ps1`, October 16, 2026).
+Offline test suite: 580 passed, 6 skipped (`test.ps1`, October 16, 2026).
+
+## Cross-agent bench (October 16, 2026)
+
+The same task was run by the three Windows desktop agents used on this PC (this server, the Codex layer and the
+Antigravity layer) on WinForms and WPF forms created without activation at the bottom of the z-order, while the
+user kept working: fill three fields, tick a box, open the "Formule" drop-down list, choose "Bravo" in the open
+list, validate. Proof is the result label read back in the application. Physical input was forbidden and counted.
+
+| | Morning | After fixes | Measured |
+|---|---|---|---|
+| This server (0.7.0 + drop-down fixes) | 17/20 | **19/20** | open list read back on both families; `select` in an open WinForms list 113 ms instead of 22 s; application received `Formule=Bravo;Envois=1`; 0 foreground take over 1,371 and 773 samples (20 ms), 0 cursor move, 0 physical input |
+| [codex-windows-computer-use](https://github.com/pironjulien/codex-windows-computer-use) 1.4.0 | 16/20 | **19/20** | every step verified on both families; observe + batch 1.2 to 1.4 s |
+| Antigravity layer | 18/20 | **19/20** | open WinForms list read and chosen; batch status is the worst step |
+
+What still keeps this server from 20: clicking "Validate" stays `~` without an `expect` (the application did receive
+it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 
 ## Security
 

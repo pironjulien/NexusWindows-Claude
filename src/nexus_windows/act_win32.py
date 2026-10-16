@@ -74,6 +74,25 @@ class Win32Actions(ExecutorBase):
             node = node.parent
         return True
 
+    @staticmethod
+    def _win32_combo_of(e: snapshot.Element) -> int:
+        """Liste déroulante Win32/WinForms désignée par l'élément : elle-même (sa fenêtre), ou son bouton d'ouverture
+        (élément sans fenêtre juste sous elle). 0 sinon, options de la liste comprises."""
+        node = e.node
+        if e.role == "ComboBox" and node.hwnd and methods._is_class(node.hwnd, methods.COMBO_CLASSES):
+            return node.hwnd
+        parent = node.parent
+        if (
+            e.role == "Button"
+            and not node.hwnd
+            and parent is not None
+            and parent.control_type == "ComboBox"
+            and parent.hwnd
+            and methods._is_class(parent.hwnd, methods.COMBO_CLASSES)
+        ):
+            return parent.hwnd
+        return 0
+
     def _win32_item_chain(self, e: snapshot.Element) -> list[tuple[str, Callable[[], Any]]]:
         """Élément d'une liste ou d'une liste déroulante Win32/WinForms : par le contrôle qui le porte, à son RANG
         (homonymes distingués), contrôlé par le libellé. Liste déroulante ouverte : l'élément est dans la ComboLBox,

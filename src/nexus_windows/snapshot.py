@@ -389,6 +389,7 @@ class View:
     # Lecture incomplète : un texte absent de l'arbre n'y est pas prouvé absent (ni présent ni absent).
     truncated: bool = False  # arbre coupé à max_nodes
     web_missing: bool = False  # Chromium n'a pas publié le contenu de la page
+    unreadable: bool = False  # arbre de la fenêtre principale illisible (seules ses surgissantes ont été lues)
     roots: dict[int, uia.Node] = field(default_factory=dict)  # fenêtre → racine de son arbre (nœuds non listés compris)
 
     @property
@@ -441,7 +442,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     node_count = 0
     root_framework = ""
     notes: list[str] = []
-    truncated = web_missing = False
+    truncated = web_missing = unreadable = False
     roots: dict[int, uia.Node] = {}
     popups = set(windows[1:])
     chromium = info.framework == "Chromium"
@@ -478,7 +479,10 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
                             else "."
                         )
                     )
-        except uia.UIAError:
+        except uia.UIAError as error:
+            if win == hwnd:
+                unreadable = True
+                notes.append(f"Arbre UI Automation de la fenêtre illisible ({str(error)[:120]}) : se fier à l'image")
             continue
         truncated = truncated or tree.truncated
         roots[win] = tree
@@ -505,7 +509,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     framework = info.framework if info.framework != "Win32" or not root_framework else root_framework
     return View(
         hwnd, info, windows, elements, frame, node_count=node_count, framework=framework, detail=detail, notes=notes,
-        truncated=truncated, web_missing=web_missing, roots=roots,
+        truncated=truncated, web_missing=web_missing, roots=roots, unreadable=unreadable,
     )  # fmt: skip
 
 
@@ -847,6 +851,39 @@ def _outermost(elements: list[Element]) -> list[Element]:
     return [e for e in elements if not nested(e)]
 
 
+def _without_popup_twins(view: View, elements: list[Element]) -> list[Element]:
+    """Liste déroulante WPF ouverte : chaque option est publiée deux fois, sous la liste déroulante (fenêtre
+    principale) et dans sa surgissante, avec deux identifiants mais même rôle, même nom, même place. C'est la même
+    option : la copie de la surgissante est écartée (celle de la liste déroulante permet de la refermer et de relire
+    le choix). Places qui se recouvrent exigées (pas identiques : mesuré, la surgissante glisse pendant ~0,2 s à
+    l'ouverture) ; deux options homonymes de la liste déroulante elle-même restent ambiguës."""
+    if len(elements) < 2:
+        return elements
+
+    def in_open_combo(e: Element) -> bool:
+        node = e.node.parent
+        for _ in range(4):
+            if node is None:
+                return False
+            if node.control_type == "ComboBox":
+                return node.props.get("expand") == 1
+            node = node.parent
+        return False
+
+    anchors = [e for e in elements if e.window == view.hwnd and in_open_combo(e)]
+    twins = {
+        id(e)
+        for e in elements
+        if e.window != view.hwnd
+        and e.rect is not None
+        and any(
+            a.role == e.role and a.name == e.name and a.rect is not None and a.rect.intersect(e.rect) is not None
+            for a in anchors
+        )
+    }
+    return [e for e in elements if id(e) not in twins]
+
+
 def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element, str]:
     """L'élément désigné par son nom (« Valider », « bouton:Valider », « button Valider »), ou une erreur explicite :
     jamais un choix au hasard entre homonymes.
@@ -858,10 +895,18 @@ def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element
     exact, partial = _matches(view, spec)
     group, kind = (exact, "exact") if exact else (partial, "partial")
     if not group:
+        if view.unreadable:
+            raise TargetError(
+                f"Aucun élément « {spec} » lisible : l'arbre UI Automation de la fenêtre n'a pas pu être lu (seules "
+                "ses surgissantes l'ont été). look pour voir l'image, viser par point x,y."
+            )
         raise TargetError(f"Aucun élément « {spec} » dans la fenêtre (look pour voir la liste).")
     group = sorted(group, key=lambda e: _rank(e, prefer))
     best = _rank(group[0], prefer)
-    tied = _outermost([e for e in group if _rank(e, prefer) == best])
+    outer = _outermost([e for e in group if _rank(e, prefer) == best])
+    tied = _without_popup_twins(view, outer)
+    if len(tied) < len(outer) and not any(group[0] is e for e in tied):
+        group = [tied[0], *group]  # le premier était la copie de surgissante d'une option : l'option elle-même
     if len(tied) > 1:
         listed = ", ".join(e.describe() for e in tied[:8])
         raise AmbiguousTarget(

@@ -528,6 +528,26 @@ def enum_children(hwnd: int) -> list[int]:
     return out
 
 
+CB_GETDROPPEDSTATE = 0x157
+
+
+def dropped_combos(top: int) -> set[int]:
+    """Listes déroulantes Win32/WinForms de la fenêtre dont la liste est OUVERTE (CB_GETDROPPEDSTATE).
+
+    Mesuré (WinForms, 2026-10-16) : liste ouverte, la ComboLBox est une fenêtre de premier niveau et UI Automation,
+    depuis la liste déroulante, enchaîne sur ses « frères » : toutes les fenêtres du bureau (Chrome, Claude…). L'arbre
+    de la fenêtre coûtait alors 11 à 20 s puis échouait (« aucun élément »). uia.Automation.tree n'y descend pas."""
+    out: set[int] = set()
+    for child in enum_children(top):
+        cls = class_name(child).lower()
+        if cls.startswith("windowsforms"):
+            parts = cls.split(".")
+            cls = parts[1] if len(parts) > 1 else cls
+        if cls == "combobox" and IsWindowVisible(child) and send_message(child, CB_GETDROPPEDSTATE, timeout_ms=200):
+            out.add(child)
+    return out
+
+
 def send_message(hwnd: int, msg: int, wparam: int = 0, lparam: int = 0, timeout_ms: int = 1000) -> int | None:
     """SendMessage borné dans le temps : None si la fenêtre ne répond pas (ou a disparu)."""
     result = ULONG_PTR(0)

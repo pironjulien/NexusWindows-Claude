@@ -181,8 +181,9 @@ def test_point_on_text_climbs_to_the_wanted_role(monkeypatch):
 
 @pytest.fixture
 def fake_combo(monkeypatch):
-    """Liste déroulante Win32 simulée (messages CB_*), ouverte, avec deux homonymes."""
-    state = {"items": ["Bleu", "Vert", "Bleu"], "sel": -1, "dropped": 1, "notified": []}
+    """Liste déroulante Win32 simulée (messages CB_*), ouverte, avec deux homonymes. Comme Windows (mesuré) : la
+    fermer par CB_SHOWDROPDOWN FALSE est une annulation, la sélection d'avant l'ouverture (« committed ») revient."""
+    state = {"items": ["Bleu", "Vert", "Bleu"], "sel": -1, "committed": -1, "dropped": 1, "notified": []}
 
     def send(hwnd, msg, wparam=0, lparam=0, timeout_ms=1000):
         items = state["items"]
@@ -202,20 +203,30 @@ def fake_combo(monkeypatch):
         if msg == methods.CB_GETDROPPEDSTATE:
             return state["dropped"]
         if msg == methods.CB_SHOWDROPDOWN:
+            if state["dropped"] and not wparam:
+                state["sel"] = state["committed"]  # CBN_SELENDCANCEL : sélection d'avant l'ouverture rétablie
+            if wparam and not state["dropped"]:
+                state["committed"] = state["sel"]
             state["dropped"] = wparam
             return 1
         return 0
 
+    def notify(control, code):
+        state["notified"].append(code)
+        if code == methods.CBN_SELENDOK:
+            state["committed"] = state["sel"]
+
     monkeypatch.setattr(methods.w, "send_message", send)
     monkeypatch.setattr(methods.w, "class_name", lambda h: "ComboBox")
-    monkeypatch.setattr(methods, "_notify_parent", lambda control, code: state["notified"].append(code))
+    monkeypatch.setattr(methods, "_notify_parent", notify)
+    monkeypatch.setattr(methods, "_send_notify", notify)
     return state
 
 
 def test_combo_select_by_rank_checks_label_and_closes_the_list(fake_combo):
     assert methods.win32_combo_select_index(COMBO, 2, "Bleu") == "relu ✓"
     assert fake_combo["sel"] == 2 and fake_combo["dropped"] == 0
-    assert fake_combo["notified"] == [methods.CBN_SELCHANGE]
+    assert fake_combo["notified"] == [methods.CBN_SELCHANGE, methods.CBN_SELENDOK]
     fake_combo.update(sel=-1, dropped=1, notified=[])
     with pytest.raises(methods.MethodError, match="refaire look"):
         methods.win32_combo_select_index(COMBO, 1, "Bleu")  # le rang ne désigne plus l'élément vu

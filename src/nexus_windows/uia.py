@@ -175,33 +175,92 @@ class Automation:
 
     def tree(self, hwnd: int, max_nodes: int = 4000) -> Node:
         """Arbre « vue contrôle » complet de la fenêtre, en un seul appel inter-processus. Au-delà de max_nodes,
-        l'arbre est coupé et sa racine le dit (truncated) : un élément absent n'y est alors pas prouvé absent."""
+        l'arbre est coupé et sa racine le dit (truncated) : un élément absent n'y est alors pas prouvé absent.
+
+        Liste déroulante Win32/WinForms ouverte dans la fenêtre (w.dropped_combos) : UIA enchaînerait depuis elle sur
+        toutes les fenêtres du bureau. L'arbre est alors lu niveau par niveau le long de ses seuls ancêtres (le reste
+        en un appel par branche) et la liste déroulante y reste une feuille ; sa liste ouverte (ComboLBox) est lue avec
+        sa propre fenêtre, comme toute surgissante. Jamais une fenêtre de premier plan d'un autre processus dans
+        l'arbre (fenêtres de Julien)."""
+        pruned = w.dropped_combos(hwnd)
         try:
-            root_el = self.uia.ElementFromHandleBuildCache(hwnd, self._cache)
+            root_el = self.uia.ElementFromHandleBuildCache(hwnd, self._cache_children if pruned else self._cache)
         except comtypes.COMError as error:
             raise UIAError(f"Arbre UI Automation illisible pour {hwnd} : {error}") from error
-        count = 0
-        cut = False
-
-        def build(element, depth: int, parent: Node | None) -> Node:
-            nonlocal count, cut
-            count += 1
-            node = Node(element, depth, self._props(element), parent=parent)
-            try:
-                kids = element.GetCachedChildren()
-            except comtypes.COMError, ValueError:
-                kids = None
-            if kids:  # pointeur NULL quand l'élément n'a pas d'enfant
-                for i in range(kids.Length):
-                    if count >= max_nodes:
-                        cut = True
-                        break
-                    node.children.append(build(kids.GetElement(i), depth + 1, node))
-            return node
-
-        root = build(root_el, 0, None)
-        root.truncated = cut
+        state = {"count": 0, "cut": False, "root": hwnd, "pid": 0}
+        if pruned:
+            root = self._build_pruned(root_el, 0, None, pruned, state, max_nodes)
+        else:
+            root = self._build(root_el, 0, None, state, max_nodes)
+        root.truncated = state["cut"]
         return root
+
+    @property
+    def _cache_children(self):
+        if getattr(self, "_cache_kids", None) is None:
+            self._cache_kids = self._make_cache(TreeScope_Element | TreeScope_Children)
+        return self._cache_kids
+
+    @staticmethod
+    def _foreign(props: dict[str, Any], state: dict) -> bool:
+        """Fenêtre de premier niveau d'un autre processus atteinte par la navigation UIA (jamais à lire)."""
+        h = int(props.get("hwnd") or 0)
+        if not h or h == state["root"] or w.root(h) != h:
+            return False
+        if not state["pid"]:
+            state["pid"] = w.window_pid(state["root"])
+        return w.window_pid(h) != state["pid"]
+
+    @staticmethod
+    def _cached_children(element) -> list:
+        try:
+            kids = element.GetCachedChildren()
+        except comtypes.COMError, ValueError:
+            return []
+        return [kids.GetElement(i) for i in range(kids.Length)] if kids else []  # NULL : aucun enfant
+
+    def _build(
+        self, element, depth: int, parent: Node | None, state: dict, max_nodes: int, props: dict | None = None
+    ) -> Node:
+        state["count"] += 1
+        node = Node(element, depth, self._props(element) if props is None else props, parent=parent)
+        for kid in self._cached_children(element):
+            if state["count"] >= max_nodes:
+                state["cut"] = True
+                break
+            kid_props = self._props(kid)
+            if self._foreign(kid_props, state):
+                continue
+            node.children.append(self._build(kid, depth + 1, node, state, max_nodes, kid_props))
+        return node
+
+    def _build_pruned(
+        self, element, depth: int, parent: Node | None, pruned: set[int], state: dict, max_nodes: int
+    ) -> Node:
+        state["count"] += 1
+        node = Node(element, depth, self._props(element), parent=parent)
+        for kid in self._cached_children(element):
+            if state["count"] >= max_nodes:
+                state["cut"] = True
+                break
+            props = self._props(kid)
+            h = int(props.get("hwnd") or 0)
+            if self._foreign(props, state):
+                continue
+            if h in pruned:  # liste déroulante ouverte : feuille (ses propriétés seules)
+                state["count"] += 1
+                node.children.append(Node(kid, depth + 1, props, parent=node))
+                continue
+            ancestor = bool(h) and any(w.IsChild(h, combo) for combo in pruned)
+            try:
+                fresh = kid.BuildUpdatedCache(self._cache_children if ancestor else self._cache)
+            except comtypes.COMError:
+                continue  # branche disparue entre deux lectures
+            if ancestor:
+                node.children.append(self._build_pruned(fresh, depth + 1, node, pruned, state, max_nodes))
+            else:
+                node.children.append(self._build(fresh, depth + 1, node, state, max_nodes))
+        return node
 
     def refresh(self, element) -> dict[str, Any]:
         """Propriétés actuelles d'un élément (un aller-retour)."""

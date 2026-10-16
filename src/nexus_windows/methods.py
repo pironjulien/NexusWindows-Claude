@@ -30,10 +30,16 @@ BS_RADIOBUTTON, BS_3STATE, BS_AUTO3STATE, BS_AUTORADIOBUTTON = 0x4, 0x5, 0x6, 0x
 CB_GETCOUNT, CB_GETCURSEL, CB_SETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN = 0x146, 0x147, 0x14E, 0x148, 0x149
 LB_GETCOUNT, LB_SETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_GETCURSEL = 0x18B, 0x186, 0x189, 0x18A, 0x188
 CBN_SELCHANGE, LBN_SELCHANGE = 1, 1
+CBN_SELENDOK = 9
 
 
 class MethodError(RuntimeError):
     """La technique ne s'applique pas à cette cible (essayer la suivante)."""
+
+
+class ReadBackFailed(RuntimeError):
+    """Action transmise puis relue CONTRAIRE (sélection perdue, valeur vide, liste toujours fermée) : échec franc,
+    jamais « ~ », et aucune autre technique rejouée par-dessus (ce n'est pas une MethodError)."""
 
 
 def win_class(hwnd: int) -> str:
@@ -97,6 +103,17 @@ def _notify_parent(control: int, code: int) -> None:
         raise MethodError("Contrôle sans parent.")
     ident = w.GetDlgCtrlID(control) & 0xFFFF
     post(parent, w.WM_COMMAND, (code << 16) | ident, control)
+
+
+def _send_notify(control: int, code: int) -> None:
+    """Notification au parent ENVOYÉE (traitée avant le retour, dans l'ordre, et avant toute action suivante : un
+    message posté passerait après un message envoyé ensuite, l'Invoke UIA de « Valider » par exemple). Parent qui ne
+    répond pas en 2 s : rien d'autre, la relecture décide."""
+    parent = w.handle(w.GetParent(control))
+    if not parent:
+        raise MethodError("Contrôle sans parent.")
+    ident = w.GetDlgCtrlID(control) & 0xFFFF
+    w.send_message(parent, w.WM_COMMAND, (code << 16) | ident, control, timeout_ms=2000)
 
 
 def _radio_group(control: int) -> list[int]:
@@ -191,15 +208,13 @@ LBS_MULTIPLESEL, LBS_EXTENDEDSEL = 0x0008, 0x0800
 
 
 def win32_combo_select(control: int, option: str) -> str:
+    """Option d'une liste déroulante Win32/WinForms par son libellé (lu par CB_GETLBTEXT), liste ouverte ou non."""
     if not _is_class(control, COMBO_CLASSES):
         raise MethodError("Pas une liste déroulante Win32.")
     items = _item_texts(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT)
     index, partial = match_option(items, option)
-    w.send_message(control, CB_SETCURSEL, index)
-    if w.send_message(control, CB_GETCURSEL) != index:
-        raise MethodError("La liste déroulante n'a pas pris la sélection.")
-    _notify_parent(control, CBN_SELCHANGE)
-    return " ; ".join(filter(None, ["relu ✓", _partial_note(items, index, partial)]))
+    detail = _combo_commit(control, index, items[index])
+    return " ; ".join(filter(None, [detail, _partial_note(items, index, partial)]))
 
 
 def win32_listbox_select(control: int, option: str) -> str:
@@ -902,20 +917,71 @@ def _checked_rank(control: int, count_msg: int, len_msg: int, text_msg: int, ind
 
 def win32_combo_select_index(control: int, index: int, name: str) -> str:
     """Option n° index d'une liste déroulante Win32/WinForms (homonymes distingués par leur rang), contrôlée par son
-    libellé : CB_SETCURSEL relu, CBN_SELCHANGE au parent, puis la liste ouverte est refermée (CB_SHOWDROPDOWN).
-    Une fois la sélection posée, plus d'erreur : la liste refermée, une autre technique viserait un point périmé."""
+    libellé avant toute modification, puis choisie comme par Julien (_combo_commit)."""
     if not _is_class(control, COMBO_CLASSES):
         raise MethodError("Pas une liste déroulante Win32.")
     _checked_rank(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT, index, name)
+    return _combo_commit(control, index, name)
+
+
+CBS_TYPEMASK, CBS_SIMPLE = 0x3, 0x1
+
+
+def combo_dropped(control: int) -> bool | None:
+    """Liste ouverte ? (CB_GETDROPPEDSTATE ; None si la liste déroulante ne répond pas)."""
+    state = w.send_message(control, CB_GETDROPPEDSTATE, timeout_ms=500)
+    return None if state is None else bool(state)
+
+
+def _combo_commit(control: int, index: int, name: str) -> str:
+    """Choix d'une option, liste ouverte ou fermée, dans l'ordre qui laisse la valeur à l'application.
+
+    Mesuré (WinForms DropDownList, 2026-10-16) : fermer la liste par CB_SHOWDROPDOWN FALSE est une ANNULATION
+    (CBN_SELENDCANCEL) : Windows rétablit la sélection d'avant l'ouverture, et un CB_SETCURSEL posé liste ouverte est
+    perdu (l'application lisait une option vide). Donc : liste ouverte refermée d'abord (annulation, rien n'est
+    encore choisi), puis CB_SETCURSEL, puis CBN_SELCHANGE et CBN_SELENDOK (choix validé, comme un clic sur l'option)
+    ENVOYÉS au parent, puis relecture de l'application : rang (CB_GETCURSEL) et libellé de l'option courante.
+    Relecture contraire ou valeur vide : ReadBackFailed (✗), jamais un « ~ »."""
+    if combo_dropped(control):
+        w.send_message(control, CB_SHOWDROPDOWN, 0, timeout_ms=2000)
     w.send_message(control, CB_SETCURSEL, index)
     if w.send_message(control, CB_GETCURSEL) != index:
         raise MethodError("La liste déroulante n'a pas pris la sélection.")
-    _notify_parent(control, CBN_SELCHANGE)
-    if w.send_message(control, CB_GETDROPPEDSTATE):
-        w.send_message(control, CB_SHOWDROPDOWN, 0)
-    if w.send_message(control, CB_GETCURSEL) != index:
-        return "sélection posée, non relue après la fermeture de la liste"
+    _send_notify(control, CBN_SELCHANGE)
+    _send_notify(control, CBN_SELENDOK)
+    current = w.send_message(control, CB_GETCURSEL)
+    label = _item_text(control, CB_GETLBTEXTLEN, CB_GETLBTEXT, current) if current is not None else None
+    if current != index or not label:
+        shown = f"« {label} »" if label else "vide"
+        raise ReadBackFailed(f"l'application a gardé une valeur {shown} au lieu de « {name} » (relu)")
+    if " ".join(label.split()) != " ".join(name.split()):
+        raise ReadBackFailed(f"l'application affiche « {label} » au lieu de « {name} » (relu)")
+    if combo_dropped(control):
+        raise ReadBackFailed(f"« {name} » choisi mais la liste est restée ouverte (relu)")
     return "relu ✓"
+
+
+def win32_combo_show(control: int, open_: bool) -> str:
+    """Ouvre ou ferme la liste d'une liste déroulante Win32/WinForms par CB_SHOWDROPDOWN, relu par
+    CB_GETDROPPEDSTATE : ni souris, ni clavier, ni premier plan (la liste s'affiche au-dessus, fenêtre inactive).
+    Fermer ainsi n'est jamais un choix : c'est l'annulation de Windows (Échap), la sélection d'avant reste."""
+    if not _is_class(control, COMBO_CLASSES):
+        raise MethodError("Pas une liste déroulante Win32.")
+    if w.style(control) & CBS_TYPEMASK == CBS_SIMPLE:
+        raise MethodError("liste toujours affichée (CBS_SIMPLE) : rien à déplier")
+    if open_ and not w.IsWindowEnabled(control):
+        raise MethodError("liste déroulante désactivée")
+    w.send_message(control, CB_SHOWDROPDOWN, int(open_), timeout_ms=2000)
+    deadline = time.monotonic() + 0.6
+    while True:
+        state = combo_dropped(control)
+        if state is open_:
+            return "relu ✓"
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.03)
+    now = "illisible" if state is None else "ouverte" if state else "fermée"
+    raise ReadBackFailed(f"liste toujours {now} (CB_GETDROPPEDSTATE)")
 
 
 def _is_selected(control: int, index: int) -> bool:

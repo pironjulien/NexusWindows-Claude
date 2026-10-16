@@ -39,7 +39,9 @@ from .act_base import (
 class UiaActions(ExecutorBase):
     """Actions publiques de l'exécuteur, techniques UI Automation."""
 
-    def click_element(self, e: snapshot.Element, button: str = "left", count: int = 1) -> Outcome:
+    def click_element(
+        self, e: snapshot.Element, button: str = "left", count: int = 1, close_list: bool = True
+    ) -> Outcome:
         view = self.view
         fw = framework_of(e, view)
         role = e.role
@@ -85,6 +87,12 @@ class UiaActions(ExecutorBase):
             kind = w.style(hwnd) & methods.BS_TYPEMASK
             if not winforms or kind in (methods.BS_PUSHBUTTON, methods.BS_DEFPUSHBUTTON):
                 chain.append(("BN_CLICKED", lambda: methods.win32_button_click(hwnd)))
+        combo = self._win32_combo_of(e) if fw in ("Win32", "WinForms") else 0
+        if combo:
+            # Liste déroulante Win32/WinForms ou son bouton « Ouvrir » : ouverte ou fermée par CB_SHOWDROPDOWN, relu
+            # (un clic par messages y prendrait la capture de la souris).
+            opened = bool(methods.combo_dropped(combo))
+            chain.append(("CB_SHOWDROPDOWN", lambda: methods.win32_combo_show(combo, not opened)))
         if role == "ListItem" and fw in ("Win32", "WinForms"):
             chain += self._win32_item_chain(e)
         if role == "TabItem" and fw in ("Win32", "WinForms"):
@@ -127,7 +135,35 @@ class UiaActions(ExecutorBase):
             chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e))))
         if fw not in NO_MOUSE_MESSAGES:
             chain.append(("clic par messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
-        return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e)))
+        # Option d'une liste déroulante ouverte (WPF, UWP…) : la liste reste ouverte après UIA Select ; refermée, puis
+        # le choix relu sur la liste déroulante.
+        combo_parent = (
+            self._open_combo_of(e) if close_list and role in ITEM_ROLES and fw not in ("Win32", "WinForms") else None
+        )
+        outcome = self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e)))
+        if combo_parent is not None and outcome.ok:
+            closed = self._collapse_if_open(combo_parent)
+            if self._selection_confirmed(combo_parent, e):
+                outcome.verified = True
+                outcome.line += " — relu ✓" + (", liste refermée" if closed else "")
+            else:
+                outcome.ok = False
+                outcome.line += (
+                    f" — ÉCHEC À LA RELECTURE : {combo_parent.describe()} n'affiche pas « {snapshot.clip(e.name, 40)} »"
+                )
+        return outcome
+
+    @staticmethod
+    def _open_combo_of(e: snapshot.Element) -> snapshot.Element | None:
+        """Liste déroulante OUVERTE qui contient l'option (d'après l'instantané), ou None."""
+        node = e.node.parent
+        for _ in range(4):
+            if node is None:
+                return None
+            if node.control_type == "ComboBox":
+                return snapshot.Element(0, node, 0, e.window) if node.props.get("expand") == 1 else None
+            node = node.parent
+        return None
 
     def write(self, spec: Any, text: str, replace: bool) -> Outcome:
         if spec is None or spec == "":
@@ -348,6 +384,9 @@ class UiaActions(ExecutorBase):
             return self._select_by_typing(e, option)
         opened = False
         keep_open = False
+        # Liste déroulante déjà ouverte (expand précédent, ou Julien) : refermée elle aussi une fois l'option choisie
+        # (WPF la laisse ouverte après UIA Select : surgissante au-dessus des fenêtres de Julien).
+        was_open = e.role == "ComboBox" and e.props.get("expand") == 1
         try:
             if item is None and e.props.get("has_expand"):
                 windows_before = set(self.view.windows)
@@ -370,15 +409,15 @@ class UiaActions(ExecutorBase):
                         outcome.line += " — ÉCHEC À LA RELECTURE"
                     return outcome
                 raise ActionError(f"Option « {option} » introuvable dans {e.describe()}.")
-            outcome = self.click_element(item)
+            outcome = self.click_element(item, close_list=False)  # repli et relecture faits ici
             keep_open = e.role != "ComboBox"  # arbre ou liste dépliés pour atteindre l'option : laissés tels quels
         except worker.Cancelled:
-            opened = False  # arrêt d'urgence ou appel abandonné : plus aucune action, même pas le repli
+            opened = was_open = False  # arrêt d'urgence ou appel abandonné : plus aucune action, même pas le repli
             raise
         finally:
             # Une liste déroulante ouverte reste une surgissante au-dessus des fenêtres de Julien (un clic de sa part y
             # choisirait une option) : repliée sur tout chemin, échec compris.
-            if opened and not keep_open:
+            if (opened and not keep_open) or was_open:
                 self._collapse_if_open(e)
         if self._selection_confirmed(e, item):
             outcome.verified = True
@@ -527,6 +566,14 @@ class UiaActions(ExecutorBase):
     def expand(self, spec: Any, open_: bool) -> Outcome:
         e = self.resolve_element(spec, EXPAND_ROLES, "élément dépliable")
         word = "déplié" if open_ else "replié"
+        combo = self._win32_combo_of(e)
+        if combo:
+            # Liste déroulante Win32/WinForms (WinForms n'y publie pas ExpandCollapse) : CB_SHOWDROPDOWN, relu.
+            if methods.combo_dropped(combo) is open_:
+                return Outcome(True, f"{e.describe()} déjà {word} (relu)", "aucune", verified=True)
+            return self._try(
+                [("CB_SHOWDROPDOWN", lambda: methods.win32_combo_show(combo, open_))], f"{e.describe()} {word}"
+            )
         if not e.props.get("has_expand"):
             # Jamais de repli sur Invoke : ce serait exécuter la commande de l'élément (bouton, menu feuille).
             raise ActionError(f"{e.describe()} n'est pas dépliable (pas de motif ExpandCollapse) : utiliser click.")
