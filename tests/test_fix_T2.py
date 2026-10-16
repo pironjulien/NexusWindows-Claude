@@ -34,8 +34,35 @@ def no_real_stop(tmp_path, monkeypatch):
     monkeypatch.setattr(stop.log, "event", lambda *a, **k: None)
 
 
+class VirtualClock:
+    """Horloge simulée de ces tests : time.monotonic et time.sleep ne suivent plus le temps réel.
+
+    Les bornes vérifiées ici (tranche ≤ SLICE_S, premier plan rendu à temps) portent sur les décisions de
+    type_in_slices face au Chromium simulé. En temps réel, la charge du poste s'y ajoutait : sous charge, un
+    time.sleep(0.02) dure jusqu'à 0,11 s, et l'écriture puis la libération du fichier du jeton commun (agentlock)
+    jusqu'à 0,27 s (mesuré le 2026-10-16) ; la même frappe donnait alors une tranche de 0,59 s, environ une fois sur
+    quatre. Ici le temps n'avance que par les attentes (time.sleep : elles durent exactement ce qui est demandé) et
+    d'un pas fixe à chaque lecture de l'horloge (coût du code lui-même, et jamais de boucle sans fin) : les mêmes
+    décisions donnent toujours les mêmes durées."""
+
+    TICK_S = 0.00001
+
+    def __init__(self, monkeypatch) -> None:
+        self.now = time.monotonic()
+        monkeypatch.setattr(time, "monotonic", self.monotonic)
+        monkeypatch.setattr(time, "sleep", self.sleep)
+
+    def monotonic(self) -> float:
+        self.now += self.TICK_S
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += max(0.0, seconds)
+
+
 class Chromium:
-    """Champ Chromium sans DevTools simulé (textarea, ou éditeur riche : vide, il se lit « \\n »)."""
+    """Champ Chromium sans DevTools simulé (textarea, ou éditeur riche : vide, il se lit « \\n »), sur horloge
+    simulée (VirtualClock)."""
 
     def __init__(
         self,
@@ -53,6 +80,7 @@ class Chromium:
         freeze_s: float = 0.0,
         give_back_s: float = 0.0,
     ) -> None:
+        self.time = VirtualClock(monkeypatch)
         self.desk = desk
         self.dom = value
         self.rich = rich
