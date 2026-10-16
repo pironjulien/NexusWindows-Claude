@@ -1,7 +1,7 @@
 [project]
-name = "claude-windows-computer-use"
-version = "1.0.0"
-description = "Native Windows OS Computer Use & FastMCP Server for Anthropic Claude (Opus 5.5 & Sonnet 3.5). Background UI Automation & Raw Input."
+name = "nexus-windows"
+version = "0.7.0"
+description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [
     { name = "Julien Piron", email = "contact@julienpiron.com" }
 ]
@@ -31,7 +31,7 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py314"
-# Caches hors de OneDrive (sources synchronisées) : rien de généré dans le dépôt.
+# Ruff cache kept outside the repository: nothing generated in the source tree.
 cache-dir = "~/.claude/nexus-claude/cache/ruff"
 
 [tool.ruff.lint]

@@ -1,0 +1,30 @@
+[
+ {
+  "technique": "première activation simulée (nofocus, nc)",
+  "champ": "notes",
+  "valeur": "",
+  "ok": false,
+  "input_de_confiance": false,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 585,
+  "erreur": ""
+ },
+ {
+  "technique": "deuxième activation simulée",
+  "champ": "notes",
+  "valeur": "",
+  "ok": false,
+  "input_de_confiance": false,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 584,
+  "erreur": ""
+ }
+]

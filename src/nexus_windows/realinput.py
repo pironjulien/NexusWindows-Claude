@@ -10,7 +10,7 @@ import ctypes
 import time
 from contextlib import contextmanager
 
-from . import foreground, keys, stop, worker
+from . import foreground, keys, physical, stop, worker
 from . import win32 as w
 
 
@@ -83,15 +83,102 @@ def bring_to_front(hwnd: int) -> bool:
 def put_in_front(hwnd: int) -> bool:
     """window(action="front"), autorisé par Julien : comme un emprunt, pause de Julien attendue (sinon BusyUser) et
     arrêt d'urgence contrôlé juste avant ; la cible passe devant sous suspension de la garde, et les surveillances en
-    cours (traîne d'un appel précédent comprise) adoptent ce premier plan voulu au lieu de le rendre."""
+    cours (traîne d'un appel précédent comprise) adoptent ce premier plan voulu au lieu de le rendre. Jeton commun aux
+    agents tenu le temps de la mise au premier plan."""
+    with foreground.agent_token("fenêtre mise devant"):
+        if not foreground.wait_typing_pause():
+            raise foreground.BusyUser("Julien utilise la souris ou le clavier : mise au premier plan reportée.")
+        worker.check_cancelled()
+        with foreground.suspended():
+            if not bring_to_front(hwnd):
+                return False
+            foreground.adopt_foreground()
+    return True
+
+
+def _holder() -> str:
+    """Qui tient le premier plan, pour un refus compréhensible."""
+    fg = w.foreground()
+    return foreground.system_foreground() or (
+        f"premier plan tenu par « {w.window_text(fg) or w.class_name(fg)} » ({w.process_name(w.window_pid(fg))})"
+        if fg
+        else "aucune fenêtre au premier plan"
+    )
+
+
+class Hold:
+    """Lot d'étapes avec foreground=true accordé : la cible reste au premier plan du début à la fin du lot (rendu
+    final compris), où Chromium/CEF la dessine et publie son arbre ; premier plan et curseur rendus à la fin."""
+
+    def __init__(self, hwnd: int, windows: set[int], previous: int, cursor: tuple[int, int]) -> None:
+        self.hwnd = hwnd
+        self.windows = windows
+        self.previous = previous
+        self.cursor = cursor
+        self.started = time.monotonic()
+        self.user_took_over = False
+
+    def checkpoint(self) -> None:
+        """Entre deux étapes : Julien a-t-il repris la main (touche, clic, molette) ? Alors le lot s'arrête et le
+        premier plan lui reste. Sinon, la cible est remise devant si une autre fenêtre s'est intercalée."""
+        if physical.available() and physical.since(self.started):
+            self.user_took_over = True
+            raise foreground.UserInterrupted(
+                "Julien a utilisé le clavier ou la souris pendant le lot au premier plan : lot arrêté, premier plan "
+                "laissé à Julien"
+            )
+        if w.root(w.foreground()) not in self.windows:
+            worker.check_cancelled()
+            with foreground.suspended():
+                if bring_to_front(self.hwnd):
+                    foreground.adopt_foreground()
+
+
+_HOLD: Hold | None = None
+
+
+def current_hold() -> Hold | None:
+    return _HOLD
+
+
+@contextmanager
+def held(hwnd: int, windows: set[int] | None = None):
+    """foreground=true accordé : la cible passe devant (après une pause de Julien) et y reste pendant tout le lot ;
+    les surveillances du premier plan l'adoptent au lieu de le « rendre ». À la sortie (fin, erreur, arrêt
+    d'urgence), premier plan rendu à la fenêtre de Julien (sauf s'il a repris la main lui-même) et curseur remis si
+    nous l'avons déplacé et qu'il n'a pas bougé depuis. Jeton commun aux agents tenu pendant tout le lot."""
+    with foreground.agent_token("lot au premier plan"), _held(hwnd, windows) as hold:
+        yield hold
+
+
+@contextmanager
+def _held(hwnd: int, windows: set[int] | None):
+    global _HOLD, _LAST_MOVE
     if not foreground.wait_typing_pause():
-        raise foreground.BusyUser("Julien utilise la souris ou le clavier : mise au premier plan reportée.")
+        raise foreground.BusyUser(
+            "Julien utilise la souris ou le clavier : lot au premier plan reporté, rien n'a été fait."
+        )
     worker.check_cancelled()
+    previous = w.foreground()
+    allowed = set(windows or foreground.target_windows(hwnd))
+    hold = Hold(hwnd, allowed, previous, w.cursor_pos())
+    _LAST_MOVE = None
     with foreground.suspended():
         if not bring_to_front(hwnd):
-            return False
+            raise ForegroundError(f"Windows refuse de mettre la fenêtre devant ({_holder()}) : rien n'a été fait.")
         foreground.adopt_foreground()
-    return True
+    _HOLD = hold
+    try:
+        yield hold
+    finally:
+        _HOLD = None
+        time.sleep(0.05)
+        if _LAST_MOVE is not None and w.cursor_pos() == _LAST_MOVE:
+            w.SetCursorPos(*hold.cursor)
+        if not hold.user_took_over and previous and previous not in allowed:
+            with foreground.suspended():
+                foreground.give_back(previous, exclude=allowed)
+                foreground.adopt_foreground()
 
 
 @contextmanager
@@ -100,8 +187,14 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
 
     Chaque lot d'entrées vérifie d'abord que la cible est toujours devant (et le point sur elle) ; la garde est
     suspendue lot par lot. Le curseur n'est remis en place que si nous l'avons déplacé et que Julien ne l'a pas
-    bougé depuis.
+    bougé depuis. Jeton commun aux agents tenu pendant tout l'emprunt.
     """
+    with foreground.agent_token("vraie souris ou vrai clavier"), _borrowed(hwnd, windows):
+        yield
+
+
+@contextmanager
+def _borrowed(hwnd: int, windows: set[int] | None):
     global _LAST_MOVE, _ALLOWED, _TOKEN
     if not foreground.wait_typing_pause():
         raise foreground.BusyUser("Julien utilise la souris ou le clavier : emprunt reporté, rien n'a été envoyé.")
@@ -114,7 +207,9 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
         _TOKEN = token
         try:
             if not bring_to_front(hwnd):
-                raise ForegroundError("Windows refuse de mettre la fenêtre devant : rien n'a été envoyé.")
+                raise ForegroundError(
+                    f"Windows refuse de mettre la fenêtre devant ({_holder()}) : rien n'a été envoyé."
+                )
             _ALLOWED = set(allowed)
             yield
         finally:

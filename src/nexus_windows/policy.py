@@ -4,9 +4,10 @@ Principe : rien ne doit permettre d'exécuter du code ou des commandes en contou
 Claude Code (consoles, interpréteurs, scripts), ni d'agir dans les zones de secrets ou dans d'autres agents d'IA.
 
 - REFUS ABSOLU (non surchargeable) : consoles et terminaux, invites UAC et d'identifiants, écran de verrouillage,
-  gestionnaires de mots de passe, Claude lui-même, boîte « Exécuter ».
+  gestionnaires de mots de passe, boîte « Exécuter ».
 - REFUS PAR DÉFAUT (surchargeable par Julien dans ~/.claude/nexus-claude/policy.json, clé « allow_processes ») :
-  autres agents d'IA et IDE à terminal intégré, outils d'administration (registre, consoles MMC, gestionnaire des
+  Claude lui-même (ses propres demandes d'autorisation y apparaissent), autres agents d'IA et IDE à terminal
+  intégré, outils d'administration (registre, consoles MMC, gestionnaire des
   tâches).
 - LANCEMENT : ni interpréteur, console ou hôte d'exécution système (surchargeable par chemin, clé « allow_launch ») ;
   arguments lus comme Chromium les lit (préfixes « -- », « - », « / ») ; jamais un profil de navigateur choisi par
@@ -27,11 +28,11 @@ from . import win32 as w
 
 HARD_DENY_PROCESSES = {
     "windowsterminal.exe", "openconsole.exe", "conhost.exe", "mintty.exe", "powershell_ise.exe", "consent.exe",
-    "credentialuibroker.exe", "lockapp.exe", "logonui.exe", "claude.exe", "1password.exe", "bitwarden.exe",
+    "credentialuibroker.exe", "lockapp.exe", "logonui.exe", "1password.exe", "bitwarden.exe",
     "keepass.exe", "keepassxc.exe", "dashlane.exe", "nordpass.exe", "roboform.exe", "lastpass.exe",
 }  # fmt: skip
 SOFT_DENY_PROCESSES = {
-    "antigravity.exe", "chatgpt.exe", "codex.exe", "code.exe", "code - insiders.exe", "cursor.exe", "windsurf.exe",
+    "claude.exe", "antigravity.exe", "chatgpt.exe", "codex.exe", "code.exe", "code - insiders.exe", "cursor.exe", "windsurf.exe",
     "regedit.exe", "mmc.exe", "taskmgr.exe", "devenv.exe", "idea64.exe", "pycharm64.exe", "rider64.exe",
 }  # fmt: skip
 SHELL_DENY_CLASSES = {"Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW", "NotifyIconOverflowWindow"}
@@ -86,6 +87,8 @@ CHROMIUM_DENY_SWITCHES = {
     "ppapi-plugin-launcher", "load-extension", "remote-debugging-port", "remote-debugging-pipe",
     "remote-debugging-address", "remote-allow-origins", "no-sandbox", "disable-web-security", "js-flags",
     "inspect", "inspect-brk", "inspect-port",  # Electron : inspecteur Node du processus principal
+    # Steam : port DevTools sur la session de Julien (seulement launch(app="Steam", devtools=true), avec son accord).
+    "cef-enable-debugging", "devtools-port",
 }  # fmt: skip
 # Profils d'un navigateur : jamais choisis par le modèle (ce serait celui de Julien) ; devtools=true en crée un neuf.
 PROFILE_SWITCHES = {"user-data-dir", "profile-directory"}
@@ -125,6 +128,14 @@ def _allowed_overrides() -> set[str]:
     return {str(name).lower() for name in _policy().get("allow_processes", [])}
 
 
+def _allow_shell() -> bool:
+    """Julien peut autoriser la barre des tâches, le bureau et l'Explorateur via la clé allow_shell: true ou allow_processes: ['shell']."""
+    pol = _policy()
+    return bool(
+        pol.get("allow_shell", False) or "shell" in _allowed_overrides() or "shell_traywnd" in _allowed_overrides()
+    )
+
+
 def _allowed_launch() -> set[str]:
     """Exécutables que Julien autorise malgré la règle « interpréteur » (chemins complets, clé allow_launch)."""
     return {os.path.normcase(os.path.abspath(os.path.expandvars(str(p)))) for p in _policy().get("allow_launch", [])}
@@ -134,12 +145,12 @@ def act_refusal(process: str, cls: str, title: str) -> str | None:
     """Raison du refus d'agir dans cette fenêtre, ou None si permis."""
     process = process.lower()
     if cls in HARD_DENY_CLASSES or process in HARD_DENY_PROCESSES:
-        return "console, invite de sécurité, gestionnaire de mots de passe ou Claude"
+        return "console, invite de sécurité ou gestionnaire de mots de passe"
     if cls == "#32770" and process == "explorer.exe" and title.strip().lower() in RUN_DIALOG_TITLES:
         return "boîte « Exécuter » (elle lancerait une commande)"
-    if cls in SHELL_DENY_CLASSES or process in SHELL_DENY_PROCESSES:
+    if (cls in SHELL_DENY_CLASSES or process in SHELL_DENY_PROCESSES) and not _allow_shell():
         return "barre des tâches, bureau, menu Démarrer ou Recherche (ils lancent programmes et commandes)"
-    if cls in SOFT_DENY_CLASSES and "explorer.exe" not in _allowed_overrides():
+    if cls in SOFT_DENY_CLASSES and "explorer.exe" not in _allowed_overrides() and not _allow_shell():
         return (
             "Explorateur de fichiers : un double-clic y exécute n'importe quel fichier et sa barre d'adresse des "
             f"commandes (fichiers : passer par le shell ; Julien peut l'autoriser dans {POLICY_FILE}, "
@@ -147,7 +158,7 @@ def act_refusal(process: str, cls: str, title: str) -> str | None:
         )
     if process in SOFT_DENY_PROCESSES and process not in _allowed_overrides():
         return (
-            "autre agent d'IA, IDE à terminal intégré ou outil d'administration (Julien peut l'autoriser dans "
+            "Claude, autre agent d'IA, IDE à terminal intégré ou outil d'administration (Julien peut l'autoriser dans "
             f"{POLICY_FILE}, clé allow_processes)"
         )
     return None
@@ -309,6 +320,29 @@ def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
         reason = _launch_reason(candidate, args, devtools, allowed, is_alias)
         if reason:
             raise _refuse(reason)
+
+
+# Ouverture d'un document par son association : en plus des scripts (LAUNCH_DENY_SUFFIXES), les paquets et
+# installateurs (leur « ouverture » installe), et les fichiers du shell qui lancent une commande ou un panneau.
+OPEN_DENY_SUFFIXES = {
+    ".application", ".appx", ".appxbundle", ".msix", ".msixbundle", ".appinstaller", ".settingcontent-ms",
+    ".diagcab", ".ws", ".gadget", ".sct", ".xbap", ".website", ".search-ms", ".library-ms", ".ms-settings",
+}  # fmt: skip
+
+
+def check_open_document(path: str) -> None:
+    """Dossier ou document ouvert par son association (launch avec un chemin) : jamais un script, un raccourci, un
+    installateur ni un programme (un programme passe par check_launch_exe, quel que soit son nom)."""
+    target = Path(path)
+    if target.is_dir():
+        return
+    suffix = target.suffix.lower()
+    if suffix in LAUNCH_DENY_SUFFIXES:
+        raise _refuse(f"un fichier {target.suffix} s'exécute comme un script ou lance une commande")
+    if suffix in OPEN_DENY_SUFFIXES:
+        raise _refuse(f"un fichier {target.suffix} installe un paquet ou lance une commande à l'ouverture")
+    if pe_subsystem(str(target)) is not None:
+        raise _refuse(f"{target.name} est un programme : le lancer par son chemin .exe")
 
 
 def check_launch_app_id(app_id: str, name: str, args: str = "", devtools: bool = False) -> None:

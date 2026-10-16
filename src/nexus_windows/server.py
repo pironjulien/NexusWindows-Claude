@@ -8,6 +8,7 @@ dédié (worker.Worker) ; chaque appel est journalisé (log.Call), sans le texte
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import threading
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field
 from . import (
     __version__,
     actions,
+    capture,
     cdp,
     foreground,
     freshness,
@@ -31,7 +33,9 @@ from . import (
     methods,
     physical,
     policy,
+    postcond,
     realinput,
+    routines,
     snapshot,
     stop,
     uia,
@@ -62,6 +66,20 @@ ALWAYS = {"anthropic/alwaysLoad": True}
 Show = Literal["both", "image", "elements", "text", "none"]
 
 
+class Check(BaseModel):
+    """Postcondition de champ : l'état voulu d'UN élément après l'étape (tous les champs donnés)."""
+
+    target: str | int = Field(description="élément à relire : [N] ou nom visible")
+    value: str | None = Field(None, description="valeur exacte attendue (espaces normalisés)")
+    contains: str | None = Field(None, description="texte contenu dans la valeur (sans casse)")
+    checked: bool | None = None
+    selected: bool | None = None
+    expanded: bool | None = None
+    focused: bool | None = None
+    enabled: bool | None = None
+    exists: bool | None = Field(None, description="false : l'élément doit avoir disparu")
+
+
 class Step(BaseModel):
     """Une action. `do` + les champs utiles à cette action."""
 
@@ -85,6 +103,11 @@ class Step(BaseModel):
     timeout: float | None = Field(None, description="wait / expect : secondes (5 par défaut, 30 max)")
     expect: str | None = Field(
         None, description="après l'action, attendre ce texte dans la fenêtre (confirme l'effet ou échoue)"
+    )
+    check: Check | None = Field(
+        None,
+        description="état voulu d'un élément : déjà vrai avant → étape sautée (=) ; relu vrai après → ✓ ; "
+        "faux → ✗ non atteint ; illisible → ~ inconnu",
     )
 
 
@@ -307,6 +330,37 @@ def render(
 
 
 # --- Garde-fous de cible ------------------------------------------------------------------------------------
+SETTLE_MIN_S = 0.05  # attente minimale avant le rendu final d'un act (l'application traite ce qu'elle a reçu)
+SETTLE_POLL_S = 0.05  # deux images identiques à cet intervalle : interface posée
+
+
+def _settle_print(hwnd: int) -> tuple:
+    """Empreinte légère de la fenêtre et de ses surgissantes : image réduite (PrintWindow), liste des surgissantes."""
+    try:
+        image = capture.capture_printwindow(hwnd).image.convert("L").resize((64, 64)).tobytes()
+    except capture.CaptureError:
+        image = b""
+    return image, tuple(snapshot.popups_of(hwnd))
+
+
+def settle(hwnd: int, max_s: float) -> float:
+    """Attente avant le rendu final d'un act : jusqu'à ce que l'interface soit posée (deux empreintes identiques à
+    SETTLE_POLL_S d'intervalle, après SETTLE_MIN_S), au plus max_s (settle_ms, 300 ms par défaut). Mesuré
+    (bench/speed.py) : l'attente fixe de 300 ms faisait plus de la moitié d'un act avec rendu. Renvoie l'attente faite."""
+    started = time.monotonic()
+    deadline = started + max_s
+    time.sleep(min(SETTLE_MIN_S, max_s))
+    previous = None
+    while time.monotonic() < deadline:
+        worker.check_cancelled()
+        current = _settle_print(hwnd)
+        if current == previous:
+            break
+        previous = current
+        time.sleep(max(0.0, min(SETTLE_POLL_S, deadline - time.monotonic())))
+    return time.monotonic() - started
+
+
 def _check_actionable_window(hwnd: int) -> None:
     """act refusé selon la politique (policy.py), sur les applications élevées ou figées, ou si l'intégrité est
     illisible (on ne sait alors pas si Windows laisserait passer les entrées)."""
@@ -380,10 +434,12 @@ async def look(
             "look", {"window": window, "show": show, "query": query, "region": region, "detail": detail}
         ) as call:
             hwnd = SESSION.resolve_window(window)
+            known = routines.summary(routines.app_of(hwnd)[0])
             with Watch(hwnd):
                 return render(
-                    auto, hwnd, show, query, region, detail, marks, max(10, min(max_elements, 600)), call=call
-                )
+                    auto, hwnd, show, query, region, detail, marks, max(10, min(max_elements, 600)),
+                    extra=[known] if known else None, call=call,
+                )  # fmt: skip
 
     return await _run(job, reads_only=True)
 
@@ -447,18 +503,66 @@ def _logged_step(step: Step) -> dict[str, Any]:
     return data
 
 
-def _run_steps(executor: actions.Executor, steps: list[Step], hwnd: int, call: log.Call) -> tuple[list[str], bool]:
-    """Exécute les étapes dans l'ordre ; s'arrête à la première erreur ou si la fenêtre se ferme."""
+def _check_of(step: Step) -> dict[str, Any] | None:
+    return step.check.model_dump(exclude_none=True) if step.check else None
+
+
+def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcome) -> None:
+    """Postcondition relue après l'action (lectures seules, jusqu'au délai) : ✓ vraie, ✗ non atteinte, sinon issue
+    inconnue (jamais un succès supposé)."""
+    check = _check_of(step)
+    verdict = postcond.wait(executor, check, step.timeout or 3)
+    wanted = postcond.describe(check)
+    if verdict.state is True:
+        outcome.verified = True
+        outcome.line += f" — vérifié : {wanted} ({verdict.detail})"
+    elif verdict.state is False:
+        outcome.ok = False
+        outcome.line += f" — NON ATTEINT : {wanted} (relu : {verdict.detail})"
+    else:
+        outcome.verified = outcome.verified or None
+        outcome.line += f" — postcondition illisible, issue inconnue : {wanted} ({verdict.detail})"
+
+
+def _run_steps(
+    executor: actions.Executor, steps: list[Step], hwnd: int, call: log.Call, symbols: list[str] | None = None
+) -> tuple[list[str], bool]:
+    """Exécute les étapes dans l'ordre ; s'arrête à la première erreur ou si la fenêtre se ferme. symbols : reçoit
+    l'issue de chaque étape (✓ = ~ ✗)."""
     report: list[str] = []
+    symbols = symbols if symbols is not None else []
     for index, step in enumerate(steps, 1):
         t0 = time.perf_counter()
         executor.notes.clear()
         failed = False
         try:
             worker.check_cancelled()
+            hold = realinput.current_hold()
+            if hold is not None:
+                hold.checkpoint()  # Julien a repris la main : lot arrêté ; cible repassée devant si besoin
+            check = _check_of(step)
+            if check and step.do != "wait":
+                before = postcond.evaluate(executor, check)
+                if before.state is True:  # déjà dans l'état voulu : aucune entrée (idempotent, jamais de doublon)
+                    ms = round((time.perf_counter() - t0) * 1000)
+                    report.append(
+                        f"{index}. = {step.do} non exécuté : {postcond.describe(check)} déjà vrai "
+                        f"({before.detail}) [{ms} ms]"
+                    )
+                    symbols.append("=")
+                    call.step(n=index, do=step.do, target=step.target, ok=True, already=True, ms=ms)
+                    continue
             # expect ne prouve l'effet que si le texte était ABSENT avant l'action.
             expected_before = executor.present(step.expect) if step.expect else False
-            outcome = _dispatch(executor, step)
+            try:
+                outcome = _dispatch(executor, step)
+            except actions.Unconfirmed as error:
+                # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après coup.
+                if not check:
+                    raise
+                outcome = actions.Outcome(True, f"{step.do} transmis ({_short(error)})", "messages")
+            if check and outcome.ok:
+                _apply_check(executor, step, outcome)
             if step.expect and outcome.ok:
                 try:
                     seen = executor.wait(step.expect, False, step.timeout or 3)
@@ -475,6 +579,7 @@ def _run_steps(executor: actions.Executor, steps: list[Step], hwnd: int, call: l
             ms = round((time.perf_counter() - t0) * 1000)
             notes = f" ({' ; '.join(executor.notes)})" if executor.notes else ""
             report.append(f"{index}. {outcome.symbol} {outcome.line}{notes} [{ms} ms]")
+            symbols.append(outcome.symbol)
             call.step(
                 n=index, do=step.do, target=step.target, ok=outcome.ok, verified=outcome.verified,
                 method=outcome.method, attempts=outcome.attempts, ms=ms,
@@ -485,6 +590,7 @@ def _run_steps(executor: actions.Executor, steps: list[Step], hwnd: int, call: l
             if isinstance(error, cdp.CDPError):
                 SESSION.page_failed(hwnd)
             report.append(f"{index}. ✗ {step.do} : {_short(error)} [{ms} ms]")
+            symbols.append("✗")
             call.step(n=index, do=step.do, target=step.target, ok=False, error=_short(error), ms=ms)
             failed = True
         except worker.Stopped as error:
@@ -500,6 +606,7 @@ def _run_steps(executor: actions.Executor, steps: list[Step], hwnd: int, call: l
             ms = round((time.perf_counter() - t0) * 1000)
             trace = traceback.format_exc(limit=6)
             report.append(f"{index}. ✗ {step.do} : erreur interne {type(error).__name__}: {_short(error)} [{ms} ms]")
+            symbols.append("✗")
             call.step(n=index, do=step.do, target=step.target, ok=False, error=_short(error), trace=trace, ms=ms)
             failed = True
         executor.acted = True  # l'interface a pu changer : la prochaine cible par nom relira l'instantané
@@ -514,37 +621,122 @@ def _run_steps(executor: actions.Executor, steps: list[Step], hwnd: int, call: l
     return report, False
 
 
+def _tally(symbols: list[str]) -> str:
+    labels = {"✓": "vérifiées", "=": "déjà faites", "~": "issue inconnue", "✗": "échec"}
+    counts = [f"{symbols.count(s)} {label}" for s, label in labels.items() if symbols.count(s)]
+    return f"Bilan : {', '.join(counts)}." if counts else ""
+
+
+def _filled(steps: list[Step], params: dict[str, str] | None) -> list[Step]:
+    """Étapes données avec des {{x}} (futur modèle de routine) : exécutées avec les valeurs de params ; un {{x}} sans
+    valeur est refusé avant toute action (il serait tapé tel quel)."""
+    dumped = [s.model_dump(exclude_none=True, exclude_defaults=True) for s in steps]
+    if not params and not routines.PARAM.search(json.dumps(dumped, ensure_ascii=False)):
+        return steps
+    try:
+        return [Step.model_validate(s) for s in routines.expand({"steps": dumped}, params)]
+    except routines.RoutineError as error:
+        raise actions.ActionError(str(error)) from None
+
+
+def _routine_steps(
+    app: str, fingerprint: dict[str, Any], routine: str, params: dict[str, str] | None, notes: list[str]
+) -> list[Step]:
+    entry = routines.get(app, routine)
+    steps = [Step.model_validate(s) for s in routines.expand(entry, params)]
+    notes.append(f"Routine « {routine} » ({app}, {len(steps)} étapes, enregistrée le {entry.get('saved', '?')[:10]}).")
+    if routines.changed(entry, fingerprint):
+        notes.append("Application mise à jour depuis l'enregistrement : chaque étape reste revérifiée.")
+    if entry.get("last_ok") is False:
+        notes.append("Dernier rejeu raté : routine à revoir si celui-ci échoue aussi.")
+    return steps
+
+
+def _remember(
+    app: str,
+    fingerprint: dict[str, Any],
+    title: str,
+    name: str,
+    steps: list[Step],
+    symbols: list[str],
+    failed: bool,
+) -> str:
+    """Enregistre le lot comme routine s'il est entièrement prouvé ; sinon dit pourquoi (rien n'est enregistré)."""
+    if not steps:
+        return f"Routine « {name} » oubliée ({app})." if routines.forget(app, name) else f"Aucune routine « {name} »."
+    if failed or len(symbols) != len(steps) or any(s not in ("✓", "=") for s in symbols):
+        return (
+            f"Routine « {name} » NON enregistrée : toutes les étapes doivent être vérifiées (✓) ou déjà faites (=) ; "
+            "ajouter check ou expect aux étapes à issue inconnue (~)."
+        )
+    try:
+        routines.remember(
+            app, name, [s.model_dump(exclude_none=True, exclude_defaults=True) for s in steps], fingerprint, title
+        )
+    except routines.RoutineError as error:
+        return f"Routine « {name} » NON enregistrée : {error}."
+    return f'Routine « {name} » enregistrée pour {app} ({len(steps)} étapes) : act(routine="{name}").'
+
+
 @mcp.tool(meta=ALWAYS, structured_output=False)
 async def act(
-    steps: list[Step],
+    steps: list[Step] | None = None,
     window: str | int | None = None,
     then: Show = "both",
     foreground: bool = False,
     settle_ms: int = 300,
+    remember: str | None = None,
+    routine: str | None = None,
+    params: dict[str, str] | None = None,
 ) -> list[Any]:
     """Agir dans une fenêtre en arrière-plan : une liste d'étapes exécutées dans l'ordre (arrêt à la première erreur),
-    puis l'état à jour (then : both par défaut, image, elements, none). Compte rendu : ✓ effet relu, ~ transmis
-    sans relecture (vérifier sur l'image), ✗ échec.
+    puis l'état à jour (then : both par défaut, image, elements, none). Compte rendu par étape : ✓ effet vérifié,
+    = déjà fait (rien envoyé), ~ issue inconnue (transmis sans relecture : vérifier sur l'image), ✗ échec ou non
+    atteint ; puis le bilan.
     Étapes (do) : click, double_click, right_click, type (ajoute du texte ; target omis = élément qui a le focus),
     set (remplace le texte), clear, key (keys « ctrl+s », « enter », « alt+f4 »), select (option dans une liste),
     check, uncheck, toggle, expand, collapse, scroll (direction, amount), focus, menu (path « Fichier > Ouvrir »),
     wait (text apparu, ou gone=true ; timeout), drag (target → to), hover. expect : texte attendu après l'étape.
+    check : état voulu d'un élément ({"target":"Nom","value":"Julien"} ; aussi contains, checked, selected, expanded,
+    focused, enabled, exists) : déjà vrai → étape sautée, relu après → ✓, sinon ✗ non atteint.
     target : [N] du dernier look, nom visible (« Enregistrer », « bouton:OK », « champ:Nom ») ou "x,y" image.
     Exemple : steps=[{"do":"set","target":"Nom","text":"Julien"},{"do":"click","target":"Valider"}].
-    foreground=true : autorise la vraie souris/le vrai clavier quand l'arrière-plan est impossible (glisser,
-    survol, raccourcis WPF/UWP/Chromium, Tk) ; seulement avec l'accord de Julien."""
+    Routines : remember="nom" enregistre le lot s'il est entièrement prouvé (✓/=, cibles par nom ; {{x}} = texte
+    variable) ; routine="nom" (sans steps) le rejoue, params={"x": "…"} ; remember="nom" avec steps=[] l'oublie.
+    Les routines connues sont listées par look.
+    foreground=true : fenêtre gardée devant pendant tout le lot, vraie souris/vrai clavier quand l'arrière-plan est
+    impossible ou ignoré (glisser, survol, raccourcis WPF/UWP/Chromium, Tk) ; seulement avec l'accord de Julien."""
 
     def job(auto):
         payload = {
             "window": window,
-            "steps": [_logged_step(s) for s in steps],
+            "steps": [_logged_step(s) for s in steps or []],
             "then": then,
             "foreground": foreground,
+            "remember": remember,
+            "routine": routine,
+            "params": sorted(params or {}),  # noms seulement : les valeurs peuvent être du texte saisi
         }
         with log.Call("act", payload) as call:
             worker.check_cancelled()
             hwnd = SESSION.resolve_window(window)
+            app, fingerprint = routines.app_of(hwnd)
+            title = w.window_text(hwnd)
+            if remember is not None and not steps and routine is None:
+                return [_remember(app, fingerprint, title, remember, [], [], False)]
             _check_actionable_window(hwnd)
+            routine_notes: list[str] = []
+            if routine is not None:
+                if steps:
+                    raise actions.ActionError("routine : ne pas donner steps (les étapes sont celles de la routine).")
+                try:
+                    todo = _routine_steps(app, fingerprint, routine, params, routine_notes)
+                except (routines.RoutineError, ValueError) as error:
+                    raise actions.ActionError(str(error)) from None
+            elif not steps:
+                raise actions.ActionError("steps manquant (ou routine=…).")
+            else:
+                todo = _filled(steps, params)  # {{x}} remplacés pour l'exécution ; la routine garde le modèle
             SESSION.check_account(hwnd)  # navigateur DevTools : aucun compte apparu depuis le lancement
             if w.IsIconic(hwnd):
                 snapshot.restore_behind(hwnd)
@@ -555,16 +747,35 @@ async def act(
                 auto,
                 hwnd,
                 get_view=lambda rebuild: SESSION.view(auto, hwnd, rebuild=rebuild),
-                get_page=lambda: SESSION.page(hwnd),
+                get_page=lambda title=None: SESSION.page(hwnd, title),
                 allow_foreground=foreground,
                 get_shown=lambda: SESSION.shown.get(hwnd),
                 get_frame=lambda: SESSION.frames.get(hwnd),
                 fresh=fresh,
             )
+            out: list[Any] | None = None
             with Watch(hwnd, SESSION.views[hwnd].windows) as watch:
-                report, failed = _run_steps(executor, steps, hwnd, call)
-                if then != "none" and w.IsWindow(hwnd):
-                    time.sleep(max(0, min(settle_ms, 5000)) / 1000)
+                # foreground=true accordé : la cible reste devant pendant tout le lot ET le rendu final (Chromium/CEF
+                # recouvert ne dessine ni ne publie rien), puis premier plan et curseur rendus à Julien.
+                hold = realinput.held(hwnd, executor.windows) if foreground else contextlib.nullcontext()
+                with hold:
+                    symbols: list[str] = []
+                    report, failed = _run_steps(executor, todo, hwnd, call, symbols)
+                    report = routine_notes + report + [line for line in [_tally(symbols)] if line]
+                    if routine is not None:
+                        routines.record_run(app, routine, not failed and all(s in ("✓", "=") for s in symbols))
+                    if remember is not None:
+                        saved = steps if routine is None else todo  # le modèle à trous {{x}}, pas les valeurs du jour
+                        report.append(_remember(app, fingerprint, title, remember, saved, symbols, failed))
+                    if then != "none" and w.IsWindow(hwnd):
+                        waited = settle(hwnd, max(0, min(settle_ms, 5000)) / 1000)
+                        call.note(settle_ms=round(waited * 1000))
+                    if foreground:
+                        report.append(
+                            "Fenêtre gardée au premier plan pendant le lot, puis premier plan rendu à Julien."
+                        )
+                        if w.IsWindow(hwnd):
+                            out = render(auto, hwnd, then, extra=report, call=call)
             if failed:
                 call.error = next(line for line in reversed(report) if not line.startswith("   ("))
             if watch.note():
@@ -576,6 +787,10 @@ async def act(
                         report + (["La fenêtre s'est fermée."] if report[-1:] != ["La fenêtre s'est fermée."] else [])
                     )
                 ]
+            if out is not None:
+                if watch.note() and out and isinstance(out[0], str):
+                    out[0] += "\n" + watch.note()
+                return out
             return render(auto, hwnd, then, extra=report, call=call)
 
     # Arrêt d'urgence non garanti : signalé aussi en tête d'act (résultat comme refus), pas seulement des lectures.
@@ -597,22 +812,32 @@ async def launch(
     devtools: bool = False,
     then: Show = "both",
     wait_s: float = 15.0,
+    restart: bool = False,
 ) -> list[Any]:
     """Ouvrir une application en arrière-plan (sans lui donner le premier plan) et la voir. app : nom du menu
     Démarrer (« Calculatrice », « Bloc-notes »), exécutable (« notepad.exe ») ou chemin. args : arguments.
+    app = chemin d'un DOSSIER ou d'un DOCUMENT : ouvert par son association (Explorateur, application par défaut),
+    ouverture vérifiée (dossier affiché relu, ou titre portant le nom du fichier) ; ni script, raccourci ni installateur.
     devtools=true (Chromium/Electron/Edge seulement, application pas déjà ouverte) : ouvre un port DevTools local
-    pour des clics, frappes et raccourcis plus fiables. La fenêtre devient la fenêtre courante."""
+    pour des clics, frappes et raccourcis plus fiables. La fenêtre devient la fenêtre courante.
+    Steam : toujours lancé lisible même recouvert ; devtools=true ouvre son port DevTools (127.0.0.1:8080, SA
+    session) ; déjà ouvert, restart=true le ferme puis le relance (refusé si un jeu tourne). Les deux : accord de
+    Julien."""
 
     def job(auto):
-        with log.Call("launch", {"app": app, "args": args, "devtools": devtools}) as call:
+        with log.Call("launch", {"app": app, "args": args, "devtools": devtools, "restart": restart}) as call:
             worker.check_cancelled()
             # Garde-fou d'intégrité des comptes (dans launcher.launch, puis avant chaque act) : un navigateur DevTools
             # qui porte un compte est fermé aussitôt, oublié de la session et son profil supprimé.
-            result = launcher.launch(app, args, devtools, wait_s, auto=auto, on_account_kill=SESSION.forget_profile)
+            result = launcher.launch(
+                app, args, devtools, wait_s, auto=auto, on_account_kill=SESSION.forget_profile, restart=restart
+            )
             call.note(hwnd=result.hwnd, pid=result.pid, via=result.via, port=result.port, returned=result.returned)
             notes = [f"Lancé ({result.via}), pid {result.pid}"]
             if result.port and result.hwnd:
-                if SESSION.register_devtools(w.window_pid(result.hwnd), result.port, profile=result.profile):
+                if SESSION.register_devtools(
+                    w.window_pid(result.hwnd), result.port, profile=result.profile, own_session=result.own_session
+                ):
                     notes[0] += f", DevTools 127.0.0.1:{result.port}"
                 else:
                     notes.append("DevTools ne répond pas : actions sans DevTools (UI Automation et messages)")
@@ -632,7 +857,8 @@ async def launch(
                     out[0] += "\n" + watch.note()
             return out
 
-    return await _run(job, timeout_s=max(30.0, wait_s + 30))
+    # Steam : fermeture (jusqu'à 60 s) puis démarrage (jusqu'à 90 s, mise à jour comprise).
+    return await _run(job, timeout_s=max(30.0, wait_s + 30) + (180.0 if "steam" in app.lower() else 0.0))
 
 
 @mcp.tool(structured_output=False)
@@ -668,6 +894,14 @@ async def window(
                     time.sleep(0.3)
                 return f"{label} : agrandie.{' ' + watch.note() if watch.note() else ''}"
             if action == "close":
+                tabs = launcher.explorer_tabs(hwnd) if w.class_name(hwnd) in policy.SOFT_DENY_CLASSES else []
+                if len(tabs) > 1:
+                    # Fermer la fenêtre fermerait TOUS ses onglets, dont ceux de Julien (mesuré le 15/10 : un dossier
+                    # ouvert par launch était devenu un onglet de sa fenêtre, fermée avec ses onglets).
+                    return (
+                        f"{label} porte {len(tabs)} onglets ({', '.join(snapshot.clip(t, 40) for t in tabs[:5])}) : "
+                        "fenêtre NON fermée. Fermer seulement l'onglet voulu (act : key ctrl+w sur cet onglet)."
+                    )
                 try:  # UWP/WinUI ignorent souvent WM_CLOSE sur leur cadre : WindowPattern.Close d'abord
                     auto.pattern(auto.element_from_hwnd(hwnd), "window").Close()
                 except Exception:  # noqa: BLE001 - pas de motif Window : demande classique
@@ -735,6 +969,16 @@ def _status_lines() -> list[str]:
     ]
 
 
+def _sync_routines() -> None:
+    try:
+        changes = routines.sync()
+    except OSError as error:
+        log.event("routines-miroir", {"erreur": str(error)[:200]})
+        return
+    if changes:
+        log.event("routines-miroir", {"changements": changes[:50]})
+
+
 def main() -> None:
     log.prune()
     hotkey = stop.start()  # un échec (raccourci déjà pris) est journalisé par stop et annoncé en tête de look
@@ -743,6 +987,8 @@ def main() -> None:
     log.event("start", {**started, "hotkey": hotkey, "raw_input": raw_input})
     # Profils DevTools jetables des sessions précédentes (navigateurs fermés) : supprimés, jamais réutilisés.
     threading.Thread(target=launcher.prune_profiles, name="nexus-prune-profiles", daemon=True).start()
+    # Routines des autres PC de Julien (miroir NexusClaude/routines) : fusionnées par date, sans bloquer le démarrage.
+    threading.Thread(target=_sync_routines, name="nexus-sync-routines", daemon=True).start()
     # Liste du menu Démarrer préchargée (PowerShell, ~1 s) pour que le premier launch soit rapide.
     threading.Thread(target=launcher.start_apps, name="nexus-start-apps", daemon=True).start()
     mcp.run("stdio")

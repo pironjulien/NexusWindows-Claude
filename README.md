@@ -1,156 +1,277 @@
-# Claude Windows Computer Use — Background-First OS Automation & FastMCP 🖥️🤖⚡
+# claude-windows-computer-use
 
-[![Anthropic Claude](https://img.shields.io/badge/Anthropic-Claude%20(Opus%205.5%20%2F%20Sonnet%203.5)-D97706?logo=anthropic&logoColor=white)](https://anthropic.com)
-[![Model Context Protocol](https://img.shields.io/badge/MCP-FastMCP%20Server-FF6F00?logo=anthropic&logoColor=white)](https://modelcontextprotocol.io/)
-[![Windows 11 Native](https://img.shields.io/badge/Windows-10%20%2F%2011%20Native-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Background Safe](https://img.shields.io/badge/Safety-Zero%20Focus%20Hijacking-2ea44f)](https://github.com/pironjulien/claude-windows-computer-use)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Author](https://img.shields.io/badge/Author-Julien%20Piron-10a37f)](https://julienpiron.com)
+An MCP server (`nexus-windows`) that lets Claude see and operate Windows desktop applications **in the background**:
+the user keeps their mouse, keyboard and foreground window while Claude reads a window and acts on it.
 
-> **High-performance, background-first Windows OS Computer Use and FastMCP server engineered specifically for Anthropic Claude Code and Claude Desktop.**
->
-> 🚀 **Operate Windows desktop applications silently in the background while keeping your physical mouse, keyboard, and foreground window completely undisturbed.**
+Version 0.7.0 · Windows 10/11 · Python 3.14 · MIT licence
 
----
+## Why
 
-## ⚡ Why Claude Windows Computer Use?
+Screenshot-and-click computer use moves the real cursor and brings windows to the front, so the person at the PC has
+to stop working while the agent acts. Most Windows applications can be driven without that: native controls accept
+window messages, modern frameworks expose UI Automation, and Chromium can be reached through its accessibility tree.
+This server picks, per UI family, a technique that was **measured** not to steal focus, reads the effect back, and
+only falls back to the real mouse or keyboard when the user explicitly allows it.
 
-Anthropic introduced Computer Use in API beta primarily on Linux Docker containers and macOS. For developers and teams working on Windows — including Claude Desktop, Pro, and Team subscribers — no native out-of-the-box solution existed. In enterprise workflows, engineers cannot afford to have their physical mouse cursor hijacked, their active terminal interrupted, or their screen taken over.
+## What it does
 
-`claude-windows-computer-use` solves this with a native, **background-first architecture** via FastMCP:
+### Tools
 
-| Dimension | Conventional Screen-Capture Automation | **Claude Windows Computer Use (`nexus-windows`)** |
-| :--- | :--- | :--- |
-| **Execution Mode** | Forced foreground window takeover | **100% Background-First** (Operates occluded & covered windows) |
-| **Mouse Interaction** | Physical cursor hijacked across screen | **Zero Cursor Movement** (Direct Win32 & UI Automation COM invocation) |
-| **Keyboard Interaction** | Blind keystroke injection | **Direct Buffer Setting** (`EM_REPLACESEL`, `ValuePattern`) without focus theft |
-| **User Interference** | Fights user input and crashes | **Raw Input Yield** (Restores user focus in ~10 ms upon any physical key/mouse stroke) |
-| **Clipboard Safety** | Uses and clobbers system clipboard | **Zero Clipboard Dependency** (Never touches Windows clipboard) |
-| **Safety & Redlines** | Unrestricted access to system | **Strict Policy Guard (`policy.py`)** + Global Emergency Stop (`Ctrl+Alt+Shift+Esc`) |
-| **Protocol** | Generic screenshot guessing | **Native Model Context Protocol (FastMCP)** with atomic batch actions (`act`) |
+| Tool | Purpose |
+|---|---|
+| `windows(filter)` | Application windows, front to back: hwnd, title, process, UI family, size |
+| `look(window, show, query, region, detail, marks)` | Numbered `[N]` elements (role, name, value, state, position) plus an image, without bringing the window forward |
+| `act(steps, window, then, foreground, remember, routine, params)` | Several steps in one call, each read back, then the updated state |
+| `launch(app, args, devtools, restart)` | Start an application (Start menu name, Store app, executable), a folder or a document without giving it focus; the opening is verified |
+| `window(action, ...)` | Restore behind, minimize, maximize, close, move, resize |
+| `logs(count, errors_only)` | Debug log: techniques tried, durations, errors, server state |
 
----
+Step actions: `click`, `double_click`, `right_click`, `type`, `set`, `clear`, `key`, `select`, `check`, `uncheck`,
+`toggle`, `expand`, `collapse`, `scroll`, `focus`, `menu`, `wait`, `drag`, `hover`. A target is an `[N]` from the last
+`look`, a visible name (`"OK"`), a role-qualified name (`"button:OK"`, `"edit:Name"`, `"checkbox:Subscribe"`) or an
+`x,y` point in the last image.
 
-## 🏛️ Empirical Architecture: 6 Windows Frameworks Measured
+### Four outcomes per step
 
-Benchmarked across 6 major Windows UI technologies (see [`bench/RESULTS.md`](bench/RESULTS.md)):
+Each step is reported as one of:
+
+- `✓` the effect was read back (value, state, window, image);
+- `=` the state requested by the step's `check` was already true, so nothing was sent;
+- `~` the input was sent but its effect could not be read (never counted as a success);
+- `✗` failure, refusal, or postcondition not met; the batch stops there.
+
+A batch ends with a tally of the four counts.
+
+### Postconditions (`check`)
+
+A step may carry `check`: one element and the state it must reach (`value`, `contains`, `checked`, `selected`,
+`expanded`, `focused`, `enabled`, `exists`). Already true before the step: the step is skipped (`=`). True after: `✓`.
+False after: `✗` and the batch stops. A state the element does not publish stays unknown, never false.
+
+### Routines
+
+`act(remember="name")` saves a batch only if every step ended `✓` or `=` and every target is a visible name (never an
+`[N]` or a point). `{{x}}` marks variable text, filled at replay with `params`. `act(routine="name")` finds each
+target again by name and re-verifies every step; an application update is reported and a failed replay marks the
+routine for review. Routines are stored per executable under `%USERPROFILE%\.claude\nexus-claude\routines`. An
+optional mirror folder (`NEXUS_ROUTINES_MIRROR`) can share definitions between PCs; typed text is never mirrored in
+clear (a routine whose text is not a `{{x}}` template stays local).
+
+### Verified opening of paths
+
+`launch(app=<folder or document>)` opens through the file association (ShellExecuteEx, no activation requested), then
+checks what actually opened: the folder shown in File Explorer (read through Shell.Application) or a window titled
+with the file name. Scripts, shortcuts and installers are refused.
+
+### Per UI family
+
+- **Native Win32**: direct messages to controls (`BN_CLICKED`, `CB_SETCURSEL`/`LB_SETCURSEL` with their notification,
+  `EM_REPLACESEL`, menu `WM_COMMAND`, `TCM_SETCURFOCUS`), read back. UI Automation is avoided where it was measured to
+  steal focus (button Invoke) or to fail silently (list Select).
+- **WinForms, WPF, UWP, WinUI**: UI Automation with `AutoSetFocus` disabled and bounded timeouts.
+- **Chromium and Electron, without activation**: for an app already open without DevTools, multiline fields, rich
+  editors, `<select>`, keys and Ctrl/Alt shortcuts go through a *simulated activation*: `WM_NCACTIVATE` and
+  `WM_ACTIVATE` are sent to that window only (Chromium takes its activation state from these messages; Windows does
+  not change the foreground), DOM focus is set with MSAA `accSelect(SELFLAG_TAKEFOCUS)` and read back, characters go
+  as `WM_CHAR`, and the deactivation is *posted* so it is processed after them. The page receives trusted `keydown`
+  and `input` events. One caveat was measured: an app launched a moment ago may use its launch-time foreground right
+  once (about 10 ms, handed back by the guard), so the first simulated activation per process is treated like a brief
+  activation. Apps started with `launch(devtools=true)` are driven through the DevTools protocol instead.
+- **Steam (CEF in an SDL frame)**: recognised as Chromium; `launch(app="Steam")` adds Steam's own
+  `-cef-disable-occlusion -cef-force-accessibility` switches so the UI stays readable while covered.
+- **Tk**: no UI Automation and posted input has no effect; refused unless real input is allowed.
+
+### Capture
+
+`PrintWindow` (10 to 26 ms, covered windows included), Windows.Graphics.Capture only as a fallback. Images are capped
+at 1568 px and 1.15 MP (2000 px and 3.75 MP with `detail="high"`) so that Claude models do not downscale them, which
+keeps coordinates exact. Coordinates are bound to the window: followed if it moves, refused if it was resized.
+
+### Real mouse and keyboard
+
+Only with `act(foreground=true)`, which the user must approve. The window then stays in front for the whole batch;
+cursor and foreground are handed back at the end; any physical input from the user during the batch stops it.
+
+## Working alongside other agents
+
+The server cooperates with other desktop agents on the same PC (it is used next to a Codex layer,
+[codex-windows-computer-use](https://github.com/pironjulien/codex-windows-computer-use), and an Antigravity layer)
+through two small file-based protocols. Any agent can implement them.
+
+**Foreground token** (`%USERPROFILE%\.nexus\foreground.lock`): taken only while really holding the mouse or the
+foreground (real input, brief activation, window put in front), never for background actions. Holding it means an
+exclusive `LockFileEx` on 1 byte at offset 2^32, opened with read, write and delete sharing; Windows releases it when
+the handle closes, including when the process dies, so there is no stale token. The holder writes
+`{"owner", "pid", "since", "purpose"}` at the start of the file for diagnostics only. Waiters wait at most a few
+seconds (8 s here), then do nothing and say who holds it. A foreground guard that sees another agent holding the
+token follows that agent's window instead of taking the foreground back.
+
+**Emergency stop** (Ctrl+Alt+Shift+Esc, files in `%USERPROFILE%\.nexus\`): every agent tries
+`RegisterHotKey(MOD_NOREPEAT)`; one gets it, the others retry every 3 s. The holder writes a heartbeat to
+`stop.owner` every 3 s. On a press it rewrites `stop` with `{"by", "pid", "at", "hold_s": 120, "nonce"}`. Every agent
+watches `stop` at least every 0.2 s and before each action: a new version younger than 120 s blocks all desktop
+actions for the remaining time (reads stay allowed). The stop is latched in memory on a monotonic clock: deleting the
+file or changing the clock does not lift it, a new press re-arms it.
+
+## Architecture
 
 ```mermaid
-flowchart TD
-    Claude["Anthropic Claude<br/>Claude Code / Claude Desktop"] -->|"Model Context Protocol (FastMCP)"| MCPServer["nexus-windows Server<br/>FastMCP Runtime"]
-    
-    subgraph Engine ["Background Execution Engine"]
-        Router{"UI Framework Detection"}
-        
-        Router -->|"Win32 Native"| Win32["Direct Win32 Message Dispatch<br/>BN_CLICKED, CB_SETCURSEL, EM_REPLACESEL"]
-        Router -->|"WinForms / WPF / WinUI"| UIA["COM UI Automation Patterns<br/>TogglePattern, ValuePattern, InvokePattern"]
-        Router -->|"Chromium / Electron"| Chromium["Render Accessibility & DevTools Bridge<br/>Zero Occlusion Calculation"]
-        
-        Capture["Offscreen GDI & PrintWindow<br/>PW_RENDERFULLCONTENT"]
-        RawInput["Hardware Raw Input Watcher<br/>Yields in ~10ms on user activity"]
-        Policy["Strict Policy Engine<br/>Protects passwords, UAC, consoles, explorer"]
-    end
-    
-    MCPServer --> Engine
-    Win32 --> Target["Target Application Window<br/>Background / Occluded"]
-    UIA --> Target
-    Chromium --> Target
-    
-    style Engine fill:#1e1e2e,stroke:#d97706,stroke-width:2px
-    style Target fill:#11111b,stroke:#2ea44f,stroke-width:2px
+flowchart LR
+    Claude["Claude Code or Claude Desktop"] -->|"MCP stdio"| Server["server.py MCP tools"]
+    Server --> Worker["COM worker thread with hard timeout"]
+    Worker --> Snapshot["snapshot and capture"]
+    Worker --> Actions["actions per UI family"]
+    Actions --> Win32["Win32 messages"]
+    Actions --> UIA["UI Automation"]
+    Actions --> Chromium["Chromium simulated activation and DevTools"]
+    Actions --> Real["real input only with foreground true"]
+    Server --> Safety["policy, emergency stop, foreground guard"]
+    Safety --> Shared["shared files in USERPROFILE nexus"]
+    Real --> Shared
 ```
 
-### The Core Pillars
+```
+src/nexus_windows/
+  server.py        MCP tools, dedicated COM thread, per-call log
+  actions.py       executor facade, assembled from the act_*.py modules
+  act_base.py      targets read back live, technique chains, outcomes, shared refusals
+  act_win32.py     Win32 messages
+  act_uia.py       UI Automation (WinForms, WPF, UWP/WinUI) and dispatch per family
+  act_chromium.py  Chromium/Electron/CEF: verified click, DevTools, simulated activation, <select>
+  act_pointer.py   points, message clicks, scrolling, drag, hover
+  act_wait.py      text presence and waiting
+  snapshot.py      window + popups, [N] elements, image, coordinates
+  uia.py           UI Automation with a single cross-process cache request
+  methods.py       Win32 message techniques
+  cdp.py           minimal Chrome DevTools Protocol client
+  capture.py       PrintWindow / Windows.Graphics.Capture
+  foreground.py    foreground monitoring and restoration, brief activation
+  agentlock.py     shared foreground token
+  postcond.py      step postconditions (check)
+  routines.py      verified routines per application
+  physical.py      the user's physical input (Raw Input, no hook), told apart from injected input
+  launch.py        background launch, DevTools, throwaway browser profiles
+  steam.py         Steam switches, clean restart, DevTools port
+  realinput.py     real mouse/keyboard (SendInput), only when authorised
+  policy.py        where to act and what to launch
+  stop.py          shared emergency stop
+  freshness.py     detects a server whose code changed on disk
+  worker.py        COM thread with a hard timeout
+  log.py           JSONL log, 14 days
+lab/     test applications (Win32, WinForms, WPF, Tk, a web page for Electron/Edge)
+bench/   technique benchmarks and raw results
+tests/   unit tests (pytest) and end-to-end tests (pytest -m live)
+```
 
-1. **Native Win32 Direct Messaging**:
-   - Buttons, checkboxes, dropdowns, and tabs receive direct messages (`BN_CLICKED`, `CB_SETCURSEL`, `TCM_SETCURFOCUS`). UI Automation is bypassed where it would otherwise steal focus.
-2. **WinForms, WPF, UWP & WinUI 3**:
-   - UI Automation patterns (`AutoSetFocus` explicitly disabled) with deterministic timeouts.
-3. **Chromium & Electron Applications**:
-   - Headless DevTools execution and forced accessibility rendering (`--disable-features=CalculateNativeWinOcclusion --force-renderer-accessibility`), allowing background operation without visual rendering degradation.
-4. **Offscreen Capture Guard**:
-   - Direct `PrintWindow` capture (10–25 ms) strictly calibrated for Claude multimodal token budgets ($\le 1568$ px and $1.15$ Mpx) so coordinates remain 1:1 pixel-accurate without downsampling.
-5. **Physical Raw Input Safety**:
-   - Monitors physical keyboard and mouse input without hooks. If the user touches a key or moves the mouse during an action, Claude immediately halts and yields the foreground.
+## Installation
 
----
+Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
 
-## 🛡️ Enterprise Safety & Security
-
-- 🛑 **Global Hardware Kill Switch (`Ctrl + Alt + Shift + Esc`)**:
-  - Immediately aborts any ongoing action at the next checkpoint. Blocks all actions for 2 minutes across all active sessions.
-- 🔒 **Zero-Trust Policy (`policy.py`)**:
-  - Automatically denies interaction with password managers, UAC credential dialogs, Windows Terminal / PowerShell consoles, Claude interfaces, the Start Menu, and Taskbar.
-  - Password inputs are strictly blocked; entered text is never logged or mirrored.
-- 📋 **Zero Clipboard Pollution**:
-  - Does not read, overwrite, or touch the user's system clipboard.
-
----
-
-## 🛠️ MCP Tool Reference
-
-| Tool | Parameters | Description |
-| :--- | :--- | :--- |
-| `windows` | `filter: str = ""` | Enumerates application windows from front to back with HWND, title, process name, and UI framework family. |
-| `look` | `window: int, show: bool, marks: bool...` | Extracts interactive controls with Set-of-Marks `[N]` badges and an offscreen screenshot without foreground theft. |
-| `act` | `steps: list, window: int, foreground: bool` | Executes multiple actions atomically in a single turn with live readback verification. |
-| `launch` | `app: str, args: list, devtools: bool` | Launches desktop apps (Start Menu, Store, executable) safely in the background. |
-| `window` | `action: str, window: int...` | Manages window geometry (restore, minimize, maximize, close, move, resize). |
-| `logs` | `count: int, errors_only: bool` | Returns diagnostic logs (techniques attempted, latencies, errors, server state). |
-
----
-
-## 🚀 Quickstart & Setup
-
-### 1. Installation
-
-```bash
+```powershell
 git clone https://github.com/pironjulien/claude-windows-computer-use.git
 cd claude-windows-computer-use
-uv sync
+$env:UV_PROJECT_ENVIRONMENT = "$env:LOCALAPPDATA\claude-windows-computer-use\venv"   # optional: venv outside the clone
+uv sync --frozen
 ```
 
-*Or install via pip:*
-```bash
-pip install -e .
+Register it with Claude Code (user scope):
+
+```powershell
+claude mcp add --scope user --transport stdio `
+  -e "UV_PROJECT_ENVIRONMENT=$env:LOCALAPPDATA\claude-windows-computer-use\venv" -e PYTHONUTF8=1 `
+  nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
 ```
 
-### 2. Add to Claude Code
-
-```bash
-claude mcp add nexus-windows -- python -m nexus_windows.server
-```
-
-### 3. Add to Claude Desktop
-
-Add to `%APPDATA%\Claude\claude_desktop_config.json`:
+For Claude Desktop, add the same command to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "nexus-windows": {
-      "command": "python",
-      "args": [
-        "-m",
-        "nexus_windows.server"
-      ],
-      "cwd": "C:/Dev/claude-windows-computer-use"
+      "command": "uv",
+      "args": ["run", "--project", "C:/path/to/claude-windows-computer-use", "--frozen", "python", "-m", "nexus_windows"],
+      "env": { "PYTHONUTF8": "1" }
     }
   }
 }
 ```
 
-### 4. Run the Test Suite
+Local state (logs, routines, optional policy) lives in `%USERPROFILE%\.claude\nexus-claude\`; set
+`NEXUS_WINDOWS_HOME` to use another folder.
 
-```bash
-uv run pytest tests/test_contract.py -v
+## Usage
+
+Typical flow: `look(window="Notepad")`, then one `act` with all the steps, then read the per-step report.
+
+```text
+act(window="Settings form", steps=[
+  {"do": "set",   "target": "edit:Name", "text": "Ada",
+   "check": {"target": "Name", "value": "Ada"}},
+  {"do": "check", "target": "Subscribe"},
+  {"do": "click", "target": "button:Save", "expect": "Saved"}
+], remember="save-form")
 ```
-*(64 contract verification tests covering framework dispatch, raw input yields, emergency stop, and policy redlines).*
 
----
+Later: `act(window="Settings form", routine="save-form")`.
 
-## 👨‍💻 Author & License
+## Measurements
 
-Architected with symbiotic precision by **Julien Piron** ([julienpiron.com](https://julienpiron.com) • [julienpiron.fr](https://julienpiron.fr) • X: [@julienpironfr](https://x.com/julienpironfr)).
+All figures come from [`bench/RESULTS.md`](bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
+PC, October 2026; the notes in `RESULTS.md` are in French).
 
-Published under the **MIT License**.
+| What | Result |
+|---|---|
+| Capture, PrintWindow | 10 to 26 ms, covered windows included |
+| Real MCP server, 73 actions on the lab apps (0.4.0 to 0.5.0) | 69 succeeded, 5 explicit refusals, 0 false success, 0 cursor move, clipboard never touched; median 78 ms, p90 321 ms |
+| 2,000 characters with 20 line breaks | Win32 38 ms, WinForms 66 ms, WPF 141 ms, Electron/Edge with DevTools 82 to 108 ms |
+| Chromium simulated activation, scenario of 18 steps (0.7.0) | Electron 18/18, 1 foreground take of 9 ms (launch right, first time); Edge 18/18, 0 foreground take |
+| Same, Electron without switches, hidden | 17/18; the failure is a page that rebuilds 1,500 elements per keystroke, reported as ✗ |
+| Typing 700 characters on 6 lines, simulated activation | 0.85 to 1.1 s (Electron, Edge), 1.9 to 2 s when occluded |
+| Final render of an `act` (0.7.0 vs 0.6.1) | Win32 418 → 221 ms, Electron 341 → 205 ms (window-settle detection replaces a fixed 300 ms wait) |
+
+Offline test suite: 562 passed, 6 skipped (`test.ps1`, October 16, 2026).
+
+## Security
+
+- **Emergency stop**: Ctrl+Alt+Shift+Esc interrupts the running action at its next checkpoint (typing included) and
+  refuses every new action for 2 minutes, across conversations and for the other agents (protocol above).
+- **Policy** (`policy.py`): no action ever in consoles, UAC and credential prompts, password managers, the Run dialog,
+  the taskbar, the desktop, Start or Search; no typing in an address bar; no context menu in a file dialog's list.
+  The Claude app, File Explorer, other AI agents, IDEs with an integrated terminal and administration tools are
+  refused by default and can be allowed in `%USERPROFILE%\.claude\nexus-claude\policy.json`
+  (`allow_processes`, `allow_shell`). `launch` refuses consoles, interpreters, script hosts, shortcuts and Chromium or
+  Electron switches that run code. Password fields are refused; typed text is never logged.
+- **Accounts**: a browser started with `devtools=true` gets a throwaway profile without account or sync, checked
+  after launch and deleted afterwards.
+- **Screen content is data**: every `look` reminds the model that on-screen text is not an instruction.
+- **Stale server**: if its code changed on disk, a running server refuses `act`, `launch` and `window` until it is
+  restarted.
+- **Timeouts**: an abandoned call is cancelled at its next checkpoint instead of finishing later.
+- **Clipboard**: never used.
+
+## Limits
+
+- Tool descriptions, step reports, refusal messages and code comments are in French; the API itself (tool names,
+  parameters, step actions) is in English.
+- Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
+  been checked.
+- Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
+  approval and the foreground.
+- A Store app that Windows does not render while launched without activation can only be shown by taking the
+  foreground; this is reported.
+- In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.
+- An effect with nothing readable (a file written by a button, for example) stays `~`; add a `check` that observes it.
+- The end-to-end suite (`pytest -m live`) drives real windows and refuses to start if the PC was used less than
+  2 minutes ago.
+
+## Development
+
+```powershell
+pwsh -NoProfile -File test.ps1         # unit tests, ruff check and format; venv and caches outside the clone
+pwsh -NoProfile -File test.ps1 -Full   # also the end-to-end tests on the lab windows
+uv run python bench/bench.py           # technique benchmark (when nobody is using the PC)
+```
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Julien Piron.

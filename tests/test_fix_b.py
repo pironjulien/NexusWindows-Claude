@@ -671,16 +671,19 @@ def _lab():
     [
         (True, 200.0, 30.0, 30.0, False),  # entrée physique de Julien il y a 30 s
         (True, 200.0, float("inf"), 2.0, True),  # rien de physique en 200 s ; entrée injectée d'un autre outil
-        (True, 5.0, float("inf"), 2.0, False),  # écoute trop courte pour en juger : GetLastInputInfo, prudent
+        (True, 5.0, float("inf"), 2.0, True),  # écoute trop courte : on écoute jusqu'à 120 s, rien de physique
+        (True, 5.0, 1.0, 2.0, False),  # entrée physique vue pendant l'écoute : refus aussitôt
         (False, 0.0, float("inf"), 130.0, True),
         (False, 0.0, float("inf"), 60.0, False),
     ],
 )
 def test_lab_requires_julien_away(monkeypatch, raw_input, listening, physical_idle, system_idle, away):
     apps = _lab()
+    elapsed = [0.0]  # horloge simulée : l'attente de l'écoute avance sans dormir
+    monkeypatch.setattr(apps.time, "sleep", lambda s: elapsed.__setitem__(0, elapsed[0] + s))
     monkeypatch.setattr(physical, "start", lambda timeout_s=2.0: raw_input)
     monkeypatch.setattr(physical, "available", lambda: raw_input)
-    monkeypatch.setattr(physical, "listening_s", lambda: listening)
+    monkeypatch.setattr(physical, "listening_s", lambda: listening + elapsed[0] if raw_input else 0.0)
     monkeypatch.setattr(physical, "idle_s", lambda: physical_idle)
     monkeypatch.setattr(foreground.w, "GetTickCount", lambda: 1_000_000)
     monkeypatch.setattr(foreground.w, "last_input_tick", lambda: 1_000_000 - int(system_idle * 1000))

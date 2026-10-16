@@ -1,18 +1,20 @@
 """Techniques d'entrée en arrière-plan, une par fonction (le choix entre elles est fait ailleurs).
 
-Aucune de ces fonctions ne touche la vraie souris, le vrai clavier ni le premier plan, sauf type_in_slices, qui
-enchaîne des activations brèves contrôlées (foreground.brief_activation) pour les applications qui ne lisent le
-clavier que fenêtre active (Chromium sans DevTools).
+Aucune de ces fonctions ne touche la vraie souris, le vrai clavier ni le premier plan, sauf type_in_slices en mode
+d'activation brève (foreground.brief_activation), dernier recours pour les applications qui ne lisent le clavier que
+fenêtre active. Chromium sans DevTools passe d'abord par l'activation SIMULÉE (simulated_activation) : messages
+d'activation envoyés à sa seule fenêtre, sans que Windows change le premier plan.
 """
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
-from . import foreground, worker
+from . import foreground, physical, worker
 from . import win32 as w
 
 BUTTON_CLASSES = ("button",)
@@ -342,7 +344,8 @@ class fake_modifiers:
     cible (jamais à celui de Julien), on y pose l'état voulu, puis on restaure et on se détache.
     """
 
-    def __init__(self, target: int, vks: list[int]) -> None:
+    def __init__(self, target: int, vks: list[int], hold_s: float = 0.15) -> None:
+        self.hold_s = hold_s  # état tenu après les touches postées, le temps que la cible les traite
         self.thread = w.window_thread(target)
         self.own = w.GetCurrentThreadId()
         self.vks = vks
@@ -365,14 +368,16 @@ class fake_modifiers:
 
     def __exit__(self, *exc) -> None:
         if self.attached:
-            time.sleep(0.15)  # laisser la cible traiter les messages pendant que l'état est posé
+            time.sleep(self.hold_s)  # laisser la cible traiter les messages pendant que l'état est posé
             w.SetKeyboardState(ctypes.byref(self.saved))
             w.AttachThreadInput(self.own, self.thread, False)
 
 
-def post_combo(target: int, vks: list[int], modifiers: list[int]) -> None:
-    """Raccourci par messages : modificateurs simulés le temps du traitement, touches postées."""
-    with fake_modifiers(target, modifiers):
+def post_combo(target: int, vks: list[int], modifiers: list[int], hold_s: float = 0.15) -> None:
+    """Raccourci par messages : modificateurs simulés le temps du traitement, touches postées. hold_s : durée où
+    l'état reste posé après l'envoi (Chromium lit Ctrl et Alt par GetKeyState au traitement de la touche : fenêtre
+    occultée ou fil occupé, 0,15 s ne suffit pas toujours, mesuré)."""
+    with fake_modifiers(target, modifiers, hold_s):
         for vk in modifiers:
             post(target, w.WM_KEYDOWN, vk, _key_lparam(vk, False))
         for vk in vks:
@@ -393,6 +398,88 @@ def keyboard_target(top: int, windows: set[int] | None = None) -> int:
         if focus and (focus in allowed or w.root(focus) in allowed or w.IsChild(top, focus)):
             return focus
     return top
+
+
+# --- Activation simulée (Chromium sans DevTools, sans activation réelle) -----------------------------------------
+# Mesuré le 15 octobre 2026 (bench/chromium_input_probe.py, Electron 44 et Edge 155, fenêtre inactive et recouverte) :
+# Chromium jette le clavier d'une fenêtre inactive, quel que soit le canal (WM_CHAR à la fenêtre principale ou à
+# Chrome_RenderWidgetHostHWND, KEYDOWN+CHAR à lParam complet, WM_IME_CHAR, WM_UNICHAR, état clavier attaché). Mais il
+# tient son état d'activation des MESSAGES qu'il reçoit (WM_NCACTIVATE et WM_ACTIVATE), pas de Windows : ces messages
+# envoyés à sa seule fenêtre, sans activation réelle, suffisent pour que WM_CHAR et WM_KEYDOWN produisent des
+# événements keydown, beforeinput et input DE CONFIANCE dans <input>, <textarea> et contenteditable, Entrée et
+# raccourcis Ctrl (état clavier simulé) compris, premier plan de Julien intact. Focus DOM sans activation : action
+# MSAA accSelect(SELFLAG_TAKEFOCUS) (UIA SetFocus, lui, active la fenêtre ; une sélection TextPattern ne focalise pas).
+# Une seule réserve, mesurée : une application lancée À L'INSTANT par un processus au premier plan garde le droit de
+# prendre le premier plan une fois ; sa toute première activation simulée l'utilise (premier plan pris puis rendu en
+# ≈10 ms par la garde). Cette première fois par processus est donc encadrée comme une activation brève (jeton commun,
+# pause de Julien attendue) ; ensuite, aucune précaution n'est nécessaire.
+WM_ACTIVATE, WM_NCACTIVATE = 0x0006, 0x0086
+WA_INACTIVE, WA_ACTIVE = 0, 1
+# Fenêtre de premier niveau d'un navigateur ou d'une application Electron (HWNDMessageHandler de Chromium). Steam
+# (CEF dans un cadre SDL) n'en est pas : ses messages d'activation n'atteignent pas CEF, activation brève inchangée.
+CHROMIUM_TOP_CLASS = "Chrome_WidgetWin_"
+# Tranche de frappe en activation simulée : le premier plan de Julien n'est jamais tenu, la tranche borne seulement
+# ce qui part sans être encore relu. Même cadence que les activations brèves (≈60 caractères au départ, puis selon le
+# débit mesuré) : mesuré sur une page lourde (1 500 éléments reconstruits à chaque caractère), des lots de 200
+# arrivaient tous dans la page mais sa valeur UIA ne se publiait plus à temps (« 0/200 relus »).
+SIM_SLICE_S = 0.5  # = SLICE_S
+SIM_MODIFIERS_HOLD_S = 0.5  # Ctrl/Alt simulés tenus le temps que Chromium traite la touche (occulté : lent)
+SIM_SETTLE_S = 0.03  # après la désactivation postée : traitée avant toute nouvelle activation (envoyée, prioritaire)
+_PRIMED: set[int] = set()  # processus déjà passés par une activation simulée (droit de premier plan consommé)
+
+
+class SimulatedActivation:
+    """Activation simulée en cours. Les touches de Julien vont à SA fenêtre, jamais à la cible : rien à interrompre,
+    sauf s'il a lui-même mis la cible au premier plan pendant la frappe (ses touches s'y mêleraient)."""
+
+    def __init__(self, top: int, windows: set[int]) -> None:
+        self.top = top
+        self.windows = windows
+        self.started = time.monotonic()
+
+    def _julien_in_target(self) -> bool:
+        return w.root(w.foreground()) in self.windows and physical.available() and physical.since(self.started)
+
+    def check(self, consequence: str) -> None:
+        if self._julien_in_target():
+            raise foreground.UserInterrupted(f"Julien est passé dans la fenêtre et y tape : {consequence}.")
+
+    def checkpoint(self) -> None:
+        self.check("frappe arrêtée ; ses touches ont pu arriver dans la cible : vérifier la cible (look)")
+
+
+@contextlib.contextmanager
+def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[SimulatedActivation]:
+    """Bloc où la fenêtre Chromium `top` se croit active sans l'être : WM_NCACTIVATE puis WM_ACTIVATE envoyés
+    (synchrones), désactivation POSTÉE en sortie, donc traitée après tout ce qui a été posté dans le bloc (des messages
+    envoyés passeraient devant les caractères encore en file, qui seraient jetés). Fenêtre réellement au premier plan
+    (choisie par Julien) : MethodError, la frappe ordinaire s'applique. Première fois pour ce processus : jeton commun et
+    pause de Julien (son droit de premier plan de lancement peut être utilisé, voir plus haut)."""
+    windows = windows or {top}
+    if not w.IsWindow(top) or not w.class_name(top).startswith(CHROMIUM_TOP_CLASS):
+        raise MethodError("pas une fenêtre Chromium de premier niveau : activation simulée inapplicable")
+    if w.root(w.foreground()) in windows:
+        raise MethodError("la fenêtre est au premier plan : activation simulée inutile")
+    pid = w.window_pid(top)
+    with contextlib.ExitStack() as stack:
+        if pid not in _PRIMED:
+            stack.enter_context(foreground.agent_token("activation simulée (première fois)"))
+            if not foreground.wait_typing_pause():
+                raise foreground.BusyUser(
+                    "Julien tape, bouge la souris ou tient un bouton en ce moment : première frappe sans activation "
+                    "reportée (l'application peut encore prendre le premier plan une fois)."
+                )
+        if w.send_message(top, WM_NCACTIVATE, 1, 0) is None or w.send_message(top, WM_ACTIVATE, WA_ACTIVE, 0) is None:
+            raise MethodError("la fenêtre ne répond pas aux messages d'activation")
+        _PRIMED.add(pid)
+        try:
+            yield SimulatedActivation(top, windows)
+        finally:
+            if w.root(w.foreground()) not in windows:  # Julien ne l'a pas choisie entre-temps : état d'origine
+                with contextlib.suppress(MethodError):
+                    post(top, WM_ACTIVATE, WA_INACTIVE, 0)
+                    post(top, WM_NCACTIVATE, 0, 0)
+                time.sleep(SIM_SETTLE_S)
 
 
 # --- Frappe par tranches d'activation brève ------------------------------------------------------------------
@@ -440,9 +527,38 @@ def _head(rest: str, want: str) -> int | None:
     return len(core) + min(len(rest) - len(core), len(tail) - len(tail.lstrip("\n")))
 
 
+def _rich_head(rest: str, want: str, bounded_left: bool = False) -> int | None:
+    """Comme _head, pour la valeur que Chromium publie d'un éditeur riche à paragraphes (mesuré le 2026-10-14) : un
+    paragraphe vide entre deux paragraphes de texte n'y paraît pas (« <p>A</p><p><br></p><p>V</p> » se lit « A\\nV »),
+    donc n sauts de ligne tapés entre deux textes se relisent n − 1 (n ≥ 2). En tête (ou après un contenu qui finit
+    par un saut de ligne) et en fin, les paragraphes vides se lisent un « \\n » chacun. bounded_left : du texte précède
+    `want` dans le champ (ajout). La lecture est ambiguë (« A\\nV » est aussi « A », Entrée, « V ») ; l'appelant ne
+    tape la suite d'une Entrée qu'une fois la valeur changée par elle, ce qui lève l'ambiguïté."""
+    core = rest.rstrip("\n")
+    i = j = 0
+    while j < len(core):
+        if i >= len(want):
+            return None
+        if want[i] == "\n":
+            run = len(want[i:]) - len(want[i:].lstrip("\n"))
+            if i + run >= len(want):
+                return None  # sauts de ligne de fin du texte : jamais suivis d'un caractère dans le champ
+            shown = run - 1 if run >= 2 and (i > 0 or bounded_left) else run
+            if core[j : j + shown] != "\n" * shown:
+                return None
+            i, j = i + run, j + shown
+        elif core[j] == want[i]:
+            i, j = i + 1, j + 1
+        else:
+            return None
+    tail = want[i:]
+    return i + min(len(rest) - len(core), len(tail) - len(tail.lstrip("\n")))
+
+
 def typed_prefix(value: str | None, text: str, before: str = "", append: bool = False) -> int | None:
     """Combien du début de `text` le champ contient déjà. Remplacement : la valeur entière ; ajout : ce qui suit le
     contenu d'avant, dont les paragraphes vides de la fin ont pu être remplis (un éditeur riche vide se lit « \\n »).
+    Valeur lue telle quelle, sinon sous la forme publiée par un éditeur riche Chromium (_rich_head).
     None : la valeur n'est pas un début du texte (autre contenu, doublon, ordre inversé)."""
     got, want = norm_text(value), norm_text(text)
     bases = [""]
@@ -454,7 +570,10 @@ def typed_prefix(value: str | None, text: str, before: str = "", append: bool = 
             bases.append("")
     for base in bases:
         if got.startswith(base):
-            head = _head(got[len(base) :], want)
+            rest = got[len(base) :]
+            head = _head(rest, want)
+            if head is None:
+                head = _rich_head(rest, want, bounded_left=bool(base) and not base.endswith("\n"))
             if head is not None:
                 return head
     return None
@@ -475,6 +594,7 @@ class Typed:
     sent: int = 0
     clear: bool = False  # remplacement d'un contenu d'origine
     erased: bool = False  # contenu d'origine effacé
+    simulated: bool = False  # activation simulée : premier plan de Julien jamais pris
 
     @property
     def complete(self) -> bool:
@@ -494,6 +614,8 @@ class Typed:
     def detail(self) -> str:
         if self.stopped:
             return f"frappe arrêtée ({self.state()}) : {self.stopped}"
+        if self.simulated:
+            return "frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)"
         if self.slices <= 1:
             return f"frappes WM_CHAR, activation brève {self.active_ms} ms"
         return (
@@ -521,6 +643,7 @@ def type_in_slices(
     enter_as_key: bool = False,
     slice_s: float = SLICE_S,
     clear: bool = False,
+    activation: Callable[[], contextlib.AbstractContextManager] | None = None,
 ) -> Typed:
     """Frappe WM_CHAR d'un texte dans une suite d'activations brèves d'au plus slice_s chacune, restitution comprise.
 
@@ -540,17 +663,18 @@ def type_in_slices(
     BusyUser ou MethodError si aucune touche n'est partie (une autre technique peut être essayée), UserInterrupted
     (avec l'état du champ) à une entrée physique de Julien, worker.Stopped / Cancelled.
     """
-    return _SliceTyping(hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear).run()
+    return _SliceTyping(hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear, activation).run()
 
 
 class _SliceTyping:
     """État d'une frappe par tranches (type_in_slices)."""
 
-    def __init__(self, hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear) -> None:
+    def __init__(self, hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear, activation) -> None:
         self.hwnd, self.windows, self.prepare, self.read, self.prefix = hwnd, windows, prepare, read, prefix
         self.text = text.replace("\r\n", "\n")
         self.enter_as_key, self.slice_s, self.clear = enter_as_key, slice_s, clear
-        self.out = Typed(0, len(self.text), slice_s=slice_s, clear=clear)
+        self.activation = activation or (lambda: foreground.brief_activation(self.hwnd, self.windows))
+        self.out = Typed(0, len(self.text), slice_s=slice_s, clear=clear, simulated=activation is not None)
         self.min_post = min(MIN_POST_S, slice_s / 5)
         self.k = -1 if clear else 0  # début relu dans le champ ; -1 : contenu d'origine pas encore effacé
         self.sent = 0  # text[:sent] envoyé ; jamais diminué : rien n'est renvoyé
@@ -650,7 +774,7 @@ class _SliceTyping:
         """Une activation brève : préparation, effacement (remplacement), caractères, relecture jusqu'à l'échéance.
         Renvoie vrai si la tranche a pu envoyer quelque chose."""
         posted = False
-        with foreground.brief_activation(self.hwnd, self.windows) as activation:
+        with self.activation() as activation:
             started = time.monotonic()
             self.out.slices += 1
             target = self.prepare(self.out.slices == 1 or self.k < 0)

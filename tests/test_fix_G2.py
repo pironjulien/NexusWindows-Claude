@@ -96,9 +96,11 @@ def test_latch_expires_only_with_time(stop_file, monkeypatch):
     now = time.monotonic()
     aged = time.time() - (stop.HOLD_S - 1)
     os.utime(stop_file, (aged, aged))  # les deux horloges ont avancé de HOLD_S - 1
+    os.utime(stop.SHARED_STOP_FILE, (aged, aged))  # même appui : le fichier commun aux agents a le même âge
     monkeypatch.setattr(stop, "_now", lambda: now + stop.HOLD_S - 1)
-    assert 0 < stop.remaining_s() <= 1.5  # fichier toujours présent : jamais au-delà de l'échéance
+    assert 0 < stop.remaining_s() <= 1.5  # fichiers toujours présents : jamais au-delà de l'échéance
     stop_file.unlink()
+    stop.SHARED_STOP_FILE.unlink()
     monkeypatch.setattr(stop, "_now", lambda: now + stop.HOLD_S + 1)
     assert stop.remaining_s() == 0
     worker.check_cancelled()  # échu : plus d'arrêt
@@ -268,6 +270,7 @@ def _store_launch(monkeypatch, fg: dict, give_back_ok: bool) -> list[int]:
     monkeypatch.setattr(launch.foreground, "target_windows", lambda hwnd, extra=None: {hwnd})
     monkeypatch.setattr(launch.foreground, "target_pids", lambda hwnd, extra=None: {4242})
     monkeypatch.setattr(launch.foreground, "app_pid", lambda hwnd: 4242)
+    monkeypatch.setattr(launch.foreground, "user_is_switching", lambda: False)  # jamais le vrai clavier ni la souris
 
     def give_back(prev, timeout_s=0.6, exclude=None):
         gave.append(prev)
@@ -296,8 +299,22 @@ def test_store_launch_reports_foreground_not_given_back(monkeypatch):
     fg = {"hwnd": JULIEN}
     gave = _store_launch(monkeypatch, fg, give_back_ok=False)
     monkeypatch.setattr(launch, "uwp_unshown", lambda hwnd: False)
+    # Calendrier de la garde fixé : un seul contrôle pendant wait_content (pas de nouveau contrôle avant la fin du
+    # bloc), wait_content rendant la main dès que la garde a tenté de rendre le premier plan.
+    monkeypatch.setattr(foreground.Watch, "POLL_S", 30.0)
+
+    def wait_content(auto, hwnd, limit_s=3.0):
+        deadline = time.monotonic() + 5
+        while len(gave) < 2:
+            assert time.monotonic() < deadline, "la garde n'a pas tenté de rendre le premier plan pendant l'attente"
+            time.sleep(0.001)
+        return True
+
+    monkeypatch.setattr(launch, "wait_content", wait_content)
     result = launch.launch("Calculatrice", auto=object())
-    assert gave == [JULIEN] and not result.returned and result.user_front == JULIEN
+    # Exactement trois tentatives, toutes avant le retour de launch : celle de launch après l'attente de la fenêtre,
+    # celle de la garde pendant wait_content, puis son dernier contrôle à la fin du bloc.
+    assert gave == [JULIEN, JULIEN, JULIEN] and not result.returned and result.user_front == JULIEN
     assert any("PAS rendu à Julien" in n for n in result.notes)
     assert not any("rendu aussitôt" in n for n in result.notes)
 
@@ -580,8 +597,7 @@ def test_server_120_looks_with_image_do_not_leak():
     """Chemin réel du serveur : 2 séries de 120 look avec image dans le même processus serveur. La première installe
     les pools (mesuré : +13 handles, fils, événements, sémaphores, puis 0 aux séries suivantes) : bornée. La seconde ne
     doit rien perdre : une fuite par capture (WGC, recheck6 : +1 par capture) y donnerait ~+120."""
-    live = Path(__file__).resolve().parent / "live"
-    sys.path.insert(0, str(live))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lab"))  # apps vit dans lab/, pas tests/live
     import apps
 
     app = apps.launch("win32", x=140, y=140)

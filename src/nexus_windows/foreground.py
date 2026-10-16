@@ -23,7 +23,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from . import physical
+from . import agentlock, physical
 from . import win32 as w
 
 _SwitchToThisWindow = w._fn(w.user32, "SwitchToThisWindow", None, w.w.HWND, w.w.BOOL)
@@ -335,7 +335,25 @@ def activate(hwnd: int, timeout_s: float = 0.4) -> bool:
     if not hwnd or not w.IsWindow(hwnd) or w.IsIconic(hwnd):
         return False
     mark_own_input()
-    return _switch_to(hwnd, timeout_s)
+    return _switch_to(hwnd, timeout_s) or _ask_holder(hwnd)
+
+
+def _ask_holder(hwnd: int) -> bool:
+    """Le premier plan est tenu par une fenêtre dont Windows refuse d'attacher la file (cadre d'application Store,
+    ApplicationFrameHost : ERROR_ACCESS_DENIED, mesuré le 2026-10-14 avec la Calculatrice devant) : on demande au fil
+    qui le détient de le céder lui-même à la cible (WM_SYSCOMMAND SC_HOTKEY, traité par DefWindowProc comme
+    SetForegroundWindow(lParam) ; mécanisme déjà mesuré pour le rendre à Julien, voir _hand_over). Rien d'autre n'est
+    envoyé à cette fenêtre. Jamais quand une fenêtre système masquée tient le premier plan."""
+    fg = w.foreground()
+    if not fg or fg == hwnd or system_foreground():
+        return False
+    w.PostMessageW(fg, WM_SYSCOMMAND, SC_HOTKEY, hwnd)
+    deadline = time.monotonic() + HAND_OVER_S
+    while time.monotonic() < deadline:
+        if w.root(w.foreground()) == hwnd:
+            return True
+        time.sleep(0.01)
+    return w.root(w.foreground()) == hwnd
 
 
 class Activation:
@@ -397,10 +415,21 @@ def check_activation() -> None:
 
 
 @contextmanager
+def agent_token(purpose: str):
+    """Jeton commun aux agents de Julien (agentlock) : on attend qu'un autre agent ait rendu souris et premier plan
+    avant de les prendre (sinon BusyUser), et on le tient jusqu'à la fin du bloc."""
+    try:
+        with agentlock.hold(purpose, checkpoint=_checkpoint):
+            yield
+    except agentlock.Busy as exc:
+        raise BusyUser(str(exc)) from None
+
+
+@contextmanager
 def brief_activation(target: int, windows: set[int] | None = None, user_front: int = 0):
     """Bloc où la cible peut être active un court instant (Chromium ne lit le clavier que fenêtre active).
 
-    Attend une pause de Julien (sinon BusyUser), refuse si le premier plan n'a aucune fenêtre à qui être rendu
+    Prend d'abord le jeton commun aux agents (agent_token), puis attend une pause de Julien (sinon BusyUser), refuse si le premier plan n'a aucune fenêtre à qui être rendu
     (aucune, ou fenêtre système masquée : Windows refuserait aussi l'activation), relève sa fenêtre APRÈS la pause,
     suspend la surveillance, puis rend le premier plan à cette fenêtre en sortie. Pendant le bloc, toute entrée
     physique de Julien l'interrompt au prochain point de contrôle (check_activation).
@@ -410,6 +439,12 @@ def brief_activation(target: int, windows: set[int] | None = None, user_front: i
     rendu en sortie et « rendu » serait faux : refus (BusyUser). Sans user_front (act), une cible au premier plan est
     celle que Julien a choisie (comme pour Watch) : l'activation est permise et n'a rien à rendre.
     """
+    with agent_token("activation brève"), _brief_activation(target, windows, user_front) as activation:
+        yield activation
+
+
+@contextmanager
+def _brief_activation(target: int, windows: set[int] | None, user_front: int):
     if not wait_typing_pause():
         raise BusyUser(
             "Julien tape, bouge la souris ou tient un bouton en ce moment : frappe reportée pour ne pas capter ses "
@@ -525,6 +560,9 @@ class Watch:
                 return
         if _suspended_now():
             return  # mise au premier plan voulue commencée pendant ce contrôle : ne pas la défaire
+        if agentlock.other_holder() is not None:
+            self._follow(fg)  # un autre agent de Julien, jeton en main, a mis cette fenêtre devant : on ne lutte pas
+            return
         self.stolen += 1
         self._alt_pending = False
         if not give_back(self.front, exclude=self.windows):
@@ -539,7 +577,9 @@ class Watch:
                     tail_end = tail_end or time.monotonic() + self.tail_s
                     if time.monotonic() >= tail_end:
                         return
-                time.sleep(self.POLL_S)
+                    time.sleep(self.POLL_S)
+                else:
+                    self._stop.wait(self.POLL_S)  # fin du bloc : réveil immédiat, dernier contrôle sans délai
         finally:
             with _LOCK:
                 _LIVE.discard(self)
@@ -558,8 +598,12 @@ class Watch:
         return self
 
     def __exit__(self, *exc) -> None:
-        # Sans attendre : le fil de surveillance finit seul sa traîne pendant que la réponse part.
+        # Sans attendre : le fil de surveillance finit seul sa traîne pendant que la réponse part. Sans traîne
+        # (tail_s=0), il ne reste que son dernier contrôle : on l'attend, pour que stolen et failed soient définitifs
+        # quand l'appelant les lit (launch), au lieu de dépendre de l'ordonnanceur.
         self._stop.set()
+        if self._thread is not None and self.tail_s <= 0:
+            self._thread.join()
 
     def note(self) -> str:
         if not self.stolen:

@@ -132,6 +132,9 @@ def _variant(value):
     return value
 
 
+SELFLAG_TAKEFOCUS = 1  # IAccessible::accSelect : donner le focus à l'élément
+
+
 class Automation:
     """Client UIA dédié à un thread COM (créé et utilisé sur le même thread)."""
 
@@ -274,6 +277,11 @@ class Automation:
 
     def set_focus(self, element) -> None:
         element.SetFocus()
+
+    def take_focus(self, element) -> None:
+        """Focus par l'action MSAA accSelect(SELFLAG_TAKEFOCUS). Chromium : focus DOM sans activer la fenêtre (UIA
+        SetFocus, lui, l'active ; mesuré, bench/chromium_input_probe.py)."""
+        self.pattern(element, "legacy").Select(SELFLAG_TAKEFOCUS)
 
     def show_context_menu(self, element) -> None:
         try:

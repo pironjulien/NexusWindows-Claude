@@ -361,10 +361,12 @@ def test_policy_hard_and_soft_denies(tmp_path, monkeypatch):
     assert policy.act_refusal("WindowsTerminal.exe", "x", "t")
     assert policy.act_refusal("explorer.exe", "#32770", "Exécuter")
     assert policy.act_refusal("Codex.exe", "x", "Codex")
+    assert policy.act_refusal("claude.exe", "x", "Claude")  # refusé par défaut
     assert policy.act_refusal("notepad.exe", "Notepad", "Sans titre") is None
     (tmp_path / "policy.json").write_text('{"allow_processes": ["codex.exe", "claude.exe"]}', encoding="utf-8")
     assert policy.act_refusal("codex.exe", "x", "Codex") is None  # surchargeable par Julien
-    assert policy.act_refusal("claude.exe", "x", "Claude")  # jamais surchargeable
+    assert policy.act_refusal("claude.exe", "x", "Claude") is None  # surchargeable par Julien
+    assert policy.act_refusal("keepass.exe", "x", "KeePass")  # jamais surchargeable
 
 
 @pytest.mark.parametrize(
@@ -575,6 +577,8 @@ def test_present_matches_whole_words_and_unreadable_is_unknown():
 
 
 def test_command_surface_refused():
+    from nexus_windows import policy
+
     band = node("Pane", "", class_name="Address Band Root")
     edit = node("Edit", "Adresse", has_value=True)
     edit.parent = band
@@ -582,6 +586,9 @@ def test_command_surface_refused():
     with pytest.raises(actions.ActionError, match="barre d'adresse"):
         executor(make_view(edit), auto).write("Adresse", "cmd", replace=True)
     assert auto.calls == []
+    policy.POLICY_FILE.write_text('{"allow_shell": true}', encoding="utf-8")  # autorisée par Julien
+    executor(make_view(edit), auto).write("Adresse", "Documents", replace=True)
+    assert auto.calls
 
 
 def test_shell_surfaces_and_explorer_refused(tmp_path, monkeypatch):
@@ -593,7 +600,12 @@ def test_shell_surfaces_and_explorer_refused(tmp_path, monkeypatch):
     assert policy.act_refusal("explorer.exe", "CabinetWClass", "Documents")
     (tmp_path / "policy.json").write_text('{"allow_processes": ["explorer.exe"]}', encoding="utf-8")
     assert policy.act_refusal("explorer.exe", "CabinetWClass", "Documents") is None
-    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "")  # la barre des tâches, jamais
+    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "")  # la barre des tâches, jamais par défaut
+    (tmp_path / "policy.json").write_text(
+        '{"allow_shell": true, "allow_processes": ["explorer.exe"]}', encoding="utf-8"
+    )
+    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "") is None  # débloqué quand allow_shell: true
+    assert policy.act_refusal("SearchHost.exe", "Windows.UI.Core.CoreWindow", "Rechercher") is None
 
 
 @pytest.mark.parametrize(
@@ -603,7 +615,7 @@ def test_shell_surfaces_and_explorer_refused(tmp_path, monkeypatch):
         ("--renderer-cmd-prefix=cmd", False),
         ("--remote-debugging-port=9222", False),
         (r"--load-extension=C:\x", False),
-        (r"--user-data-dir=C:\Users\julie\AppData\Local\Microsoft\Edge\User Data", True),
+        (r"--user-data-dir=C:\Users\user\AppData\Local\Microsoft\Edge\User Data", True),
     ],
 )
 def test_chromium_switches_refused(args, devtools):

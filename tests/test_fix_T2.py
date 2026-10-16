@@ -10,6 +10,7 @@ premier plan (lose) ou traités en retard. Un doublon ou un saut de ligne dépla
 from __future__ import annotations
 
 import math
+import re
 import time
 from collections import deque
 
@@ -101,8 +102,13 @@ class Chromium:
 
     # --- File de messages et traitement -------------------------------------------------------------------------
     def _uia(self, dom: str) -> str:
-        """Éditeur riche : un paragraphe vide (<p><br></p>, champ vide ou ligne vide après une Entrée) se lit « \\n »."""
-        return dom + "\n" if self.rich and (not dom or dom.endswith("\n")) else dom
+        """Éditeur riche : un paragraphe vide de fin (<p><br></p>, champ vide ou ligne vide après une Entrée) se lit
+        « \\n » ; un paragraphe vide ENTRE deux paragraphes de texte ne se lit pas (mesuré le 2026-10-14 :
+        « <p>A</p><p><br></p><p>V</p> » se lit « A\\nV ») : n sauts entre deux textes se lisent n − 1."""
+        if not self.rich:
+            return dom
+        value = re.sub(r"(?<=[^\n])\n(\n+)(?=[^\n])", r"\1", dom)
+        return value + "\n" if not dom or dom.endswith("\n") else value
 
     def _post(self, target, msg, wparam, lparam) -> None:
         if msg == w.WM_CHAR:

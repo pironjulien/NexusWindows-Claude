@@ -510,6 +510,7 @@ def devtools(monkeypatch):
         ex = actions.Executor(auto, HWND, lambda rebuild: view, lambda: sess.page(HWND))
         ex._pids = {7}
         ex._windows = {HWND}
+        ex._effect = lambda e, fn, settle_s=1.0: fn  # effet du clic hors sujet ici (voir test_fix_U)
         report, _ = server._run_steps(ex, [server.Step(do="click", target="OK")], HWND, server.log.Call("act", {}))
         return report[0]
 

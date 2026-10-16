@@ -12,7 +12,7 @@ messages refusée), DPI. Banc intrusif : refusé si Julien a utilisé clavier ou
 Textes longs (Chromium sans DevTools : frappe par tranches) : 731 et 700 caractères sur 6 lignes dans Notes, 700 dans
 l'Éditeur, 700 sur 6 lignes dans l'éditeur riche « Paragraphes » (<p><br></p> au départ) ; contenu exact prouvé par
 l'empreinte que la page calcule sur son DOM, « relu ✓ » exigé, et chaque prise du premier plan par la cible ≤ 0,5 s.
-Usage : python tests/live/drive.py [win32 winforms wpf electron edge tk calc] ; images : ~/.claude/nexus-claude/lab/drive/
+Usage : python tests/live/drive.py [win32 winforms wpf electron edge occult tk calc] ; images : ~/.claude/nexus-claude/lab/drive/
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ import apps  # noqa: E402
 from mcp import Client, StdioServerParameters  # noqa: E402
 from PIL import Image  # noqa: E402
 
-from nexus_windows import foreground, methods, uia  # noqa: E402
+from nexus_windows import foreground, methods, snapshot, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
 
 OUT = apps.STATE / "drive"
@@ -254,7 +254,11 @@ class Events:
             self.auto = uia.Automation()
 
     def _journal(self) -> list[str]:
+        # Fenêtre recouverte et « occluded » : Chromium ne publie les changements qu'à une action d'accessibilité ;
+        # l'observateur déclenche la publication comme l'outil (ScrollIntoView du Document racine, sans effet).
+        snapshot.flush_web(self.auto, self.app.hwnd)
         tree = self.auto.tree(self.app.hwnd)
+        snapshot.remember_web_documents(self.app.hwnd, tree)
         journal = next((n for n in tree.walk() if n.name == "Journal" and n.control_type == "List"), None)
         return [c.name for c in journal.walk() if c.control_type == "ListItem"] if journal else []
 
@@ -279,7 +283,51 @@ class Events:
         return seen
 
 
+OCCLUDED_SCENARIO = [
+    ("click Charlie", [{"do": "click", "target": "Charlie"}], lambda e: e == "liste Charlie"),
+    ("click Bravo", [{"do": "click", "target": "Bravo"}], lambda e: e == "liste Bravo"),
+    ("click Alpha", [{"do": "click", "target": "Alpha"}], lambda e: e == "liste Alpha"),
+    ("check Option", [{"do": "check", "target": "Option"}], lambda e: e == "coche on"),
+    ("click Valider expect", [{"do": "click", "target": "Valider", "expect": "clic 1"}], lambda e: e == "clic 1"),
+    ("set Nom", [{"do": "set", "target": "champ:Nom", "text": "Occulté"}], lambda e: e == "nom Occulté"),
+]  # fmt: skip
+
+
+async def drive_occluded() -> list[tuple[str, bool, str]]:
+    """Electron du labo (sans commutateur) occulté : déplacé hors écran sans activation, son moteur de rendu passe
+    « hidden » (mesuré : document.visibilityState) et ne publie plus les changements d'accessibilité qu'à l'action
+    suivante — l'état qu'une activation brève laisse derrière elle quand la fenêtre est recouverte. Aucune étape
+    n'active la fenêtre : chaque effet doit être relu à jour (✓, événement de la page), jamais en retard d'un cran."""
+    app = apps.launch("electron", x=150, y=110)  # Julien absent exigé ; premier plan rendu s'il est pris
+    rows: list[tuple[str, bool, str]] = []
+    events = Events(app)
+    try:
+        async with Client(server_params(), read_timeout_seconds=120) as client:
+            await client.call_tool("look", {"window": app.hwnd, "show": "elements"})  # arbre construit, visible
+            w.SetWindowPos(app.hwnd, 1, -4000, -4000, 0, 0, 0x1 | 0x10)  # SWP_NOSIZE | SWP_NOACTIVATE, en bas
+            time.sleep(1.0)
+            print("== electron occulté (hors écran, jamais activé)")
+            fg0 = w.foreground()
+            for label, steps, expect in OCCLUDED_SCENARIO:
+                events.reset()
+                t0 = time.perf_counter()
+                result = await client.call_tool("act", {"window": app.hwnd, "steps": steps, "then": "none"})
+                ms = (time.perf_counter() - t0) * 1000
+                report = text_of(result).splitlines()[0] if text_of(result) else "(vide)"
+                ok = bool(re.match(r"^\s*\d+\. ✓", report)) and not result.is_error  # effet relu exigé
+                seen = events.collect(1.5, lambda s: any(expect(e) for e in s))
+                ok = ok and any(expect(e) for e in seen) and len(seen) == 1  # ni en retard, ni en double
+                rows.append((f"occulté {label}", ok, report))
+                print(f"   {'OK ' if ok else 'NON'} {label:20} {ms:5.0f} ms  {report[:150]}   ⇒ {seen[-3:]}")
+            rows.append(("occulté premier plan intact", w.foreground() == fg0, ""))
+    finally:
+        app.close()
+    return rows
+
+
 async def drive(kind: str) -> list[tuple[str, bool, str]]:
+    if kind == "occult":
+        return await drive_occluded()
     if kind == "tk":
         return await drive_tk()
     if kind == "calc":
@@ -475,7 +523,7 @@ async def drive_devtools(kind: str) -> list[tuple[str, bool, str]]:
 
 
 async def main() -> None:
-    kinds = sys.argv[1:] or ["win32", "winforms", "wpf", "electron", "edge", "tk", "calc"]
+    kinds = sys.argv[1:] or ["win32", "winforms", "wpf", "electron", "edge", "occult", "tk", "calc"]
     total = ok = 0
     for kind in kinds:
         try:

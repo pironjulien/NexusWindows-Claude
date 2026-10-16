@@ -14,9 +14,10 @@ import re
 import time
 from dataclasses import dataclass, field
 
+import comtypes
 from PIL import Image, ImageDraw, ImageFont
 
-from . import capture, uia
+from . import capture, steam, uia
 from . import win32 as w
 
 # Limites de vision de Claude : sans réduction côté serveur, les coordonnées lues sur l'image restent exactes.
@@ -163,12 +164,25 @@ class WindowInfo:
         return f"« {clip(self.title, 80)} » ({self.process}, {self.framework})"
 
 
+CEF_BROWSER_CLASS = "CefBrowserWindow"
+# Cadres qui hébergent souvent un navigateur embarqué CEF : Steam (SDL_app autour de CefBrowserWindow), lanceurs…
+HOST_FRAMEWORKS = {"Win32", "SDL", "GLFW", "Qt"}
+
+
+def hosts_chromium(hwnd: int) -> bool:
+    """La fenêtre est-elle le cadre d'un navigateur CEF embarqué (Steam, lanceurs de jeux…) ? Seulement CEF : une
+    application native qui loge un simple contrôle WebView2 garde sa famille (ses contrôles natifs restent natifs)."""
+    return any(w.class_name(child) == CEF_BROWSER_CLASS for child in w.enum_children(hwnd))
+
+
 def framework_of(hwnd: int, cls: str | None = None) -> str:
+    """Famille d'interface par la classe de fenêtre ; un cadre hôte (SDL, Win32…) qui contient une zone de rendu
+    Chromium est du Chromium (CEF) : occlusion, accessibilité à la demande et techniques sont celles de Chromium."""
     cls = cls if cls is not None else w.class_name(hwnd)
-    for prefix, name in FRAMEWORK_BY_CLASS:
-        if cls.startswith(prefix):
-            return name
-    return "Win32"
+    name = next((name for prefix, name in FRAMEWORK_BY_CLASS if cls.startswith(prefix)), "Win32")
+    if name in HOST_FRAMEWORKS and hosts_chromium(hwnd):
+        return "Chromium"
+    return name
 
 
 def window_info(hwnd: int) -> WindowInfo:
@@ -429,17 +443,40 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     notes: list[str] = []
     truncated = web_missing = False
     roots: dict[int, uia.Node] = {}
+    popups = set(windows[1:])
+    chromium = info.framework == "Chromium"
+    if chromium:
+        flush_web(auto, hwnd)  # documents de la lecture précédente ; oubliés s'ils ont disparu
     for win in windows:
         try:
             tree = auto.tree(win, max_nodes=max_nodes)
-            if win == hwnd and info.framework == "Chromium" and not _has_web_content(tree):
+            if win == hwnd and chromium:
+                known = hwnd in _ROOT_DOCUMENTS
+                remember_web_documents(hwnd, tree)
+                # Première lecture (ou document remplacé), fenêtre recouverte : publication déclenchée puis relue.
+                flushed = None if known else flush_web(auto, hwnd)
+                if flushed:
+                    tree = auto.tree(win, max_nodes=max_nodes)
+                    remember_web_documents(hwnd, tree)
+                elif flushed is False:
+                    notes.append(
+                        "Arbre UI Automation peut-être en retard (fenêtre Chromium recouverte : sa publication n'a pas "
+                        "pu être déclenchée) : se fier à l'image"
+                    )
+            if win == hwnd and chromium and not _has_web_content(tree):
                 tree, ready = _wait_web_content(auto, win, tree, max_nodes)
                 if not ready:
                     web_missing = True
                     notes.append(
                         "Contenu web absent de l'arbre UI Automation (Chromium cesse de le publier quand sa fenêtre est "
                         "recouverte) : se fier à l'image et aux clics par coordonnées ; pour Chrome, préférer Claude in "
-                        "Chrome ; une application lancée par launch n'a pas ce problème."
+                        "Chrome ; une application lancée par launch n'a pas ce problème"
+                        + (
+                            ' (Steam : launch(app="Steam", restart=true) avec l\'accord de Julien le relance avec '
+                            "-cef-disable-occlusion -cef-force-accessibility)."
+                            if steam.is_steam_window(hwnd)
+                            else "."
+                        )
                     )
         except uia.UIAError:
             continue
@@ -455,6 +492,8 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
             role = node.control_type
             if role in SKIP_SUBTREE:
                 return
+            if node is not tree and node.hwnd and node.hwnd != win and node.hwnd in popups:
+                return  # surgissante publiée aussi sous la fenêtre principale (CEF/Steam) : lue avec sa fenêtre
             listed = node is not tree and _visible(node, win_bounds) and _listable(node, parent_name)
             if listed:
                 elements.append(Element(len(elements) + 1, node, depth, win))
@@ -468,6 +507,71 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
         hwnd, info, windows, elements, frame, node_count=node_count, framework=framework, detail=detail, notes=notes,
         truncated=truncated, web_missing=web_missing, roots=roots,
     )  # fmt: skip
+
+
+def is_web_document(node: uia.Node) -> bool:
+    """Racine d'une page web Chromium/Electron (le DOM y porte l'ordre z de ce qui est dessiné)."""
+    p = node.props
+    return (
+        node.control_type == "Document"
+        and str(p.get("framework") or "").lower() == "chrome"
+        and str(p.get("automation_id") or "").lower() == "rootwebarea"
+    )
+
+
+def root_web_documents(tree: uia.Node) -> list[uia.Node]:
+    """Documents web de premier niveau d'un arbre (cadres internes exclus : leur document n'est pas la zone
+    d'affichage, le faire « défiler en vue » ferait défiler la page qui le contient)."""
+    out: list[uia.Node] = []
+
+    def visit(node: uia.Node) -> None:
+        if is_web_document(node):
+            out.append(node)
+            return
+        for child in node.children:
+            visit(child)
+
+    visit(tree)
+    return out
+
+
+# Publication différée de l'arbre d'accessibilité Chromium (mesuré le 2026-10-14, Electron du labo sans commutateur) :
+# une fenêtre recouverte qui a eu le premier plan une fois, puis l'a perdu (activation brève d'une frappe), passe
+# « occluded » : document.visibilityState « hidden », plus aucune image, et le moteur de rendu ne sérialise plus les
+# changements du DOM pour l'accessibilité. Ils restent en attente jusqu'à la prochaine action d'accessibilité reçue
+# par le moteur de rendu (Invoke, Select…) : l'arbre UIA est alors en retard d'un changement. Les lectures UIA seules
+# (propriétés, TextPattern, test de position) ne débloquent rien. Remède sans premier plan : ScrollIntoView du
+# Document racine. Chromium traite toute action en publiant d'abord ce qui attend, et faire défiler la zone
+# d'affichage « en vue » ne déplace rien (page défilée à 0, 120 et 700 px : position, focus et sélection intacts).
+# Publication relue en ~15 ms. Fait avant toute lecture d'une fenêtre Chromium qui n'a pas le premier plan (au
+# premier plan elle est dessinée : rien n'attend).
+_ROOT_DOCUMENTS: dict[int, list] = {}  # hwnd → éléments UIA des documents web de premier niveau (dernière lecture)
+
+
+def remember_web_documents(hwnd: int, tree: uia.Node) -> None:
+    documents = [n.element for n in root_web_documents(tree)]
+    if documents:
+        _ROOT_DOCUMENTS[hwnd] = documents
+    else:
+        _ROOT_DOCUMENTS.pop(hwnd, None)
+
+
+def flush_web(auto: uia.Automation, hwnd: int) -> bool | None:
+    """Fait publier à Chromium les changements d'accessibilité en attente (fenêtre recouverte). None : rien à faire
+    (fenêtre au premier plan, aucun document connu) ; False : impossible (document disparu, motif absent) — l'arbre
+    peut alors être en retard."""
+    documents = _ROOT_DOCUMENTS.get(hwnd)
+    if not documents or w.root(w.foreground()) == hwnd:
+        return None
+    done = True
+    for element in documents:
+        try:
+            auto.scroll_into_view(element)
+        except uia.UIAError, comtypes.COMError:  # document remplacé (navigation), motif absent
+            done = False
+    if not done:
+        _ROOT_DOCUMENTS.pop(hwnd, None)
+    return done
 
 
 def _has_web_content(tree: uia.Node) -> bool:
@@ -700,7 +804,47 @@ def _matches(view: View, spec: str) -> tuple[list[Element], list[Element]]:
     if not exact:
         exact = [e for e in pool if str(e.props.get("automation_id") or "").lower() == wanted]
     partial = [e for e in pool if wanted and wanted in e.name.lower() and e not in exact]
+    if not exact and not partial and wanted:
+        # Liste déroulante sans nom (Steam : choix du disque) : désignée par la valeur qu'elle affiche.
+        partial = [
+            e for e in pool if e.role == "ComboBox" and not e.name and wanted in norm(str(e.props.get("value") or "")).lower()
+        ]  # fmt: skip
     return exact, partial
+
+
+def scrolled_away(view: View) -> list[Element]:
+    """Éléments de la fenêtre principale hors de la zone visible parce que leur conteneur a défilé (UIA « offscreen »,
+    motif ScrollItem) : absents de la liste, mais visables par leur nom exact une fois amenés à l'écran
+    (ScrollIntoView). Mesuré le 2026-10-14 : page Electron défilée de 275 px par la frappe dans un éditeur du bas,
+    champs du haut introuvables."""
+    root = view.roots.get(view.hwnd)
+    if root is None:
+        return []
+    out: list[Element] = []
+    for node in root.walk():
+        p = node.props
+        if node is root or not p.get("offscreen") or not p.get("has_scroll_item") or node.rect is None:
+            continue
+        if node.control_type in TEXT_ROLES or not _listable(node, ""):
+            continue
+        out.append(Element(0, node, 0, view.hwnd))
+    return out
+
+
+def _outermost(elements: list[Element]) -> list[Element]:
+    """Un même contrôle publié deux fois, imbriqué sous le même rôle et le même nom (onglet React de Steam : TabItem
+    « Stockage » qui contient un TabItem « Stockage ») n'est pas une ambiguïté : le plus extérieur le représente."""
+    nodes = {id(e.node) for e in elements}
+
+    def nested(e: Element) -> bool:
+        parent = e.node.parent
+        while parent is not None:
+            if id(parent) in nodes and parent.control_type == e.role and norm(parent.name) == e.name:
+                return True
+            parent = parent.parent
+        return False
+
+    return [e for e in elements if not nested(e)]
 
 
 def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element, str]:
@@ -717,7 +861,7 @@ def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element
         raise TargetError(f"Aucun élément « {spec} » dans la fenêtre (look pour voir la liste).")
     group = sorted(group, key=lambda e: _rank(e, prefer))
     best = _rank(group[0], prefer)
-    tied = [e for e in group if _rank(e, prefer) == best]
+    tied = _outermost([e for e in group if _rank(e, prefer) == best])
     if len(tied) > 1:
         listed = ", ".join(e.describe() for e in tied[:8])
         raise AmbiguousTarget(

@@ -340,6 +340,38 @@ def process_name(pid: int) -> str:
     return os.path.basename(process_path(pid)) or f"pid {pid}"
 
 
+class PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_ulong), ("cntUsage", ctypes.c_ulong), ("th32ProcessID", ctypes.c_ulong),
+        ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", ctypes.c_ulong), ("cntThreads", ctypes.c_ulong),
+        ("th32ParentProcessID", ctypes.c_ulong), ("pcPriClassBase", ctypes.c_long), ("dwFlags", ctypes.c_ulong),
+        ("szExeFile", ctypes.c_wchar * 260),
+    ]  # fmt: skip
+
+
+_CreateToolhelp32Snapshot = _fn(kernel32, "CreateToolhelp32Snapshot", w.HANDLE, w.DWORD, w.DWORD)
+_Process32FirstW = _fn(kernel32, "Process32FirstW", w.BOOL, w.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
+_Process32NextW = _fn(kernel32, "Process32NextW", w.BOOL, w.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
+
+
+def process_table() -> list[tuple[int, int, str]]:
+    """Processus du système : (pid, pid parent, nom de l'exécutable). Instantané Toolhelp : quelques millisecondes."""
+    snap = _CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    rows: list[tuple[int, int, str]] = []
+    if not snap or snap == ctypes.c_void_p(-1).value:
+        return rows
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        ok = _Process32FirstW(snap, ctypes.byref(entry))
+        while ok:
+            rows.append((entry.th32ProcessID, entry.th32ParentProcessID, entry.szExeFile))
+            ok = _Process32NextW(snap, ctypes.byref(entry))
+    finally:
+        CloseHandle(snap)
+    return rows
+
+
 def command_line_args(text: str) -> list[str]:
     """Arguments d'une ligne de commande découpés par CommandLineToArgvW, comme Chromium sous Windows (guillemets,
     barres obliques inverses). Un nom de programme fictif est placé devant : son découpage obéit à d'autres règles."""

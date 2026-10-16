@@ -1,0 +1,38 @@
+{
+ "win32": {
+  "look (liste + image)": {
+   "médiane_ms": 151,
+   "p90_ms": 170
+  },
+  "look (liste seule)": {
+   "médiane_ms": 121,
+   "p90_ms": 133
+  },
+  "act clic, then=none": {
+   "médiane_ms": 106,
+   "p90_ms": 130
+  },
+  "act clic, then=both": {
+   "médiane_ms": 524,
+   "p90_ms": 582
+  }
+ },
+ "electron": {
+  "look (liste + image)": {
+   "médiane_ms": 82,
+   "p90_ms": 88
+  },
+  "look (liste seule)": {
+   "médiane_ms": 57,
+   "p90_ms": 66
+  },
+  "act clic, then=none": {
+   "médiane_ms": 188,
+   "p90_ms": 201
+  },
+  "act clic, then=both": {
+   "médiane_ms": 529,
+   "p90_ms": 553
+  }
+ }
+}

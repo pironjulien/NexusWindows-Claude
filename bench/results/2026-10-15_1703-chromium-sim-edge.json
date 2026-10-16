@@ -1,0 +1,219 @@
+{
+ "lignes": [
+  {
+   "étape": "focus Notes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 3145,
+   "compte_rendu": "1. ✓ focus sur Edit « Notes » (focus sans activation — relu ✓ focus, sans activation (activation simulée) 66 ms) [121 ms]",
+   "événements": []
+  },
+  {
+   "étape": "set Nom",
+   "ok": true,
+   "sans_activation": false,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 253,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Nom » (UIA Value) — relu ✓ [134 ms]",
+   "événements": [
+    "nom Julien Piron"
+   ]
+  },
+  {
+   "étape": "type Nom",
+   "ok": true,
+   "sans_activation": false,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 259,
+   "compte_rendu": "1. ✓ texte saisi dans Edit « Nom » (UIA Value) — relu ✓ [146 ms]",
+   "événements": [
+    "nom Julien Piron 42"
+   ]
+  },
+  {
+   "étape": "select Couleur",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 294,
+   "compte_rendu": "1. ✓ « Bleu » choisi dans ComboBox « Couleur » (frappes sans activation — sans activation (activation simulée) 98 ms) — relu ✓ [157 ms]",
+   "événements": [
+    "couleur Bleu"
+   ]
+  },
+  {
+   "étape": "click Charlie",
+   "ok": true,
+   "sans_activation": false,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 315,
+   "compte_rendu": "1. ✓ clic sur ListItem « Charlie » (UIA Invoke — relu ✓ sélectionné) [176 ms]",
+   "événements": [
+    "liste Charlie"
+   ]
+  },
+  {
+   "étape": "key ctrl+k",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 553,
+   "compte_rendu": "1. ~ touches « ctrl+k » (messages sans activation — activation simulée, état clavier simulé ; changement visible) [409 ms]",
+   "événements": [
+    "raccourci ctrl+k"
+   ]
+  },
+  {
+   "étape": "set Notes 2 lignes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 3381,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Notes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [240 ms]",
+   "événements": [
+    "notes 13 #cb70a994"
+   ]
+  },
+  {
+   "étape": "type Éditeur",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 648,
+   "compte_rendu": "1. ✓ texte saisi dans Edit « Éditeur » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [226 ms]",
+   "événements": [
+    "editeur Bonjour"
+   ]
+  },
+  {
+   "étape": "type Éditeur bis",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 620,
+   "compte_rendu": "1. ✓ texte saisi dans Edit « Éditeur » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [201 ms]",
+   "événements": [
+    "editeur Bonjour encore"
+   ]
+  },
+  {
+   "étape": "set Notes 731 sur 6 lignes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 1191,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Notes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [807 ms]",
+   "événements": [
+    "notes 731 #da710b02"
+   ]
+  },
+  {
+   "étape": "set Notes 700 sur 6 lignes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 1153,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Notes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [762 ms]",
+   "événements": [
+    "notes 700 #b16e2ebd"
+   ]
+  },
+  {
+   "étape": "set Éditeur 700",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 920,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Éditeur » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [541 ms]",
+   "événements": [
+    "editeur Phrase 000 du compte rendu. Phrase 001 du compte rendu. Phrase 002 du compte rendu. Phrase 003 du compte rendu. Phrase 004 du compte rendu. Phrase 005 du compte rendu. Phrase 006 du compte rendu. Phrase 007 du compte rendu. Phrase 008 du compte rendu. Phrase 009 du compte rendu. Phrase 010 du compte rendu. Phrase 011 du compte rendu. Phrase 012 du compte rendu. Phrase 013 du compte rendu. Phrase 014 du compte rendu. Phrase 015 du compte rendu. Phrase 016 du compte rendu. Phrase 017 du compte rendu. Phrase 018 du compte rendu. Phrase 019 du compte rendu. Phrase 020 du compte rendu. Phrase 021 du compte rendu. Phrase 022 du compte rendu. Phrase 023 du compte rendu. Phrase 024 du compte rendu.!"
+   ]
+  },
+  {
+   "étape": "type Paragraphes 700 sur 6 lignes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 1065,
+   "compte_rendu": "1. ✓ texte saisi dans Edit « Paragraphes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [671 ms]",
+   "événements": [
+    "paragraphes 6 lignes 700 car. #b16e2ebd"
+   ]
+  },
+  {
+   "étape": "set Paragraphes 2 lignes",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 681,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Paragraphes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [275 ms]",
+   "événements": [
+    "paragraphes 2 lignes 36 car. #95a272d6"
+   ]
+  },
+  {
+   "étape": "set Paragraphes courriel",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 717,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Paragraphes » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [374 ms]",
+   "événements": [
+    "paragraphes 5 lignes 67 car. #f28465ba"
+   ]
+  },
+  {
+   "étape": "set Gel 300",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 2219,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Gel » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [1790 ms]",
+   "événements": [
+    "gel 300 #d81c0806"
+   ]
+  },
+  {
+   "étape": "set Lent 300",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 4290,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Lent » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [3946 ms]",
+   "événements": [
+    "lent 300 #d81c0806"
+   ]
+  },
+  {
+   "étape": "set Lourd 200",
+   "ok": true,
+   "sans_activation": true,
+   "prises_premier_plan": 0,
+   "plus_longue_ms": 0,
+   "ms": 6201,
+   "compte_rendu": "1. ✓ texte remplacé dans Edit « Lourd » (frappes sans activation — frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)) — relu ✓ [4746 ms]",
+   "événements": [
+    "lourd 200 #99fb4543"
+   ]
+  }
+ ],
+ "premier_plan_intact": false
+}

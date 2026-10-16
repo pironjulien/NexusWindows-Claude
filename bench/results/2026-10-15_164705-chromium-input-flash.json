@@ -1,0 +1,72 @@
+[
+ {
+  "technique": "activation simulée #1 (barre des tâches observée)",
+  "champ": "notes",
+  "valeur": "abc",
+  "ok": true,
+  "input_de_confiance": true,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": false,
+  "vols_rendus": 1,
+  "ms": 966,
+  "erreur": ""
+ },
+ {
+  "technique": "activation simulée #2 (barre des tâches observée)",
+  "champ": "notes",
+  "valeur": "abc",
+  "ok": true,
+  "input_de_confiance": true,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 938,
+  "erreur": ""
+ },
+ {
+  "technique": "activation simulée #3 (barre des tâches observée)",
+  "champ": "notes",
+  "valeur": "abc",
+  "ok": true,
+  "input_de_confiance": true,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 939,
+  "erreur": ""
+ },
+ {
+  "technique": "activation simulée #4 (barre des tâches observée)",
+  "champ": "notes",
+  "valeur": "abc",
+  "ok": true,
+  "input_de_confiance": true,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 939,
+  "erreur": ""
+ },
+ {
+  "technique": "activation simulée #5 (barre des tâches observée)",
+  "champ": "notes",
+  "valeur": "abc",
+  "ok": true,
+  "input_de_confiance": true,
+  "keydown": false,
+  "actif": "notes",
+  "hasFocus": false,
+  "premier_plan_intact": true,
+  "vols_rendus": 0,
+  "ms": 939,
+  "erreur": ""
+ }
+]

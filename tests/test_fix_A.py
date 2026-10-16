@@ -15,7 +15,20 @@ import pytest
 from PIL import Image
 from test_contract import HWND, ROLE_IDS, FakeAuto, FakeEl, executor, make_view, node
 
-from nexus_windows import actions, methods, server, snapshot, uia, worker
+from nexus_windows import (
+    act_base,
+    act_chromium,
+    act_pointer,
+    act_uia,
+    act_wait,
+    act_win32,
+    actions,
+    methods,
+    server,
+    snapshot,
+    uia,
+    worker,
+)
 from nexus_windows import win32 as w
 from nexus_windows.session import Session
 
@@ -593,7 +606,8 @@ def test_build_view_flags_truncation_and_missing_web_content(monkeypatch):
 @pytest.fixture
 def clock(monkeypatch):
     fake = Clock()
-    monkeypatch.setattr(actions, "time", fake)
+    for module in (act_base, act_chromium, act_pointer, act_uia, act_wait, act_win32):  # exécuteur découpé par famille
+        monkeypatch.setattr(module, "time", fake)
     return fake
 
 

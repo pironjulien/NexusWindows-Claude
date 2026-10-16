@@ -14,6 +14,10 @@ NEXUS_WINDOWS_HOME), mais il est TENU en mémoire : chaque serveur pose un verro
 Toute action en cours s'interrompt au prochain point de contrôle et toute nouvelle action est refusée. Un nouvel appui
 le réarme (jamais il ne le lève : un double appui par réflexe ne doit pas relancer l'outil). Aucun chemin de code ne
 le lève avant l'échéance. Limite : un serveur démarré APRÈS la suppression du fichier ne voit pas l'arrêt.
+
+Arrêt COMMUN aux agents de Julien (protocole NexusHarness/shared/emergency-stop.md) : chaque appui écrit aussi
+~/.nexus/stop, que NexusAGY et NexusCodex surveillent ; et ce serveur s'arrête quand l'un d'eux l'écrit (le même
+raccourci, détenu par l'harnais qui l'a obtenu). Le détenteur, quel qu'il soit, bat dans ~/.nexus/stop.owner.
 """
 
 from __future__ import annotations
@@ -31,6 +35,9 @@ from . import __version__, log
 HOLD_S = 120.0
 STOP_FILE = Path.home() / ".claude" / "nexus-claude" / "stop"
 OWNER_FILE = STOP_FILE.with_name("stop.owner")
+SHARED_STOP_FILE = Path.home() / ".nexus" / "stop"  # commun aux trois agents (local au poste, hors OneDrive)
+SHARED_OWNER_FILE = SHARED_STOP_FILE.with_name("stop.owner")
+OWNER_NAME = "NexusClaude"
 HEARTBEAT_S = 3.0  # battement du détenteur, et intervalle des nouvelles tentatives des autres serveurs
 OWNER_STALE_S = 3 * HEARTBEAT_S  # trois battements manqués : plus de détenteur vivant
 MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_NOREPEAT = 0x0001, 0x0002, 0x0004, 0x4000
@@ -53,6 +60,7 @@ _owner = threading.Event()  # ce serveur détient le raccourci
 _failure = 0  # GetLastError du premier échec de RegisterHotKey (0 : aucun)
 _latched_until = 0.0  # _now() : échéance de l'arrêt vu par ce serveur (appui, ou fichier vu actif) ; ne recule jamais
 _seen_mtime: tuple | None = None  # version (date, contenu) du fichier d'arrêt déjà prise en compte
+_seen_shared: tuple | None = None  # idem pour le fichier d'arrêt commun aux agents
 _LATCH = threading.Lock()
 
 
@@ -72,21 +80,23 @@ def _read_file() -> None:
     """Chaque NOUVELLE version du fichier (un appui, ici ou dans un autre serveur, le réécrit) pose le verrou une
     seule fois, pour ce qu'il lui reste d'après sa date, borné à [0, HOLD_S]. Ensuite seul le verrou compte : ni
     sa suppression ni un saut de l'horloge murale ne lèvent l'arrêt, et une horloge reculée (fichier « du futur »)
-    ne le prolonge pas au-delà d'HOLD_S."""
-    global _seen_mtime
+    ne le prolonge pas au-delà d'HOLD_S. Les deux fichiers comptent : celui des serveurs nexus-windows et celui
+    commun aux agents (même règle, versions suivies séparément)."""
+    _read_one(STOP_FILE, "_seen_mtime")
+    _read_one(SHARED_STOP_FILE, "_seen_shared")
+
+
+def _read_one(path: Path, seen: str) -> None:
     try:
-        info = STOP_FILE.stat()
+        info = path.stat()
         mtime = info.st_mtime
-        version = (
-            info.st_mtime_ns,
-            STOP_FILE.read_bytes(),
-        )  # octets bruts : aucun encodage ne peut le rendre illisible
+        version = (info.st_mtime_ns, path.read_bytes())  # octets bruts : aucun encodage ne peut le rendre illisible
     except OSError:
         return
     with _LATCH:
-        if version == _seen_mtime:
+        if version == globals()[seen]:
             return
-        _seen_mtime = version
+        globals()[seen] = version
     left = min(max(HOLD_S - (time.time() - mtime), 0.0), HOLD_S)
     if left > 0:
         _latch(left)
@@ -103,6 +113,23 @@ def request() -> None:
     # Contenu unique à chaque appui : deux appuis dans le même tic d'horloge de fichier (~15 ms) restent deux
     # versions distinctes, chacune reposant le verrou.
     STOP_FILE.write_text(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {os.getpid()} {os.urandom(6).hex()}", encoding="utf-8")
+    # Puis les autres agents de Julien : une erreur ici ne doit pas empêcher l'arrêt des serveurs nexus-windows.
+    try:
+        SHARED_STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SHARED_STOP_FILE.write_text(
+            json.dumps(
+                {
+                    "by": OWNER_NAME,
+                    "pid": os.getpid(),
+                    "at": time.time(),
+                    "hold_s": HOLD_S,
+                    "nonce": os.urandom(6).hex(),
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError as error:
+        log.event("stop", {"shared": False, "error": str(error)})
 
 
 def pressed() -> None:
@@ -136,23 +163,28 @@ def message() -> str:
 
 
 def _heartbeat() -> None:
-    try:
-        OWNER_FILE.parent.mkdir(parents=True, exist_ok=True)
-        OWNER_FILE.write_text(
-            json.dumps({"pid": os.getpid(), "version": __version__, "ts": time.time()}), encoding="utf-8"
-        )
-    except OSError:
-        pass  # battement manqué : les autres serveurs signaleront l'arrêt indisponible, ce qui reste honnête
+    beat = json.dumps({"owner": OWNER_NAME, "pid": os.getpid(), "version": __version__, "ts": time.time()})
+    for path in (OWNER_FILE, SHARED_OWNER_FILE):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(beat, encoding="utf-8")
+        except OSError:
+            pass  # battement manqué : les autres signaleront l'arrêt indisponible, ce qui reste honnête
 
 
-def owner() -> dict | None:
-    """Détenteur vivant du raccourci (battement de moins de OWNER_STALE_S secondes), sinon None."""
+def _fresh_owner(path: Path) -> dict | None:
     try:
-        data = json.loads(OWNER_FILE.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
         fresh = time.time() - float(data["ts"]) <= OWNER_STALE_S
     except OSError, ValueError, KeyError, TypeError:
         return None
-    return data if fresh else None
+    return data if fresh and isinstance(data, dict) else None
+
+
+def owner() -> dict | None:
+    """Détenteur vivant du raccourci (battement de moins de OWNER_STALE_S secondes) : un serveur nexus-windows ou un
+    autre agent de Julien (NexusAGY, NexusCodex) qui suit le protocole commun ; sinon None."""
+    return _fresh_owner(OWNER_FILE) or _fresh_owner(SHARED_OWNER_FILE)
 
 
 def _loop() -> None:
@@ -209,7 +241,7 @@ def status() -> str:
         return "détenu par ce serveur"
     holder = owner()
     if holder is not None:
-        return f"détenu par le serveur pid {holder.get('pid')} ({holder.get('version')})"
+        return f"détenu par {holder.get('owner') or 'le serveur'} pid {holder.get('pid')} ({holder.get('version')})"
     if not _tried.is_set():
         return "pas encore essayé"
     return f"NON GARANTI (raccourci non obtenu, erreur {_failure}, aucun détenteur à jour)"

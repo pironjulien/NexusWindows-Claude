@@ -27,7 +27,7 @@ from pathlib import Path
 import comtypes
 import comtypes.client
 
-from . import foreground, log, policy, snapshot, uia
+from . import foreground, log, policy, snapshot, steam, uia
 from . import win32 as w
 
 _START_APPS: list[dict] | None = None
@@ -56,6 +56,7 @@ class Launched:
     profile: Path | None = None  # profil jetable d'un navigateur DevTools
     user_front: int = 0  # fenêtre de Julien au premier plan AVANT le lancement : référence de la garde du serveur
     returned: bool = True  # faux : l'application tient encore le premier plan pris à Julien (Windows a refusé)
+    own_session: bool = False  # port DevTools sur la session réelle de Julien (Steam) : jamais fermé par l'outil
 
 
 def free_port() -> int:
@@ -154,38 +155,11 @@ def _activate_packaged(app_id: str, args: str) -> int:
     return int(manager.ActivateApplication(app_id, args or None, AO_NOERRORUI))
 
 
-class PROCESSENTRY32W(ctypes.Structure):
-    _fields_ = [
-        ("dwSize", ctypes.c_ulong),
-        ("cntUsage", ctypes.c_ulong),
-        ("th32ProcessID", ctypes.c_ulong),
-        ("th32DefaultHeapID", ctypes.c_size_t),
-        ("th32ModuleID", ctypes.c_ulong),
-        ("cntThreads", ctypes.c_ulong),
-        ("th32ParentProcessID", ctypes.c_ulong),
-        ("pcPriClassBase", ctypes.c_long),
-        ("dwFlags", ctypes.c_ulong),
-        ("szExeFile", ctypes.c_wchar * 260),
-    ]
-
-
-_CreateToolhelp32Snapshot = w._fn(w.kernel32, "CreateToolhelp32Snapshot", w.w.HANDLE, w.w.DWORD, w.w.DWORD)
-_Process32FirstW = w._fn(w.kernel32, "Process32FirstW", w.w.BOOL, w.w.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
-_Process32NextW = w._fn(w.kernel32, "Process32NextW", w.w.BOOL, w.w.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
-
-
 def descendants(pid: int) -> set[int]:
     """pid et tous ses descendants (instantané Toolhelp : quelques millisecondes)."""
-    snap = _CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
     children: dict[int, list[int]] = {}
-    if snap and snap != ctypes.c_void_p(-1).value:
-        entry = PROCESSENTRY32W()
-        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-        ok = _Process32FirstW(snap, ctypes.byref(entry))
-        while ok:
-            children.setdefault(entry.th32ParentProcessID, []).append(entry.th32ProcessID)
-            ok = _Process32NextW(snap, ctypes.byref(entry))
-        w.CloseHandle(snap)
+    for child, parent, _name in w.process_table():
+        children.setdefault(parent, []).append(child)
     out, todo = {pid}, [pid]
     while todo:
         for child in children.get(todo.pop(), []):
@@ -248,10 +222,14 @@ def _new_window(
     took_back = False
     while True:
         now = time.monotonic()
-        if pid and now - refreshed > 0.3:
+        exited = bool(pid) and running is not None and not running()
+        # Lanceur parti : arbre relu sur-le-champ avant de conclure. Mesuré (Edge 155, profil neuf) : le lanceur
+        # relance le navigateur puis se termine en moins de 0,3 s ; relu à la cadence de 0,3 s seulement, l'arbre
+        # datait d'avant cet enfant et le lancement échouait en 0,5 s, navigateur orphelin laissé ouvert.
+        if pid and (now - refreshed > 0.3 or exited):
             pids = descendants(pid)
             refreshed = now
-        gone = bool(pid) and running is not None and not running() and pids == {pid}
+        gone = exited and pids == {pid}
         strict = bool(pid) and not (fallback and gone)
         fg = w.foreground()
         if (
@@ -357,9 +335,14 @@ def fresh_profile() -> Path:
 
 
 def kill_tree(pid: int) -> None:
-    """Ferme un processus lancé par l'outil et ses descendants (navigateur DevTools à profil neuf)."""
+    """Ferme un processus lancé par l'outil et ses descendants (navigateur DevTools à profil neuf). Le lanceur peut
+    être déjà parti (Edge se relance) : taskkill /T sur lui seul ne fermerait pas ses enfants orphelins, chacun est
+    donc nommé."""
     if pid:
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, check=False)
+        command = ["taskkill", "/T", "/F"]
+        for member in sorted(descendants(pid)):
+            command += ["/PID", str(member)]
+        subprocess.run(command, capture_output=True, check=False)
 
 
 # --- Compte dans un navigateur DevTools ----------------------------------------------------------------------
@@ -512,21 +495,26 @@ _GetExtendedTcpTable = w._fn(
 TCP_TABLE_OWNER_PID_LISTENER, AF_INET = 3, 2
 
 
-def port_owner(port: int) -> tuple[int, str] | None:
-    """Processus qui écoute sur le port TCP local, et l'adresse d'écoute (pour vérifier 127.0.0.1)."""
+def listeners() -> list[tuple[int, str, int]]:
+    """Ports TCP (IPv4) en écoute : (port, adresse d'écoute, pid propriétaire)."""
     size = ctypes.c_ulong(0)
     _GetExtendedTcpTable(None, ctypes.byref(size), False, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0)
     buffer = ctypes.create_string_buffer(size.value + 4096)
     size = ctypes.c_ulong(len(buffer))
     if _GetExtendedTcpTable(buffer, ctypes.byref(size), False, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0) != 0:
-        return None
+        return []
     count = ctypes.c_ulong.from_buffer(buffer).value
     rows = (ctypes.c_ulong * (count * 6)).from_buffer(buffer, 4)
+    out = []
     for i in range(count):
         _state, local_addr, local_port, _ra, _rp, pid = rows[i * 6 : i * 6 + 6]
-        if socket.ntohs(local_port & 0xFFFF) == port:
-            return pid, socket.inet_ntoa(local_addr.to_bytes(4, "little"))
-    return None
+        out.append((socket.ntohs(local_port & 0xFFFF), socket.inet_ntoa(local_addr.to_bytes(4, "little")), pid))
+    return out
+
+
+def port_owner(port: int) -> tuple[int, str] | None:
+    """Processus qui écoute sur le port TCP local, et l'adresse d'écoute (pour vérifier 127.0.0.1)."""
+    return next(((pid, address) for number, address, pid in listeners() if number == port), None)
 
 
 # --- Contenu prêt (applications Store, UWP, WinUI) ------------------------------------------------------------
@@ -600,6 +588,212 @@ def _app_id_path(app_id: str) -> str | None:
     return None
 
 
+# --- Dossier ou document ouvert par son association -------------------------------------------------------------
+class SHELLEXECUTEINFOW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_ulong),
+        ("fMask", ctypes.c_ulong),
+        ("hwnd", ctypes.c_void_p),
+        ("lpVerb", ctypes.c_wchar_p),
+        ("lpFile", ctypes.c_wchar_p),
+        ("lpParameters", ctypes.c_wchar_p),
+        ("lpDirectory", ctypes.c_wchar_p),
+        ("nShow", ctypes.c_int),
+        ("hInstApp", ctypes.c_void_p),
+        ("lpIDList", ctypes.c_void_p),
+        ("lpClass", ctypes.c_wchar_p),
+        ("hkeyClass", ctypes.c_void_p),
+        ("dwHotKey", ctypes.c_ulong),
+        ("hIconOrMonitor", ctypes.c_void_p),
+        ("hProcess", ctypes.c_void_p),
+    ]
+
+
+SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC, SEE_MASK_FLAG_NO_UI = 0x40, 0x100, 0x400
+_shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+_shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SHELLEXECUTEINFOW)]
+_shell32.ShellExecuteExW.restype = ctypes.c_bool
+_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+_kernel32.GetProcessId.argtypes = [ctypes.c_void_p]
+_kernel32.GetProcessId.restype = ctypes.c_ulong
+_kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+
+
+def openable(candidate: str) -> Path | None:
+    """Chemin existant d'un dossier ou d'un document (pas d'un programme) : ouvert par son association, comme un
+    double-clic de Julien. Un programme, quel que soit son nom, reste un lancement d'exécutable (et sa politique)."""
+    if not candidate:
+        return None
+    path = Path(os.path.expandvars(os.path.expanduser(candidate)))
+    try:
+        if path.is_dir():
+            return path.resolve()
+        if not path.is_file() or path.suffix.lower() == ".exe" or policy.pe_subsystem(str(path)) is not None:
+            return None
+    except OSError:
+        return None
+    return path.resolve()
+
+
+def shell_open(path: Path) -> int:
+    """ShellExecuteEx « open » sans activation demandée ; pid du processus qui l'ouvre (0 : application déjà ouverte
+    qui l'a pris en charge, ou Explorateur)."""
+    info = SHELLEXECUTEINFOW()
+    info.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI
+    info.lpVerb = "open"
+    info.lpFile = str(path)
+    info.nShow = w.SW_SHOWNOACTIVATE
+    if not _shell32.ShellExecuteExW(ctypes.byref(info)):
+        raise LaunchError(f"Ouverture de « {path} » refusée par Windows (erreur {ctypes.get_last_error()}).")
+    if not info.hProcess:
+        return 0
+    try:
+        return int(_kernel32.GetProcessId(info.hProcess))
+    finally:
+        _kernel32.CloseHandle(info.hProcess)
+
+
+def explorer_tabs(hwnd: int) -> list[str]:
+    """Dossiers affichés par les onglets d'une fenêtre de l'Explorateur (Windows 11 : un onglet par élément de
+    Shell.Application, même HWND). Vide si la fenêtre n'est pas une fenêtre de l'Explorateur."""
+    tabs: list[str] = []
+    try:
+        shell = comtypes.client.CreateObject("Shell.Application", dynamic=True)
+        windows = shell.Windows()
+        for index in range(int(windows.Count)):
+            try:
+                item = windows.Item(index)
+                if item is not None and int(item.HWND) == hwnd:
+                    tabs.append(str(item.Document.Folder.Self.Path))
+            except comtypes.COMError, AttributeError, OSError, ValueError:
+                continue
+    except comtypes.COMError, OSError:
+        return []
+    return tabs
+
+
+def explorer_windows(path: Path) -> list[int]:
+    """Fenêtres de l'Explorateur dont le dossier affiché est exactement `path` (Shell.Application)."""
+    wanted = os.path.normcase(str(path))
+    found: list[int] = []
+    try:
+        shell = comtypes.client.CreateObject("Shell.Application", dynamic=True)
+        windows = shell.Windows()
+        for index in range(int(windows.Count)):
+            try:
+                item = windows.Item(index)
+                if item is not None and os.path.normcase(str(item.Document.Folder.Self.Path)) == wanted:
+                    found.append(int(item.HWND))
+            except comtypes.COMError, AttributeError, OSError, ValueError:
+                continue
+    except comtypes.COMError, OSError:
+        return []
+    return found
+
+
+def titled_windows(text: str) -> list[int]:
+    """Fenêtres d'application dont le titre contient `text` (sans casse)."""
+    low = text.lower()
+    return [h for h in w.enum_windows() if snapshot.is_app_window(h) and low in w.window_text(h).lower()]
+
+
+REUSED_AFTER_S = (
+    1.5  # une fenêtre déjà ouverte n'est retenue qu'après ce délai sans nouvelle fenêtre (onglet, instance)
+)
+
+
+def _opened_window(path: Path, folder: bool, before: set[int], waited_s: float) -> int:
+    """Nouvelle fenêtre qui montre le dossier ou le document ; une fenêtre déjà ouverte seulement après
+    REUSED_AFTER_S (l'application a pu l'ouvrir dans un onglet ou une instance existante), et pour un document
+    seulement si son titre porte le nom COMPLET du fichier (extension comprise) : jamais une fenêtre sans lien dont le
+    titre contient le même mot."""
+    if folder:
+        candidates = explorer_windows(path)
+        fresh = [h for h in candidates if h not in before]
+        old = candidates
+    else:
+        fresh = [h for h in titled_windows(path.stem) if h not in before] if len(path.stem) >= 3 else []
+        fresh = fresh or [h for h in titled_windows(path.name) if h not in before]
+        old = titled_windows(path.name)
+    if fresh:
+        return fresh[0]
+    return old[0] if old and waited_s >= REUSED_AFTER_S else 0
+
+
+def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> Launched:
+    """Ouvre un dossier (Explorateur) ou un document (application associée) sans lui donner la main, et VÉRIFIE ce
+    qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), ou fenêtre dont le titre porte le
+    nom du document. Faute de preuve, la note le dit (jamais « ouvert » supposé)."""
+    folder = path.is_dir()
+    policy.check_open_document(str(path))
+    via = "dossier" if folder else "document"
+    notes: list[str] = []
+    pid = shell_open(path)
+    start = time.monotonic()
+    deadline = start + max(1.0, wait_s)
+    took_back = False
+    hwnd = 0
+    while True:
+        fg = w.foreground()
+        if (
+            user_front
+            and fg
+            and fg != user_front
+            and w.root(fg) not in before
+            and not foreground.user_is_switching()
+            and (
+                w.class_name(w.root(fg)) in policy.SOFT_DENY_CLASSES
+                if folder
+                else path.stem.lower() in w.window_text(w.root(fg)).lower()
+            )  # jamais une fenêtre que Julien vient d'ouvrir lui-même : seulement celle du dossier ou du document
+        ):
+            took_back = foreground.give_back(user_front, exclude={fg}) or took_back  # la nouvelle fenêtre s'est activée
+        hwnd = _opened_window(path, folder, before, time.monotonic() - start)
+        if hwnd or time.monotonic() >= deadline:
+            break
+        time.sleep(0.05)
+    verified = bool(hwnd)
+    if hwnd:
+        # Explorateur : Windows 11 réutilise une fenêtre cachée créée d'avance (mesuré le 15/10 : « déjà là » avec 0
+        # onglet visible) ; seuls ses onglets disent si la fenêtre est partagée avec Julien.
+        tabs = len(explorer_tabs(hwnd)) if folder else 0
+        shared = tabs > 1 if folder else hwnd in before
+        where = (
+            (f"onglet d'une fenêtre à {tabs} onglets" if shared else "fenêtre à lui seul")
+            if folder
+            else ("fenêtre déjà ouverte" if shared else "nouvelle fenêtre")
+        )
+        shown = f"dossier affiché « {path} »" if folder else f"titre « {snapshot.clip(w.window_text(hwnd), 80)} »"
+        notes.append(f"ouverture vérifiée ({where}, {shown})")
+        if shared:
+            notes.append(
+                "ouvert dans une fenêtre que Julien avait déjà (nouvel onglet ou document de la même instance) : ne "
+                "pas fermer cette fenêtre, elle porte aussi ses propres onglets ou documents (fermer seulement "
+                "l'onglet ouvert, ctrl+w)"
+            )
+        fg = w.foreground()
+        if fg and fg != user_front and user_front and w.IsWindow(user_front):
+            windows = foreground.target_windows(hwnd)
+            if foreground.belongs_to(fg, windows, foreground.target_pids(hwnd), before):
+                took_back = foreground.give_back(user_front, exclude=windows) or took_back
+        if w.foreground() != hwnd and user_front and w.IsWindow(user_front) and hwnd not in before:
+            w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+    else:
+        notes.append(
+            f"ouverture NON vérifiée : aucune fenêtre {'de l’Explorateur sur ce dossier' if folder else 'portant le nom du document'} "
+            f"en {max(1.0, wait_s):.0f} s (windows pour la chercher)"
+        )
+    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
+    if not returned:
+        notes.append("la fenêtre a pris le premier plan et Windows a refusé de le rendre (la garde réessaie)")
+    elif took_back:
+        notes.append("la fenêtre s'est mise devant : premier plan rendu aussitôt à Julien")
+    log.event("open", {"via": via, "verified": verified, "pid": pid})
+    app_pid = foreground.app_pid(hwnd) if hwnd else pid
+    return Launched(hwnd, app_pid, 0, via, notes, None, user_front, returned)
+
+
 def launch(
     app: str,
     args: str = "",
@@ -607,9 +801,10 @@ def launch(
     wait_s: float = 15.0,
     auto: uia.Automation | None = None,
     on_account_kill: Callable[[Path], None] | None = None,
+    restart: bool = False,
 ) -> Launched:
     """on_account_kill(profil) : appelé quand la garde de compte ferme le navigateur DevTools lancé (le serveur y
-    oublie ce processus)."""
+    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de Julien)."""
     notes: list[str] = []
     user_front = w.foreground()
     before = set(w.enum_windows())
@@ -622,17 +817,28 @@ def launch(
     profile: Path | None = None
     browser = False
     candidate = app.strip().strip('"')
+    document = openable(candidate)
+    if document is not None:
+        if args.strip() or devtools or restart:
+            raise LaunchError("Ouvrir un dossier ou un document : ni args, ni devtools, ni restart.")
+        return open_path(document, wait_s, user_front, before)
     exe = None
     if Path(os.path.expandvars(candidate)).exists():
         exe = os.path.expandvars(candidate)
     elif shutil.which(candidate):
         exe = shutil.which(candidate)
+    if exe is None and candidate.lower() in ("steam", "steam.exe"):
+        exe = steam.steam_exe()
     if exe is None and " " in app and not _is_start_app(app):
         parts = shlex.split(app, posix=False)
         head = parts[0].strip('"')
         if Path(head).exists() or shutil.which(head):
             exe = shutil.which(head) or head
             args = " ".join(parts[1:]) + (" " + args if args else "")
+    if exe is not None and steam.is_steam_exe(exe):
+        return launch_steam(exe, args, devtools, restart, wait_s, user_front, before)
+    if restart:
+        raise LaunchError("restart=true : seulement pour Steam (relance avec ses commutateurs).")
     if exe is not None:
         policy.check_launch_exe(exe, args, devtools=devtools)
         browser = policy.is_browser_exe(exe)
@@ -672,7 +878,7 @@ def launch(
         target = _app_id_path(app_id)
         if target and target.lower().endswith(".exe"):
             # Exécutable : politique et identité par processus.
-            return launch(target, args, devtools, wait_s, auto, on_account_kill)
+            return launch(target, args, devtools, wait_s, auto, on_account_kill, restart)
         if target:
             policy.check_launch_exe(target, "")  # document ouvert par son association : jamais un script
         policy.check_launch_app_id(app_id, title_hint, args, devtools)
@@ -768,3 +974,124 @@ def launch(
     if pid and app_pid != pid and w.process_name(app_pid).lower() in foreground.HOST_PROCESSES:
         app_pid = pid  # cadre UWP sans CoreWindow enfant : l'application est le processus lancé, pas l'hôte
     return Launched(hwnd, app_pid, port, via, notes, profile, user_front, returned)
+
+
+# --- Steam ----------------------------------------------------------------------------------------------------
+def _wait_steam(deadline: float, user_front: int, before: set[int]) -> tuple[int, bool]:
+    """Attend la fenêtre principale de Steam (steamwebhelper), en rendant le premier plan à Julien dès qu'une fenêtre
+    de Steam le prend (fenêtre de mise à jour de steam.exe comprise)."""
+    took_back = False
+    while True:
+        fg = w.foreground()
+        name = w.process_name(w.window_pid(fg)).lower() if fg else ""
+        if (
+            user_front
+            and fg
+            and fg != user_front
+            and name in (steam.STEAM_EXE, steam.WEBHELPER)
+            and not foreground.user_is_switching()
+        ):
+            took_back = foreground.give_back(user_front, exclude={fg}) or took_back
+        hwnd = steam.main_window()
+        if hwnd:
+            return hwnd, took_back
+        if time.monotonic() >= deadline:
+            return 0, took_back
+        time.sleep(0.1)
+
+
+def launch_steam(
+    exe: str, args: str, devtools: bool, restart: bool, wait_s: float, user_front: int, before: set[int]
+) -> Launched:
+    """Steam avec -cef-disable-occlusion -cef-force-accessibility (lisible et pilotable recouvert), et
+    -cef-enable-debugging si devtools (port 127.0.0.1:8080 sur la session de Julien : seulement avec son accord).
+    Steam déjà ouvert : ses commutateurs ne changent qu'à une relance (restart, accord de Julien ; refusée si un jeu
+    tourne). Tout est contrôlé AVANT de fermer Steam."""
+    policy.check_launch_exe(exe, args)  # arguments du modèle : jamais de port DevTools ni de commutateur dangereux
+    notes: list[str] = []
+    running = bool(steam.steam_pids())
+    if running and not restart:
+        port = steam.debugging_port() if devtools else None
+        if devtools and not port:
+            raise LaunchError(
+                "Steam est déjà ouvert sans DevTools : ses commutateurs ne s'appliquent qu'au démarrage. Avec l'accord "
+                'de Julien, launch(app="Steam", devtools=true, restart=true) le ferme puis le relance (téléchargements '
+                "interrompus ; refusé si un jeu tourne). Rien n'a été fait."
+            )
+        hwnd = steam.main_window()
+        took_back = False
+        if not hwnd:
+            # Steam dans la zone de notification : sa fenêtre principale s'ouvre par son propre protocole.
+            subprocess.Popen(
+                [exe, "steam://open/main"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )  # fmt: skip
+            hwnd, took_back = _wait_steam(time.monotonic() + max(5.0, wait_s), user_front, before)
+        notes.append(
+            "Steam était déjà ouvert (fenêtre existante)"
+            + (
+                f", DevTools déjà actif sur 127.0.0.1:{port}"
+                if port
+                else " ; si look le trouve vide une fois recouvert, restart=true (accord de Julien) le relance avec "
+                "-cef-disable-occlusion -cef-force-accessibility"
+            )
+        )
+        if took_back:
+            notes.append("Steam s'est mis devant : premier plan rendu aussitôt à Julien")
+        pid = w.window_pid(hwnd) if hwnd else 0
+        if port:
+            log.event("steam-devtools", {"action": "enregistré", "port": port, "pid": pid})
+        return Launched(hwnd, pid, port or 0, "Steam", notes, None, user_front, True, own_session=bool(port))
+    if devtools:
+        other = steam.port_taken_by_other()
+        if other and other.lower() != steam.WEBHELPER:
+            raise LaunchError(
+                f"Port {steam.DEVTOOLS_PORT} déjà pris par {other} : le DevTools de Steam ne pourrait pas s'y ouvrir "
+                "(et ce programme serait pris pour Steam). Rien n'a été fermé."
+            )
+    if running:
+        try:
+            steam.shutdown(exe)
+        except steam.SteamError as error:
+            raise LaunchError(str(error)) from error
+        notes.append("Steam fermé proprement puis relancé")
+        before = set(w.enum_windows())
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = w.SW_SHOWNOACTIVATE
+    try:
+        proc = subprocess.Popen(
+            steam.command(exe, args, devtools), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, startupinfo=startupinfo,
+        )  # fmt: skip
+    except OSError as error:
+        raise LaunchError(f"Lancement impossible de Steam : {error}") from error
+    log.event("steam", {"action": "lancement", "devtools": devtools, "relance": running, "pid": proc.pid})
+    deadline = time.monotonic() + max(wait_s, steam.START_WAIT_S)
+    hwnd, took_back = _wait_steam(deadline, user_front, before)
+    notes.append("Steam : -cef-disable-occlusion -cef-force-accessibility (lisible et pilotable même recouvert)")
+    port = 0
+    if devtools:
+        while time.monotonic() < deadline:
+            port = steam.debugging_port() or 0
+            if port:
+                break
+            time.sleep(0.5)
+        if port:
+            notes.append(
+                f"DevTools de Steam sur 127.0.0.1:{port} : la session Steam de Julien est accessible à tout programme "
+                'local tant que Steam reste ouvert ainsi ; launch(app="Steam", restart=true) sans devtools le referme'
+            )
+            log.event("steam-devtools", {"action": "ouvert", "port": port, "pid": proc.pid})
+        else:
+            notes.append("DevTools de Steam : port non ouvert dans le délai (actions sans DevTools)")
+    if not hwnd:
+        notes.append("fenêtre principale de Steam pas encore affichée (mise à jour, connexion ?) : windows puis look")
+    elif took_back:
+        notes.append("Steam s'est mis devant : premier plan rendu aussitôt à Julien")
+    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
+    pid = w.window_pid(hwnd) if hwnd else proc.pid
+    return Launched(
+        hwnd, pid, port, "Steam (relancé)" if running else "Steam", notes, None, user_front, returned,
+        own_session=bool(port),
+    )  # fmt: skip

@@ -80,10 +80,12 @@ class Session:
     shown: dict[int, snapshot.View] = field(default_factory=dict)
     frames: dict[int, snapshot.Frame] = field(default_factory=dict)  # cadre de la dernière image montrée
     devtools: dict[int, int] = field(default_factory=dict)  # pid → port DevTools vérifié
-    pages: dict[int, cdp.Page] = field(default_factory=dict)  # hwnd → page connectée
+    pages: dict[int | tuple[int, str], cdp.Page] = field(default_factory=dict)  # hwnd (ou hwnd, titre) → page
     dead_ports: dict[int, float] = field(default_factory=dict)  # port → instant du dernier échec
     profiles: dict[int, Path] = field(default_factory=dict)  # pid → profil jetable d'un navigateur DevTools
     identities: dict[int, int] = field(default_factory=dict)  # pid → heure de création relevée à l'enregistrement
+    # pid → port DevTools ouvert sur la session réelle de Julien (Steam), avec son accord : jamais fermé par l'outil.
+    own_sessions: set[int] = field(default_factory=set)
 
     # --- Fenêtres -----------------------------------------------------------------------------------------------
     def resolve_window(self, spec: int | str | None) -> int:
@@ -140,16 +142,17 @@ class Session:
         self.views.pop(hwnd, None)
         self.shown.pop(hwnd, None)
         self.frames.pop(hwnd, None)
-        page = self.pages.pop(hwnd, None)
-        if page:
-            page.close()
+        for key in [k for k in self.pages if k == hwnd or (isinstance(k, tuple) and k[0] == hwnd)]:
+            self.pages.pop(key).close()
 
     def forget_all(self) -> None:
-        for hwnd in list(self.views) + list(self.pages):
+        for hwnd in list(self.views) + [k[0] if isinstance(k, tuple) else k for k in self.pages]:
             self.forget(hwnd)
 
     # --- DevTools -----------------------------------------------------------------------------------------------
-    def register_devtools(self, pid: int, port: int, profile: Path | None = None, timeout_s: float = 6.0) -> bool:
+    def register_devtools(
+        self, pid: int, port: int, profile: Path | None = None, timeout_s: float = 6.0, own_session: bool = False
+    ) -> bool:
         """N'enregistre le port que s'il répond en DevTools, n'écoute que sur 127.0.0.1 et appartient bien au
         processus de l'application lancée (pas à un autre programme qui aurait pris le port entre-temps).
         Le profil jetable du navigateur est retenu même sans port vérifié : son compte est contrôlé avant chaque act."""
@@ -168,6 +171,8 @@ class Session:
                 if owner is None or owner[1] != "127.0.0.1" or owner[0] not in descendants(pid):
                     return False
                 self.devtools[pid] = port
+                if own_session:
+                    self.own_sessions.add(pid)
                 return True
             time.sleep(0.2)
         return False
@@ -177,6 +182,7 @@ class Session:
         self.devtools.pop(pid, None)
         self.profiles.pop(pid, None)
         self.identities.pop(pid, None)
+        self.own_sessions.discard(pid)
 
     def forget_profile(self, profile: Path) -> None:
         """Rappel de la garde de compte (launch.guard_account, autre fil) : le navigateur de ce profil a été fermé."""
@@ -193,8 +199,8 @@ class Session:
 
         pid = w.window_pid(hwnd)
         port, profile = self.devtools.get(pid), self.profiles.get(pid)
-        if not port and profile is None:
-            return
+        if (not port and profile is None) or (pid in self.own_sessions and profile is None):
+            return  # session de Julien ouverte avec son accord (Steam) : jamais fermée par l'outil
         handle = _open(pid)
         try:
             if not handle or _started_at(handle) != self.identities.get(pid):
@@ -219,41 +225,45 @@ class Session:
             f"compte de Julien derrière un port DevTools){launch._profile_fate(profile, removed)}."
         )
 
-    def page(self, hwnd: int) -> cdp.Page | None:
+    def page(self, hwnd: int, title: str | None = None) -> cdp.Page | None:
         """Page DevTools de la fenêtre, sondée en PROBE_S. None : pas de DevTools pour cette fenêtre (port absent ou
         mort, onglet non désignable). Lève PageBusy si la page ne répond pas (boîte JavaScript, script long) : le
-        port n'est pas déclaré mort et aucune nouvelle connexion n'est ouverte, elle bloquerait de même."""
+        port n'est pas déclaré mort et aucune nouvelle connexion n'est ouverte, elle bloquerait de même.
+        title : titre du document visé quand la fenêtre en porte plusieurs (Steam : cadre et magasin dans la même
+        fenêtre) ; sinon le titre de la fenêtre désigne la page."""
         pid = w.window_pid(hwnd)
         port = self.devtools.get(pid)
         if not port:
             return None
         if time.monotonic() - self.dead_ports.get(port, -1e9) < DEAD_PORT_S:
             return None  # échec récent : ne pas repayer le délai à chaque action
-        page = self.pages.get(hwnd)
+        key: int | tuple[int, str] = hwnd if title is None else (hwnd, title)
+        wanted = w.window_text(hwnd) if title is None else title
+        page = self.pages.get(key)
         if page is not None:
             try:
-                if self._shows(page, hwnd):
+                if self._shows(page, wanted):
                     return page
             except cdp.PageGone:
                 pass  # onglet fermé ou connexion perdue : reconnexion ci-dessous
-            self.page_failed(hwnd)
+            self.page_failed(key)
         try:
-            page = cdp.Page(port, match=w.window_text(hwnd))
+            page = cdp.Page(port, match=wanted)
         except cdp.AmbiguousPage:
             return None  # pas un port mort : simplement pas de page désignable pour cette action
         except cdp.CDPError:
             self.dead_ports[port] = time.monotonic()
             return None
-        self.pages[hwnd] = page
+        self.pages[key] = page
         try:
             page.evaluate("1", timeout_s=PROBE_S)
         except cdp.PageGone:
-            self.page_failed(hwnd)  # partie entre la liste et la connexion : pas de DevTools pour cette action
+            self.page_failed(key)  # partie entre la liste et la connexion : pas de DevTools pour cette action
             return None
         return page
 
     @staticmethod
-    def _shows(page: cdp.Page, hwnd: int) -> bool:
+    def _shows(page: cdp.Page, wanted: str) -> bool:
         """L'onglet actif a pu changer depuis la connexion : la page doit être visible (onglet de premier plan de sa
         fenêtre) et son titre s'accorder avec celui de la fenêtre (qui le suit avec un léger retard). PageBusy et
         PageGone remontent à l'appelant."""
@@ -264,13 +274,13 @@ class Session:
                 raise
             except cdp.CDPError, TypeError, ValueError:  # exception JavaScript, réponse d'une autre forme
                 return False
-            if visibility == "visible" and cdp.titles_agree(w.window_text(hwnd), str(title or "")):
+            if visibility == "visible" and cdp.titles_agree(wanted, str(title or "")):
                 return True
             if attempt == 0:
                 time.sleep(0.15)
         return False
 
-    def page_failed(self, hwnd: int) -> None:
+    def page_failed(self, hwnd: int | tuple[int, str]) -> None:
         """Erreur pendant un appel DevTools : on jette la connexion (elle sera refaite, ou le port déclaré mort)."""
         page = self.pages.pop(hwnd, None)
         if page:

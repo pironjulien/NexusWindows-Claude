@@ -1,0 +1,161 @@
+"""Postconditions de champ (`check` d'une étape) : l'état voulu d'UN élément, relu avant et après l'action.
+
+Repris du modèle de NexusCodex : une action n'est « vérifiée » que si l'état voulu est relu après elle ; s'il était
+déjà vrai avant, l'action n'est pas faite (« déjà fait », aucune entrée) ; une lecture impossible n'est jamais un
+succès ni un échec (« inconnu »). Quatre issues pour le modèle : ✓ vérifié, = déjà fait, ~ inconnu, ✗ échec ou non
+atteint.
+
+Champs (tous ceux donnés doivent être vrais) : value (valeur exacte, espaces normalisés), contains (sous-chaîne,
+sans casse), checked, selected, expanded, focused, enabled, exists. Un état que l'élément ne publie pas reste
+inconnu (None), jamais faux.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from . import snapshot, uia, worker
+
+FIELDS = ("value", "contains", "checked", "selected", "expanded", "focused", "enabled")
+TOGGLE_ON, TOGGLE_OFF = 1, 0
+EXPANDED, PARTIAL, LEAF = 1, 2, 3
+
+
+@dataclass
+class Verdict:
+    state: bool | None  # True : vrai ; False : faux ; None : illisible
+    detail: str
+
+
+def describe(check: dict[str, Any]) -> str:
+    target = check.get("target")
+    parts = []
+    for key in FIELDS:
+        if check.get(key) is not None:
+            value = check[key]
+            parts.append(f"{key}={value!r}" if isinstance(value, str) else f"{key}={'oui' if value else 'non'}")
+    if check.get("exists") is not None:
+        parts.append("présent" if check["exists"] else "absent")
+    return f"« {target} » {', '.join(parts) or 'présent'}"
+
+
+def _value(props: dict) -> str | None:
+    for key in ("value", "legacy_value"):
+        if props.get(key) is not None:
+            return snapshot.norm(str(props[key]))
+    if not props.get("has_value") and props.get("name") is not None:
+        return snapshot.norm(str(props["name"]))  # texte statique : son contenu est son nom
+    return None
+
+
+def _checked(props: dict) -> bool | None:
+    toggle = props.get("toggle")
+    if toggle in (TOGGLE_ON, TOGGLE_OFF):
+        return toggle == TOGGLE_ON
+    if toggle is None and props.get("selected") is not None:
+        return bool(props["selected"])  # bouton radio : coché = choisi
+    return None
+
+
+def _expanded(props: dict) -> bool | None:
+    state = props.get("expand")
+    if state in (EXPANDED, PARTIAL):
+        return True
+    if state == 0:
+        return False
+    return None  # feuille (LEAF) ou motif absent
+
+
+def _compare(props: dict, check: dict[str, Any]) -> Verdict:
+    states: list[bool | None] = []
+    seen: list[str] = []
+    value = _value(props)
+    if check.get("value") is not None:
+        states.append(None if value is None else value == snapshot.norm(check["value"]))
+        seen.append(f"valeur {snapshot.clip(value or '?', 60)!r}")
+    if check.get("contains") is not None:
+        wanted = snapshot.norm(check["contains"]).lower()
+        states.append(None if value is None else wanted in value.lower())
+        if check.get("value") is None:
+            seen.append(f"valeur {snapshot.clip(value or '?', 60)!r}")
+    readers = {
+        "checked": _checked,
+        "selected": lambda p: None if p.get("selected") is None else bool(p["selected"]),
+        "expanded": _expanded,
+        "focused": lambda p: None if p.get("focused") is None else bool(p["focused"]),
+        "enabled": lambda p: None if p.get("enabled") is None else bool(p["enabled"]),
+    }
+    for key, read in readers.items():
+        if check.get(key) is None:
+            continue
+        actual = read(props)
+        states.append(None if actual is None else actual == bool(check[key]))
+        seen.append(f"{key} {'?' if actual is None else ('oui' if actual else 'non')}")
+    if check.get("exists") is False:
+        states.append(False)  # l'élément est là alors qu'il devait avoir disparu
+        seen.append("présent")
+    if not states:
+        states.append(True)  # seulement « présent »
+        seen.append("présent")
+    if any(s is False for s in states):
+        return Verdict(False, ", ".join(seen))
+    if any(s is None for s in states):
+        return Verdict(None, ", ".join(seen) + " (état non publié par l'élément)")
+    return Verdict(True, ", ".join(seen))
+
+
+def _find(executor, target: Any) -> tuple[Any | None, str]:
+    """Élément visé par la postcondition, sans rien faire défiler. (élément ou None si absent, cause si illisible)."""
+    from .actions import ActionError  # import local : actions importe ce module
+
+    if isinstance(target, int) or (isinstance(target, str) and snapshot._ID.match(target)):
+        try:
+            return executor.resolve(target)[1], ""
+        except ActionError as error:
+            return None, str(error)
+    view = executor._rebuild()
+    try:
+        return snapshot.pick(view, str(target))[0], ""
+    except snapshot.AmbiguousTarget as error:
+        raise ActionError(f"check : {error}") from None
+    except snapshot.TargetError:
+        pass
+    hidden = snapshot.scrolled_away(view)  # présent mais hors de vue (page défilée) : il existe quand même
+    try:
+        return snapshot.pick(dataclasses.replace(view, elements=hidden), str(target))[0], ""
+    except snapshot.TargetError:
+        return None, executor._unreadable(view)
+
+
+def evaluate(executor, check: dict[str, Any]) -> Verdict:
+    """État actuel de la postcondition (relu en direct)."""
+    element, unreadable = _find(executor, check["target"])
+    if element is None:
+        if check.get("exists") is False:
+            if unreadable:
+                return Verdict(None, f"absent de la lecture, mais lecture incomplète ({unreadable})")
+            return Verdict(True, "absent")
+        if unreadable:
+            return Verdict(None, f"introuvable, lecture incomplète ({unreadable})")
+        return Verdict(False, "introuvable")
+    try:
+        props = executor._refresh(element.node.element)
+    except uia.UIAError as error:
+        return Verdict(None, f"relecture impossible ({error})")
+    merged = {**element.props, **(props or {})}
+    return _compare(merged, check)
+
+
+def wait(executor, check: dict[str, Any], timeout_s: float) -> Verdict:
+    """Relit jusqu'à ce que la postcondition soit vraie ou jusqu'au délai ; rend le dernier verdict. Ne rejoue
+    jamais l'action : seulement des lectures."""
+    deadline = time.monotonic() + max(0.1, min(float(timeout_s), 30.0))
+    while True:
+        worker.check_cancelled()
+        verdict = evaluate(executor, check)
+        if verdict.state is True or time.monotonic() >= deadline:
+            return verdict
+        time.sleep(0.1)
