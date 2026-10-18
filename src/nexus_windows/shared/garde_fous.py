@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 POLICY_FILE = Path(__file__).resolve().with_name("garde-fous.json")
-AGENTS = ("claude", "antigravity")
+AGENTS = ("claude", "antigravity", "codex")
 
 _lock = threading.Lock()
 _cache: tuple[tuple[str, int, int], dict[str, Any]] | None = None

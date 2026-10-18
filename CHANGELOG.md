@@ -6,6 +6,10 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Changed
+- Shared guard-rail policy updated (same file as the Codex, Antigravity and Android editions): calling ("appeler",
+  "call") now needs `confirm: true` too.
+
 ### Fixed
 - Supervisor: the reload note and the `tools/list` tracking are released before the result is checked, so nothing is
   left pending when the server child answers with a JSON-RPC error (review by Antigravity).

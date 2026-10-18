@@ -1,5 +1,5 @@
 {
-  "_": "Politique unique des garde-fous de bureau de Claude (nexus-windows) et d'Antigravity (Computer Use NexusAGY). Accord Claude–Antigravity du 18/10/2026 (journal-trinite.md, entrée « Garde-fous »). Tout ce qui n'est pas ici est libre. Lue par garde_fous.py (même dossier). Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
+  "_": "Politique unique des garde-fous de bureau de Claude (nexus-windows) et d'Antigravity (Computer Use NexusAGY). Accord Claude–Antigravity du 18/10/2026 (journal-trinite.md, entrée « Garde-fous »). Tout ce qui n'est pas ici est libre. Lue par garde_fous.py (même dossier) et par le Computer Use de NexusCodex (lib/garde-fous.mjs, copie embarquée identique pour sa version publique). Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
   "version": 1,
   "blocage_dur": {
     "_": "Jamais lu ni piloté (règles 1 et 2 de l'accord : pas d'auto-élévation, pas de fuite de secrets). Chaque agent applique les catégories listées pour lui dans « agents ».",
@@ -16,15 +16,21 @@
     "gestionnaires_mots_de_passe": {
       "raison": "gestionnaire de mots de passe",
       "prefixes_processus": ["keepass", "bitwarden", "1password", "dashlane", "nordpass", "roboform", "lastpass"]
+    },
+    "fenetre_autorisation_codex": {
+      "raison": "application de Codex lui-même : ses demandes d'autorisation (applications du Computer Use, plugins) s'affichent dans sa fenêtre principale, pas dans une fenêtre à part",
+      "processus": ["codex.exe", "chatgpt.exe"],
+      "classes": []
     }
   },
   "agents": {
-    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 18/10 (accord) : Antigravity reste le recours pour les invites d'identifiants Windows (Claude ne tape pas de mot de passe) ; la fenêtre de l'agent lui-même n'est bloquée pour aucun des deux (aucune demande d'autorisation n'y passe : Julien travaille en « ignorer les permissions », Antigravity n'en affiche pas).",
+    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 18/10 (accord) : Antigravity reste le recours pour les invites d'identifiants Windows (Claude ne tape pas de mot de passe) ; la fenêtre de l'agent lui-même n'est bloquée pour aucun des deux (aucune demande d'autorisation n'y passe : Julien travaille en « ignorer les permissions », Antigravity n'en affiche pas). Codex (Computer Use de NexusCodex, 18/10) : sa propre application reste bloquée, parce que le Computer Use de Codex y demande l'accès aux applications dans la fenêtre principale ; il ne tape pas de mot de passe (identifiants Windows bloqués, comme Claude).",
     "claude": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe"],
-    "antigravity": ["bureau_securise", "gestionnaires_mots_de_passe"]
+    "antigravity": ["bureau_securise", "gestionnaires_mots_de_passe"],
+    "codex": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe", "fenetre_autorisation_codex"]
   },
   "confirmation": {
-    "_": "Confirmation étanche : un geste dont la cible porte l'un de ces mots exige confirm=true, posé seulement sur l'ordre explicite de Julien ou après son oui. Ni Entrée, ni Espace, ni Ctrl+Entrée, ni Alt+lettre, ni un clic en coordonnées ne la contournent. Mise en production, push et déploiement des projets de Julien : jamais ici (autorisés durablement). Verbes d'action seulement : « Boîte d'envoi », « Éléments envoyés » ne comptent pas (rôles non actifs).",
+    "_": "Confirmation étanche : un geste dont la cible porte l'un de ces mots exige confirm=true, posé seulement sur l'ordre explicite de Julien ou après son oui. Ni Entrée, ni Espace, ni Ctrl+Entrée, ni Alt+lettre, ni un clic en coordonnées ne la contournent. Mise en production, push et déploiement des projets de Julien : jamais ici (autorisés durablement). Appeler : un appel téléphonique ou vocal sortant est une communication chez un tiers (relecture d'Antigravity du 18/10, règle « garde-fous stricts smartphone » de Julien). Verbes d'action seulement : « Boîte d'envoi », « Éléments envoyés » ne comptent pas (rôles non actifs).",
     "motifs": [
       "pay(er|ez)?",
       "paiement",
@@ -33,7 +39,7 @@
       "buy",
       "purchase",
       "checkout",
-      "commander",
+      "command(er|ez)",
       "(valider|passer|confirmer|finaliser) (la |ma |votre )?commande",
       "place (the |your )?order",
       "virement",
@@ -42,6 +48,9 @@
       "transfer money",
       "envoy(er|ez)",
       "envoie",
+      "appel(er|ez)",
+      "appel (video|vocal|audio)",
+      "call",
       "send",
       "publi(er|ez)",
       "publish",
