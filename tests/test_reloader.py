@@ -40,6 +40,8 @@ for line in sys.stdin:
             os._exit(3)
         if name == "slow":
             time.sleep(1.0)
+        if name == "silent":  # appel annulé : le SDK MCP n'y répond jamais
+            continue
         if name == "stale-once" and (here / "stale").exists():
             (here / "stale").unlink()
             text(msg_id, "serveur nexus-windows dépassé : reconnecter (/mcp) (test). Rien n'a été fait.", True)
@@ -71,8 +73,8 @@ class Out:
             time.sleep(0.02)
         raise AssertionError(f"rien reçu ; messages : {self.messages}")
 
-    def reply(self, msg_id) -> dict[str, Any]:
-        return self.wait(lambda m: m.get("id") == msg_id)
+    def reply(self, msg_id, timeout: float = 20.0) -> dict[str, Any]:
+        return self.wait(lambda m: m.get("id") == msg_id, timeout)
 
 
 @pytest.fixture
@@ -177,6 +179,36 @@ def test_waits_for_running_call_before_reloading(harness):
     slow_result = harness.out.reply(slow)["result"]
     assert "version 1.0" in _text(slow_result)  # l'appel en cours finit sur l'ancien serveur
     assert "version 2.0" in _text(harness.out.reply(quick)["result"])
+
+
+def test_cancelled_call_never_blocks_the_next_reload(harness):
+    """Régression 0.9.1 : un appel annulé par le client (jamais répondu) restait « en cours » ; le rechargement suivant
+    l'attendait sans fin et plus aucun appel ne répondait."""
+    harness.handshake()
+    silent = harness.send("tools/call", {"name": "silent", "arguments": {}})
+    harness.send("notifications/cancelled", {"requestId": silent, "reason": "timeout"}, notify=True)
+    harness.new_code("2.0")
+    result = harness.out.reply(harness.send("tools/call", {"name": "look", "arguments": {}}), timeout=5.0)["result"]
+    assert "version 2.0" in _text(result)
+
+
+def test_hung_call_is_abandoned_then_reload_proceeds(harness, monkeypatch):
+    monkeypatch.setattr(reloader, "BUSY_WAIT_S", 0.3)
+    harness.handshake()
+    hung = harness.send("tools/call", {"name": "silent", "arguments": {}})  # jamais répondu, jamais annulé
+    harness.new_code("2.0")
+    result = harness.out.reply(harness.send("tools/call", {"name": "look", "arguments": {}}), timeout=5.0)["result"]
+    assert "version 2.0" in _text(result)  # serveur figé relancé plutôt que tout bloquer
+    lost = harness.out.reply(hung)["result"]
+    assert lost["isError"] and "issue INCONNUE" in _text(lost)
+
+
+def test_late_cancel_after_answer_leaves_nothing_behind(harness):
+    harness.handshake()
+    done = harness.send("tools/call", {"name": "look", "arguments": {}})
+    harness.out.reply(done)
+    harness.send("notifications/cancelled", {"requestId": done}, notify=True)
+    assert not harness.sup.cancelled and not harness.sup.inflight
 
 
 def test_child_crash_reports_unknown_outcome_then_restarts(harness):

@@ -40,6 +40,7 @@ SETTLE_S = 0.4  # disque relu jusqu'à deux empreintes identiques à SETTLE_S d'
 SETTLE_MAX_S = 10.0
 START_TIMEOUT_S = 60.0
 STOP_TIMEOUT_S = 5.0
+BUSY_WAIT_S = 120.0  # au-delà, un appel sans réponse est tenu pour figé : serveur relancé (jamais d'attente sans fin)
 RETRIES = 2  # appel refusé « dépassé » par l'enfant (code changé entre les deux vérifications) : rejoué
 INTERNAL = "nexus-reloader-"  # identifiants des requêtes du superviseur lui-même
 TAIL_LINES = 20
@@ -93,6 +94,7 @@ class Supervisor:
         self.out = out
         self.fingerprint = fingerprint
         self.out_lock = threading.Lock()
+        self.in_lock = threading.Lock()  # stdin de l'enfant : fil de distribution et fil stdin (annulations) y écrivent
         self.cond = threading.Condition()
         self.inbox: queue.Queue[tuple[Message, int] | None] = queue.Queue()
         self.child: subprocess.Popen[bytes] | None = None
@@ -101,6 +103,8 @@ class Supervisor:
         self.generation = 0
         self.force_reload = False
         self.inflight: dict[Any, tuple[Message, int]] = {}
+        self.queued: set[Any] = set()  # requêtes du client encore dans la file
+        self.cancelled: set[Any] = set()  # annulées avant d'avoir quitté la file : jamais envoyées
         self.waiters: dict[str, queue.Queue[Message]] = {}
         self.notes: dict[Any, str] = {}
         self.init_request: Message | None = None
@@ -121,8 +125,9 @@ class Supervisor:
         child = self.child
         if child is None or child.stdin is None:
             raise BrokenPipeError("serveur arrêté")
-        child.stdin.write(_encode(message))
-        child.stdin.flush()
+        with self.in_lock:
+            child.stdin.write(_encode(message))
+            child.stdin.flush()
 
     # --- Processus enfant -------------------------------------------------------------------------------------
     def alive(self) -> bool:
@@ -193,7 +198,7 @@ class Supervisor:
             self.cond.notify_all()
         if entry and entry[0].get("method") == "tools/call" and entry[1] < RETRIES and is_stale_answer(message):
             self.force_reload = True
-            self.inbox.put((entry[0], entry[1] + 1))  # rien n'a été fait : rejoué sur le nouveau code
+            self._requeue(entry[0], entry[1] + 1)  # rien n'a été fait : rejoué sur le nouveau code
             return
         changed = False
         result = message.get("result")
@@ -310,10 +315,15 @@ class Supervisor:
         """Note de rechargement (« » si rien à faire). Le code n'est comparé qu'avant un appel d'outil."""
         if self.alive() and not self.force_reload and not (check_code and self.fingerprint() != self.child_print):
             return ""
-        with self.cond:  # jamais pendant un appel : on attend la fin de ceux en cours
-            self.cond.wait_for(lambda: not self.inflight)
+        with self.cond:  # jamais pendant un appel : on attend la fin de ceux en cours, mais pas sans fin
+            idle = self.cond.wait_for(lambda: not self.inflight, BUSY_WAIT_S)
         if self.alive() and not self.force_reload and not (check_code and self.fingerprint() != self.child_print):
             return ""
+        if not idle:
+            # Appel sans réponse depuis BUSY_WAIT_S : serveur figé. Ses appels reçoivent « issue INCONNUE » et le
+            # rechargement repart sur un serveur neuf, plutôt que de geler tous les appels suivants.
+            log.event("reloader-fige", {"en_cours": len(self.inflight)})
+            self._child_died()
         reason = "arrêté" if not self.alive() else ("refus « dépassé »" if self.force_reload else "code modifié")
         self.force_reload = False
         return self.reload(reason)
@@ -346,7 +356,12 @@ class Supervisor:
         if note and request_id is not None:
             self.notes[request_id] = note
         if request_id is not None:
-            with self.cond:
+            with self.cond:  # passage file → en cours atomique, sous le même verrou que _forget
+                self.queued.discard(request_id)
+                if request_id in self.cancelled:
+                    self.cancelled.discard(request_id)
+                    self.notes.pop(request_id, None)
+                    return  # annulé par le client avant envoi : ni envoyé ni répondu (spécification MCP)
                 self.inflight[request_id] = (message, retries)
         try:
             self.to_child(message)
@@ -357,7 +372,7 @@ class Supervisor:
                 self.notes.pop(request_id, None)
                 self.force_reload = True
                 if retries < RETRIES:
-                    self.inbox.put((message, retries + 1))
+                    self._requeue(message, retries + 1)
                 else:
                     self.to_client(_tool_error(request_id, "nexus-windows injoignable : relancer l'appel."))
 
@@ -377,10 +392,33 @@ class Supervisor:
             return
         if "method" not in message or message.get("method") == "notifications/cancelled":
             # Réponse du client à une requête du serveur, ou annulation : tout de suite, même pendant un appel long.
+            if message.get("method") == "notifications/cancelled":
+                self._forget(message.get("params") or {})
             with contextlib.suppress(OSError):
                 self.to_child(message)
             return
+        if message.get("id") is not None:
+            with self.cond:
+                self.queued.add(message["id"])
         self.inbox.put((message, 0))
+
+    def _requeue(self, message: Message, retries: int) -> None:
+        with self.cond:
+            self.queued.add(message.get("id"))
+        self.inbox.put((message, retries))
+
+    def _forget(self, params: Any) -> None:
+        """Appel annulé par le client : le serveur n'y répondra jamais (spécification MCP), il ne compte plus comme
+        en cours. Sans cela, le rechargement suivant l'attendrait pour toujours et bloquerait tous les appels."""
+        request_id = params.get("requestId") if isinstance(params, dict) else None
+        if request_id is None:
+            return
+        with self.cond:
+            if self.inflight.pop(request_id, None) is None and request_id in self.queued:
+                self.cancelled.add(request_id)  # encore dans la file : handle ne l'enverra pas
+            self.cond.notify_all()  # déjà répondue : rien à retenir
+        self.notes.pop(request_id, None)
+        self.tools_requests.discard(request_id)
 
     def serve(self, stdin: IO[bytes]) -> None:
         self.spawn()
