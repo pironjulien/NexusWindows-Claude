@@ -4,7 +4,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
-## [Unreleased]
+## [0.9.2] - 2026-10-18 — No more freeze after a reload
+
+### Fixed
+- Supervisor: a call cancelled by the client (`notifications/cancelled`) is never answered by the server (MCP
+  specification, SDK 2.3.0); it stayed "in progress" and the next reload waited for it forever, freezing every call.
+  A cancellation now removes it from the calls in progress; cancelled while still queued, it is not sent (atomic
+  queue → in-progress step, replays included).
+- Waiting for calls in progress is bounded to 120 s: beyond that the server is taken as frozen, its calls get an
+  "outcome UNKNOWN" answer and the reload starts a fresh server.
+- Writes to the server child are serialised under a lock (dispatch thread and cancellation thread).
+- Two rounds of adversarial review by Antigravity (races, poisoned ids, endless wait); 3 tests added.
 
 ### Changed
 - Listed in the official MCP registry (`io.github.pironjulien/nexus-windows`); README installs from PyPI with
