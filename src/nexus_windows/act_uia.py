@@ -23,9 +23,6 @@ from .act_base import (
     SELECT_ALL_JS,
     TEXT_ROLES,
     UIA_ONLY,
-    VK_APPS,
-    VK_F10,
-    VK_SHIFT,
     ActionError,
     ExecutorBase,
     NeedsForeground,
@@ -49,7 +46,7 @@ class UiaActions(ExecutorBase):
         what = f"clic sur {e.describe()}"
         if p.get("enabled") is False:
             raise ActionError(f"{e.describe()} est désactivé.")
-        self._refuse_shell_view(e, dangerous=button == "right" or count >= 2)
+        self._confirm_click(e, button)
         chain: list[tuple[str, Callable[[], Any]]] = []
         hwnd, cls = self._element_hwnd_class(e)
         winforms = cls.startswith("windowsforms")
@@ -167,14 +164,16 @@ class UiaActions(ExecutorBase):
 
     def write(self, spec: Any, text: str, replace: bool) -> Outcome:
         if spec is None or spec == "":
+            self._confirm_text(None, text)
             return self._write_focused(text, replace)
-        return self.write_element(self.resolve_element(spec, TEXT_ROLES, "champ de saisie"), text, replace)
+        element = self.resolve_element(spec, TEXT_ROLES, "champ de saisie")
+        self._confirm_text(element, text)
+        return self.write_element(element, text, replace)
 
     def write_element(self, e: snapshot.Element, text: str, replace: bool) -> Outcome:
         verb = "texte remplacé" if replace else "texte saisi"
         p = e.props
         self._refuse_secret(p, e.describe())
-        self._refuse_command_surface(e)
         if p.get("readonly"):
             raise ActionError(f"{e.describe()} est en lecture seule : rien n'a été écrit.")
         if p.get("enabled") is False:
@@ -278,6 +277,7 @@ class UiaActions(ExecutorBase):
         element = None
         if target not in (None, ""):
             element = self.resolve_element(target, TEXT_ROLES | LEAF_ROLES, "élément")
+        self._confirm_keys(combos, spec, element)  # avant toute touche : ce qu'elles déclencheraient
         page = self._get_page()
         fw = self.view.framework
         if page is not None:
@@ -296,16 +296,14 @@ class UiaActions(ExecutorBase):
                 page.key(key, code, combo.key, combo.cdp_modifiers, text=char)
             return Outcome(True, f"touches « {spec} » (DevTools)", "DevTools")
         focused = element or self._focused_target_element()
-        if focused is not None:
-            self._refuse_command_surface(focused)  # même une touche seule : Entrée y exécuterait ce qui est tapé
-            context_menu_key = any(c.key == VK_APPS for c in combos) or any(
-                c.key == VK_F10 and VK_SHIFT in c.modifiers for c in combos
-            )  # touche « applications » ou Maj+F10 : ouvrent le menu contextuel (fichier exécutable au clic)
-            self._refuse_shell_view(focused, dangerous=context_menu_key)
-            if printable:
-                self._refuse_secret(focused.props, focused.describe())
+        if focused is not None and printable:
+            self._refuse_secret(focused.props, focused.describe())
         shortcut = any(set(c.modifiers) - {0x10} for c in combos)
-        real = lambda: [realinput.press(c) for c in combos]  # noqa: E731
+
+        def real() -> None:
+            for combo in combos:
+                realinput.press(combo)
+
         what = f"touches « {spec} »"
         simulated: list[tuple[str, Callable[[], Any]]] = []
         if fw == "Chromium":
@@ -559,7 +557,8 @@ class UiaActions(ExecutorBase):
             outcome.line += f" — {'coché' if wanted else 'décoché'} ✓"
         else:
             outcome.ok = False
-            state_name = {0: "décoché", 1: "coché", 2: "mixte"}.get(after, "inconnu")
+            names: dict[int | None, str] = {0: "décoché", 1: "coché", 2: "mixte"}
+            state_name = names.get(after, "inconnu")
             outcome.line += f" — ÉCHEC À LA RELECTURE : état {state_name}"
         return outcome
 
@@ -661,7 +660,6 @@ class UiaActions(ExecutorBase):
                         if time.monotonic() > deadline:
                             raise ActionError(f"Menu « {name} » introuvable (chemin « {path} »).")
                         time.sleep(0.15)
-                self._refuse_shell_view(item, dangerous=True)  # jamais un menu contextuel du shell (exécute un fichier)
                 if last:
                     clicked = True
                     outcome = self.click_element(item)

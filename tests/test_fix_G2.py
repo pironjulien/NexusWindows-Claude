@@ -23,9 +23,9 @@ from nexus_windows import capture, foreground, launch, server, session, snapshot
 from nexus_windows import win32 as w
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_contract import make_view, node  # noqa: E402
+from test_contract import as_auto, make_view, node  # noqa: E402
 from test_fix_b import JULIEN, OTHER, TARGET, Desk  # noqa: E402
-from test_fix_c import _fresh_local_state, _profile  # noqa: E402
+from test_fix_c import _fresh_local_state, _profile, as_popen  # noqa: E402
 
 
 @pytest.fixture
@@ -290,7 +290,7 @@ def test_store_launch_never_activates_and_says_it_stays_empty(monkeypatch):
     monkeypatch.setattr(launch, "wait_content", lambda auto, hwnd, limit_s=3.0: False)
     monkeypatch.setattr(launch.foreground, "brief_activation", lambda *a, **k: pytest.fail("aucune activation"))
     monkeypatch.setattr(launch.foreground, "activate", lambda *a, **k: pytest.fail("aucune activation"))
-    result = launch.launch("Calculatrice", auto=object())
+    result = launch.launch("Calculatrice", auto=as_auto(object()))
     assert result.hwnd == TARGET and result.user_front == JULIEN
     assert any("jamais affichée" in n for n in result.notes)
 
@@ -311,7 +311,7 @@ def test_store_launch_reports_foreground_not_given_back(monkeypatch):
         return True
 
     monkeypatch.setattr(launch, "wait_content", wait_content)
-    result = launch.launch("Calculatrice", auto=object())
+    result = launch.launch("Calculatrice", auto=as_auto(object()))
     # Exactement trois tentatives, toutes avant le retour de launch : celle de launch après l'attente de la fenêtre,
     # celle de la garde pendant wait_content, puis son dernier contrôle à la fin du bloc.
     assert gave == [JULIEN, JULIEN, JULIEN] and not result.returned and result.user_front == JULIEN
@@ -323,7 +323,7 @@ def test_store_launch_given_back_says_so(monkeypatch):
     fg = {"hwnd": JULIEN}
     _store_launch(monkeypatch, fg, give_back_ok=True)
     monkeypatch.setattr(launch, "uwp_unshown", lambda hwnd: False)
-    result = launch.launch("Calculatrice", auto=object())
+    result = launch.launch("Calculatrice", auto=as_auto(object()))
     assert result.returned and any("rendu aussitôt à Julien" in n for n in result.notes)
 
 
@@ -348,7 +348,7 @@ def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
             return "L'application a pris le premier plan (une fois) : rendu aussitôt à Julien."
 
     monkeypatch.setattr(server, "Watch", FakeWatch)
-    monkeypatch.setattr(server, "render", lambda auto, hwnd, then, extra=None, call=None: ["\n".join(extra)])
+    monkeypatch.setattr(server, "render", lambda auto, hwnd, then, extra=None, call=None: ["\n".join(extra or ())])
     monkeypatch.setattr(server, "SESSION", session.Session())
     monkeypatch.setattr(server, "_run", lambda fn, timeout_s=0: _sync(fn))
     out = asyncio.run(server.launch("Calculatrice"))
@@ -451,7 +451,7 @@ def test_guard_kill_cleans_session_and_removes_profile(tracked, monkeypatch):
             return 0
 
     monkeypatch.setattr(launch, "ACCOUNT_POLL_S", 0.02)
-    thread = launch.guard_account(Proc(), 9222, profile, on_kill=sess.forget_profile)
+    thread = launch.guard_account(as_popen(Proc()), 9222, profile, on_kill=sess.forget_profile)
     time.sleep(0.08)
     assert state["killed"] == [] and profile.exists()  # profil neuf
     _sign_in(profile)
@@ -571,15 +571,27 @@ def _server_resources(pid: int) -> tuple[int, int, int]:
         kernel32.CloseHandle(ctypes.c_void_p(handle))
 
 
+WARMUP_S = 45.0
+
+
 async def _look_series(hwnd: int, series: int, count: int) -> tuple[list[tuple], int]:
     """Serveur MCP réel (stdio) : `series` séries de `count` look avec image ; ressources du serveur relevées avant
     la première série puis après chacune (1,5 s plus tard : traînes des gardes finies)."""
+    live = str(Path(__file__).resolve().parent / "live")
+    if live not in sys.path:  # sans dépendre de test_live.py chargé avant
+        sys.path.insert(0, live)
     import drive
 
     async with drive.Client(drive.server_params(), read_timeout_seconds=120) as client:
         status = drive.text_of(await client.call_tool("logs", {"count": 1}))
-        pid = int(re.search(r"pid (\d+)", status).group(1))
-        for _ in range(5):  # imports, premières allocations, fils de démarrage du serveur
+        found = re.search(r"pid (\d+)", status)
+        assert found is not None
+        pid = int(found.group(1))
+        # Échauffement : look en continu pendant WARMUP_S. Mesuré le 18/10 : une allocation unique de ~15 handles
+        # (et un fil) arrive vers 20-30 s de vie active du serveur, quel que soit le nombre de look ; sans cet
+        # échauffement, elle tombait dans la série 1 ou dans la série 2 selon le rythme, et passait pour une fuite.
+        warm_until = time.monotonic() + WARMUP_S
+        while time.monotonic() < warm_until:
             await client.call_tool("look", {"window": hwnd})
         await asyncio.sleep(3)
         marks = [_server_resources(pid)]

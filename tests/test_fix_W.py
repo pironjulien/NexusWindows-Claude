@@ -231,9 +231,9 @@ class ComEl:
 
 def bare_automation(root: ComEl) -> uia.Automation:
     auto = uia.Automation.__new__(uia.Automation)
-    auto._cache = "subtree"
-    auto._cache_kids = "children"
-    auto.uia = type("UIA", (), {"ElementFromHandleBuildCache": lambda _self, hwnd, cache: root})()
+    # Faux COM : Automation créé sans __init__ ; demandes de cache et UI Automation simulés.
+    fake_uia = type("UIA", (), {"ElementFromHandleBuildCache": lambda _self, hwnd, cache: root})()
+    vars(auto).update(_cache="subtree", _cache_kids="children", uia=fake_uia)
     return auto
 
 

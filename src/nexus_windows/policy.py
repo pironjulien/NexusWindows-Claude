@@ -1,91 +1,46 @@
-"""Politique de sécurité : où nexus-windows peut agir et ce qu'il peut lancer.
+"""Politique de sécurité : la politique COMMUNE à Claude et Antigravity (NexusHarness/shared/garde-fous.json).
 
-Principe : rien ne doit permettre d'exécuter du code ou des commandes en contournant les permissions du shell de
-Claude Code (consoles, interpréteurs, scripts), ni d'agir dans les zones de secrets ou dans d'autres agents d'IA.
+Accord Claude–Antigravity du 18/10/2026 (journal de la trinité, « Garde-fous ») : un garde-fou n'existe que s'il
+empêche une auto-élévation ou une fuite de secrets, ou s'il demande l'accord avant un geste sans retour qui touche des
+tiers, de l'argent ou détruit. Julien travaille en « ignorer les permissions » : le shell de Claude fait déjà tout,
+donc consoles, interpréteurs, Explorateur, barre des tâches, outils d'administration et autres agents sont libres.
 
-- REFUS ABSOLU (non surchargeable) : consoles et terminaux, invites UAC et d'identifiants, écran de verrouillage,
-  gestionnaires de mots de passe, boîte « Exécuter ».
-- REFUS PAR DÉFAUT (surchargeable par Julien dans ~/.claude/nexus-claude/policy.json, clé « allow_processes ») :
-  Claude lui-même (ses propres demandes d'autorisation y apparaissent), autres agents d'IA et IDE à terminal
-  intégré, outils d'administration (registre, consoles MMC, gestionnaire des
-  tâches).
-- LANCEMENT : ni interpréteur, console ou hôte d'exécution système (surchargeable par chemin, clé « allow_launch ») ;
-  arguments lus comme Chromium les lit (préfixes « -- », « - », « / ») ; jamais un profil de navigateur choisi par
-  le modèle ; DevTools seulement sur l'exécutable principal d'un navigateur (profil neuf) ou une application Electron.
-`look` reste toujours permis : voir n'exécute rien.
+- BLOCAGE DUR (garde-fous.json, catégories de « claude ») : bureau sécurisé (UAC, verrouillage, ouverture de session),
+  fenêtres d'identifiants Windows, gestionnaires de mots de passe. L'application Claude et la fenêtre d'Antigravity
+  sont permises (relecture du 18/10 : aucune demande d'autorisation n'y passe en « ignorer les permissions »).
+- CONFIRMATION ÉTANCHE : confirm.py (mêmes motifs, même fichier).
+- LANCEMENT : seulement ce qui exposerait une session de Julien (profil de navigateur choisi par le modèle, port
+  DevTools ou extension chargée sur un navigateur ; devtools=true ouvre un profil neuf).
+Politique absente ou illisible : toute action refusée (échec fermé). `look` reste toujours permis, sauf blocage dur.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import re
 import struct
+import sys
 from pathlib import Path
 
-from . import log
 from . import win32 as w
 
-HARD_DENY_PROCESSES = {
-    "windowsterminal.exe", "openconsole.exe", "conhost.exe", "mintty.exe", "powershell_ise.exe", "consent.exe",
-    "credentialuibroker.exe", "lockapp.exe", "logonui.exe", "1password.exe", "bitwarden.exe",
-    "keepass.exe", "keepassxc.exe", "dashlane.exe", "nordpass.exe", "roboform.exe", "lastpass.exe",
-}  # fmt: skip
-SOFT_DENY_PROCESSES = {
-    "claude.exe", "antigravity.exe", "chatgpt.exe", "codex.exe", "code.exe", "code - insiders.exe", "cursor.exe", "windsurf.exe",
-    "regedit.exe", "mmc.exe", "taskmgr.exe", "devenv.exe", "idea64.exe", "pycharm64.exe", "rider64.exe",
-}  # fmt: skip
-SHELL_DENY_CLASSES = {"Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW", "NotifyIconOverflowWindow"}
-SHELL_DENY_PROCESSES = {"searchhost.exe", "searchapp.exe", "startmenuexperiencehost.exe", "shellexperiencehost.exe"}
-SOFT_DENY_CLASSES = {"CabinetWClass", "ExploreWClass"}  # fenêtres de l'Explorateur de fichiers
-# Zones d'une fenêtre qui exécutent ce qu'on y tape (barre d'adresse de l'Explorateur et des boîtes de fichiers).
-COMMAND_SURFACE_CLASSES = {"Address Band Root", "Breadcrumb Parent"}
-HARD_DENY_CLASSES = {
-    "ConsoleWindowClass",
-    "CASCADIA_HOSTING_WINDOW_CLASS",
-    "PseudoConsoleWindow",
-    "Credential Dialog Xaml Host",
-}
-RUN_DIALOG_TITLES = {"exécuter", "run"}
+AGENT = "claude"
+# Source du paquet (installé en mode éditable) : NexusHarness/NexusClaude/nexus-windows/src/nexus_windows/policy.py,
+# la politique vivante est NexusHarness/shared. Copie publique et paquet PyPI : pas de dossier commun voisin, la même
+# politique est embarquée dans le paquet (nexus_windows/shared, copiée par l'export public).
+_LIVE_SHARED = Path(os.environ.get("NEXUS_SHARED_DIR") or Path(__file__).resolve().parents[4] / "shared")
+_BUNDLED_SHARED = Path(__file__).resolve().parent / "shared"
+SHARED_DIR = _LIVE_SHARED if (_LIVE_SHARED / "garde_fous.py").is_file() else _BUNDLED_SHARED
+if str(SHARED_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_DIR))
+import garde_fous  # noqa: E402  (module commun, hors du paquet)
 
-# Lancement : interpréteurs, hôtes de scripts et hôtes d'exécution système (même graphiques), extensions
-# exécutables autres que .exe.
-LAUNCH_DENY_EXES = {
-    "cmd.exe", "powershell.exe", "pwsh.exe", "wt.exe", "bash.exe", "wsl.exe", "wslhost.exe", "python.exe",
-    "pythonw.exe", "py.exe", "pyw.exe", "node.exe", "wscript.exe", "cscript.exe", "mshta.exe", "rundll32.exe",
-    "regsvr32.exe", "msiexec.exe", "installutil.exe", "regasm.exe", "msbuild.exe", "schtasks.exe", "at.exe",
-    "sc.exe", "reg.exe", "certutil.exe", "bitsadmin.exe", "forfiles.exe", "pcalua.exe", "conhost.exe",
-    "mintty.exe", "powershell_ise.exe", "windowsterminal.exe", "openconsole.exe",
-    "electron.exe",  # Electron générique : exécute le script JavaScript (Node) qu'on lui donne
-    # Hôtes d'exécution système : SyncAppvPublishingServer « n; calc » exécute du PowerShell, cmstp et
-    # InfDefaultInstall un .inf, hh un .chm scripté, msdt et scriptrunner des scripts, presentationhost une XBAP.
-    "syncappvpublishingserver.exe", "cmstp.exe", "infdefaultinstall.exe", "hh.exe", "msdt.exe",
-    "scriptrunner.exe", "presentationhost.exe",
-    # Shells et interpréteurs graphiques : Git Bash/CMD, Git GUI (ses outils sont des commandes), Java.
-    "git-bash.exe", "git-cmd.exe", "git-gui.exe", "javaw.exe",
-}  # fmt: skip
-# Familles versionnées d'interpréteurs graphiques (nom sans .exe) : pythonw3.14, wish86t, AutoHotkey64, AutoIt3_x64…
-# Puis débogueurs et hôtes d'exécution exposés par un alias WindowsApps (même graphiques : la règle « console » ne les
-# couvre pas) et leurs cibles résolues : débogueurs (cdb, ntsd, kd, kdnet, WinDbg, DbgX.Shell, dbgsrv), gestionnaire de
-# paquets (winget*, WindowsPackageManager*), WSL (wslconfig), autres agents d'IA et leurs hôtes (codex*, ShellMcpServers,
-# ActionsMcpHost, extension-host) et Claude lui-même (claude*). Les noms peuvent contenir « - » ou « . » (DbgX.Shell,
-# codex-command-runner, ShellMcpServers.Packaging) : la classe comprend donc « \w », « - » et « . ».
-LAUNCH_DENY_NAMES = re.compile(
-    r"pythonw?[\d.]*|wish[\d.]*t?|tclsh[\d.]*t?|autohotkey\w*|autoit3\w*"
-    r"|cdb[\w-]*|ntsd[\w-]*|kd[\w-]*|kdnet|windbg[\w-]*|dbgx\.shell|dbgsrv[\w-]*"
-    r"|winget[\w-]*|windowspackagemanager[\w-]*|wslconfig|codex[\w-]*|shellmcpservers[\w.-]*"
-    r"|actionsmcphost|extension-host|claude[\w-]*",
-    re.IGNORECASE,
-)
-# Refusés avec un argument seulement : control.exe x.cpl exécute le panneau (une DLL), mmc.exe x.msc peut exécuter du
-# code à l'ouverture, regedit.exe x.reg importe dans le registre. Sans argument, ils ne font que s'ouvrir.
-LAUNCH_DENY_WITH_ARGS = {"control.exe", "mmc.exe", "regedit.exe"}
-# Commutateurs Chromium qui exécutent une commande, chargent du code ou ouvrent un canal de contrôle à côté de
-# devtools=true (qui, lui, impose un profil neuf). Noms sans préfixe : Chromium accepte « -- », « - » et « / ».
+EXPLORER_CLASSES = {"CabinetWClass", "ExploreWClass"}  # fenêtres de l'Explorateur de fichiers (repère, pas un refus)
+
+# Commutateurs Chromium qui ouvrent un canal de contrôle sur le navigateur, donc sur les sessions qu'il porte.
+# Noms sans préfixe : Chromium accepte « -- », « - » et « / ».
 CHROMIUM_DENY_SWITCHES = {
-    "gpu-launcher", "renderer-cmd-prefix", "utility-cmd-prefix", "browser-subprocess-path", "plugin-launcher",
-    "ppapi-plugin-launcher", "load-extension", "remote-debugging-port", "remote-debugging-pipe",
-    "remote-debugging-address", "remote-allow-origins", "no-sandbox", "disable-web-security", "js-flags",
+    "load-extension", "remote-debugging-port", "remote-debugging-pipe", "remote-debugging-address",
+    "remote-allow-origins", "disable-web-security",
     "inspect", "inspect-brk", "inspect-port",  # Electron : inspecteur Node du processus principal
     # Steam : port DevTools sur la session de Julien (seulement launch(app="Steam", devtools=true), avec son accord).
     "cef-enable-debugging", "devtools-port",
@@ -94,74 +49,27 @@ CHROMIUM_DENY_SWITCHES = {
 PROFILE_SWITCHES = {"user-data-dir", "profile-directory"}
 # Préfixes de commutateur reconnus par Chromium sous Windows (CommandLine::IsSwitch), du plus long au plus court.
 SWITCH_PREFIXES = ("--", "-", "/")
-LAUNCH_DENY_SUFFIXES = {
-    ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".hta", ".lnk", ".url", ".py",
-    ".pyw", ".msc", ".reg", ".scr", ".cpl", ".msi", ".msp", ".appref-ms", ".jar", ".com", ".pif", ".chm",
-}  # fmt: skip
-# Applications du menu Démarrer (AppID ou nom, minuscules sans espaces) : consoles, interpréteurs, assistance à
-# distance, débogueur, automatisation, Claude lui-même.
-LAUNCH_DENY_APP_IDS = (
-    "windowsterminal", "powershell", "cmd.exe", "commandprompt", "invitedecommandes", "python", "wsl", "ubuntu",
-    "gitbash", "gitcmd", "gitgui", "quickassist", "assistancerapide", "dbgx", "windbg", "powerautomate", "claude",
-)  # fmt: skip
 
 # Navigateurs Chromium : exécutable principal, et DLL du navigateur (dossier de version, à côté des annexes).
 BROWSER_EXES = {"msedge.exe", "chrome.exe", "brave.exe", "vivaldi.exe", "opera.exe", "chromium.exe"}
 BROWSER_DLLS = ("msedge.dll", "chrome.dll")
-
-POLICY_FILE = log.ROOT / "policy.json"
 
 
 class PolicyError(RuntimeError):
     pass
 
 
-def _policy() -> dict:
+def hard_block(process: str, cls: str) -> str:
+    """Raison du blocage dur de cette fenêtre (ni lue ni pilotée), « » si libre. Politique illisible : PolicyError."""
     try:
-        data = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
-    except OSError, ValueError:
-        return {}
-    return data if isinstance(data, dict) else {}
+        return garde_fous.hard_block_reason(AGENT, process, cls)
+    except garde_fous.GardeFousError as error:
+        raise PolicyError(f"{error} : rien n'a été fait (échec fermé)") from error
 
 
-def _allowed_overrides() -> set[str]:
-    return {str(name).lower() for name in _policy().get("allow_processes", [])}
-
-
-def _allow_shell() -> bool:
-    """Julien peut autoriser la barre des tâches, le bureau et l'Explorateur via la clé allow_shell: true ou allow_processes: ['shell']."""
-    pol = _policy()
-    return bool(
-        pol.get("allow_shell", False) or "shell" in _allowed_overrides() or "shell_traywnd" in _allowed_overrides()
-    )
-
-
-def _allowed_launch() -> set[str]:
-    """Exécutables que Julien autorise malgré la règle « interpréteur » (chemins complets, clé allow_launch)."""
-    return {os.path.normcase(os.path.abspath(os.path.expandvars(str(p)))) for p in _policy().get("allow_launch", [])}
-
-
-def act_refusal(process: str, cls: str, title: str) -> str | None:
+def act_refusal(process: str, cls: str, title: str = "") -> str | None:
     """Raison du refus d'agir dans cette fenêtre, ou None si permis."""
-    process = process.lower()
-    if cls in HARD_DENY_CLASSES or process in HARD_DENY_PROCESSES:
-        return "console, invite de sécurité ou gestionnaire de mots de passe"
-    if cls == "#32770" and process == "explorer.exe" and title.strip().lower() in RUN_DIALOG_TITLES:
-        return "boîte « Exécuter » (elle lancerait une commande)"
-    if (cls in SHELL_DENY_CLASSES or process in SHELL_DENY_PROCESSES) and not _allow_shell():
-        return "barre des tâches, bureau, menu Démarrer ou Recherche (ils lancent programmes et commandes)"
-    if cls in SOFT_DENY_CLASSES and "explorer.exe" not in _allowed_overrides() and not _allow_shell():
-        return (
-            "Explorateur de fichiers : un double-clic y exécute n'importe quel fichier et sa barre d'adresse des "
-            f"commandes (fichiers : passer par le shell ; Julien peut l'autoriser dans {POLICY_FILE}, "
-            "allow_processes : explorer.exe)"
-        )
-    if process in SOFT_DENY_PROCESSES and process not in _allowed_overrides():
-        return (
-            "Claude, autre agent d'IA, IDE à terminal intégré ou outil d'administration (Julien peut l'autoriser dans "
-            f"{POLICY_FILE}, clé allow_processes)"
-        )
-    return None
+    return hard_block(process, cls) or None
 
 
 def pe_subsystem(path: str) -> int | None:
@@ -237,7 +145,7 @@ def switch_refusal(args: str, chromium: bool = True, browser: bool = True, devto
             )
         key = switch_key(token)
         if key in CHROMIUM_DENY_SWITCHES:
-            return f"le commutateur {key} exécute du code ou ouvre un canal de contrôle (DevTools : devtools=true)"
+            return f"le commutateur {key} ouvre un canal de contrôle sur les sessions du navigateur (devtools=true)"
         if key in PROFILE_SWITCHES and (browser or devtools):
             return (
                 f"le commutateur {key} choisirait un profil du navigateur (celui de Julien ?) : jamais fourni par le "
@@ -247,114 +155,35 @@ def switch_refusal(args: str, chromium: bool = True, browser: bool = True, devto
 
 
 def _refuse(reason: str) -> PolicyError:
-    return PolicyError(
-        f"Lancement refusé : {reason}. Pour exécuter une commande, utiliser l'outil shell de Claude Code "
-        "(soumis aux permissions de Julien)."
-    )
-
-
-def _unreadable_exe(path: str) -> bool:
-    """Un .exe présent sur le disque mais dont le contenu ne peut pas être lu (fichier verrouillé ou protégé) : son
-    sous-système reste inconnu, donc échec fermé. Un fichier absent (la politique n'a pas à juger de l'existence) ou
-    lisible mais non-PE (Windows ne l'exécuterait pas) n'est pas concerné."""
-    if not os.path.exists(path):
-        return False
-    try:
-        with open(path, "rb") as handle:
-            handle.read(1)
-        return False
-    except OSError:
-        return True
-
-
-def _launch_reason(target: Path, args: str, devtools: bool, allowed: bool, alias: bool) -> str | None:
-    """Raison de refuser le lancement de CET exécutable (un alias d'exécution OU sa cible résolue), ou None si permis.
-    `alias` : le chemin est un alias d'exécution WindowsApps (reparse point) — son sous-système PE n'est pas lisible et
-    n'a pas de sens ; seule la cible résolue est jugée là-dessus."""
-    name = target.name.lower()
-    browser = is_browser_exe(str(target))
-    if target.suffix.lower() in LAUNCH_DENY_SUFFIXES:
-        return f"un fichier {target.suffix} s'exécute comme un script"
-    if (name in LAUNCH_DENY_EXES or LAUNCH_DENY_NAMES.fullmatch(target.stem)) and not allowed:
-        return f"{name} est un interpréteur, une console, un débogueur ou un hôte d'exécution de scripts"
-    if name in LAUNCH_DENY_WITH_ARGS and args.strip() and not allowed:
-        return f"{name} avec un argument exécute le fichier ou le panneau désigné"
-    if name == "explorer.exe" and args.strip() and not Path(args.strip().strip('"')).is_dir():
-        return "explorer.exe avec un argument autre qu'un dossier peut lancer n'importe quel fichier"
-    if not alias and not allowed:
-        # Tout fichier, quel que soit son suffixe : une copie de programme renommée .bin ou .dat se lance quand même.
-        subsystem = pe_subsystem(str(target))
-        if subsystem == 3:
-            return f"{name} est un programme console"
-        if subsystem is not None and target.suffix.lower() != ".exe":
-            return f"{name} est un programme sous un autre nom que .exe (copie renommée ?)"
-        if subsystem is None and target.suffix.lower() == ".exe" and _unreadable_exe(str(target)):
-            return f"{name} : sous-système illisible (fichier protégé ou verrouillé) ; refusé par sécurité"
-    if devtools and browser and name not in BROWSER_EXES:
-        return (
-            f"devtools=true seulement sur l'exécutable principal du navigateur (msedge.exe, chrome.exe…), jamais sur "
-            f"{name}, qui ouvrirait le profil de Julien"
-        )
-    return switch_refusal(args, chromium=browser or is_chromium_exe(str(target)), browser=browser, devtools=devtools)
+    return PolicyError(f"Lancement refusé : {reason}.")
 
 
 def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
-    """Refuse ce qui exécuterait du code ou une commande hors des permissions du shell de Claude Code, ou ouvrirait
-    un profil de navigateur de Julien. Un alias d'exécution WindowsApps (reparse point AppExecLink) est résolu et
-    TOUTES les règles s'appliquent à l'alias ET à sa cible : lui seul rend le sous-système PE illisible et laissait
-    donc passer débogueurs, gestionnaires de paquets et exécuteurs de commandes."""
+    """Refuse seulement ce qui ouvrirait une session de Julien à un canal de contrôle : DevTools hors de l'exécutable
+    principal d'un navigateur (son profil neuf), profil choisi par le modèle, commutateurs de débogage. Un alias
+    d'exécution WindowsApps est jugé sur sa cible résolue aussi."""
     target = Path(os.path.expandvars(path))
-    allowed_names = _allowed_launch()
     resolved = w.appexec_target(str(target))
-    if resolved is None:
-        paths: list[tuple[Path, bool]] = [(target, False)]  # fichier ordinaire
-    elif resolved == "":
-        # Alias d'exécution dont la cible est illisible : échec fermé, sauf autorisation explicite de l'alias.
-        if os.path.normcase(os.path.abspath(str(target))) not in allowed_names:
-            raise _refuse(f"{target.name.lower()} est un alias d'exécution WindowsApps dont la cible est illisible")
-        return
-    else:
-        paths = [(target, True), (Path(os.path.expandvars(resolved)), False)]
-    allowed = any(os.path.normcase(os.path.abspath(str(p))) in allowed_names for p, _ in paths)
-    for candidate, is_alias in paths:
-        reason = _launch_reason(candidate, args, devtools, allowed, is_alias)
+    candidates = [target] + ([Path(os.path.expandvars(resolved))] if resolved else [])
+    for candidate in candidates:
+        name = candidate.name.lower()
+        browser = is_browser_exe(str(candidate))
+        if devtools and browser and name not in BROWSER_EXES:
+            raise _refuse(
+                f"devtools=true seulement sur l'exécutable principal du navigateur (msedge.exe, chrome.exe…), jamais "
+                f"sur {name}, qui ouvrirait le profil de Julien"
+            )
+        reason = switch_refusal(
+            args, chromium=browser or is_chromium_exe(str(candidate)), browser=browser, devtools=devtools
+        )
         if reason:
             raise _refuse(reason)
 
 
-# Ouverture d'un document par son association : en plus des scripts (LAUNCH_DENY_SUFFIXES), les paquets et
-# installateurs (leur « ouverture » installe), et les fichiers du shell qui lancent une commande ou un panneau.
-OPEN_DENY_SUFFIXES = {
-    ".application", ".appx", ".appxbundle", ".msix", ".msixbundle", ".appinstaller", ".settingcontent-ms",
-    ".diagcab", ".ws", ".gadget", ".sct", ".xbap", ".website", ".search-ms", ".library-ms", ".ms-settings",
-}  # fmt: skip
-
-
-def check_open_document(path: str) -> None:
-    """Dossier ou document ouvert par son association (launch avec un chemin) : jamais un script, un raccourci, un
-    installateur ni un programme (un programme passe par check_launch_exe, quel que soit son nom)."""
-    target = Path(path)
-    if target.is_dir():
-        return
-    suffix = target.suffix.lower()
-    if suffix in LAUNCH_DENY_SUFFIXES:
-        raise _refuse(f"un fichier {target.suffix} s'exécute comme un script ou lance une commande")
-    if suffix in OPEN_DENY_SUFFIXES:
-        raise _refuse(f"un fichier {target.suffix} installe un paquet ou lance une commande à l'ouverture")
-    if pe_subsystem(str(target)) is not None:
-        raise _refuse(f"{target.name} est un programme : le lancer par son chemin .exe")
-
-
 def check_launch_app_id(app_id: str, name: str, args: str = "", devtools: bool = False) -> None:
-    """Application du menu Démarrer ou empaquetée : ni console, ni interpréteur, ni agent ou outil de contrôle à
-    distance ; ses arguments sont lus comme des commutateurs Chromium (nature inconnue : règles les plus strictes) ;
-    jamais de port DevTools (son processus et son profil ne sont pas vérifiables)."""
-    low = (app_id + " " + name).lower().replace(" ", "")
-    if any(marker in low for marker in LAUNCH_DENY_APP_IDS):
-        raise PolicyError(
-            f"Lancement refusé : « {name} » est une console, un interpréteur, un outil d'exécution ou de contrôle à "
-            "distance, ou Claude. Utiliser l'outil shell de Claude Code."
-        )
+    """Application du menu Démarrer ou empaquetée : ses arguments sont lus comme des commutateurs Chromium (nature
+    inconnue : règles les plus strictes) ; jamais de port DevTools (son processus et son profil ne sont pas
+    vérifiables)."""
     if devtools:
         raise PolicyError(
             f"Lancement refusé : devtools=true pas pour « {name} » (application du menu Démarrer ou empaquetée) : "

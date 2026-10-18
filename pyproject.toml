@@ -1,22 +1,37 @@
 [project]
 name = "nexus-windows"
-version = "0.7.0"
+version = "0.8.2"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
-authors = [
-    { name = "Julien Piron", email = "contact@julienpiron.com" }
-]
+authors = [{ name = "Julien Piron" }]
+license = "MIT"
+readme = "README.md"
 requires-python = ">=3.14"
+keywords = ["mcp", "mcp-server", "windows", "computer-use", "ui-automation", "desktop-automation", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment",
+]
 dependencies = [
-    "comtypes>=1.4.17",
+    # Bureau Windows seulement : ailleurs, le serveur démarre et liste ses outils (offwindows) sans ces dépendances.
+    "comtypes>=1.4.17; sys_platform == 'win32'",
     "mcp>=2.3.0",
     "pillow>=12.3.0",
     "websockets>=17.2",
-    "windows-capture>=2.0.1",
+    "windows-capture>=2.0.1; sys_platform == 'win32'",
 ]
 
+[project.urls]
+Homepage = "https://julienpiron.fr/nexuswindows/claude/"
+Repository = "https://github.com/pironjulien/claude-windows-computer-use"
+Changelog = "https://github.com/pironjulien/claude-windows-computer-use/blob/main/CHANGELOG.md"
+Issues = "https://github.com/pironjulien/claude-windows-computer-use/issues"
+
 [project.scripts]
-claude-windows-computer-use = "nexus_windows.server:main"
 nexus-windows = "nexus_windows.server:main"
+claude-windows-computer-use = "nexus_windows.server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
@@ -24,6 +39,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pyright==1.1.407",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
@@ -31,7 +47,7 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py314"
-# Ruff cache kept outside the repository: nothing generated in the source tree.
+# Caches hors de OneDrive (sources synchronisées) : rien de généré dans le dépôt.
 cache-dir = "~/.claude/nexus-claude/cache/ruff"
 
 [tool.ruff.lint]
@@ -42,3 +58,10 @@ ignore = ["E501", "E731", "B023"]
 testpaths = ["tests"]
 markers = ["live: tests sur de vraies fenêtres (labo), lents"]
 addopts = "-m 'not live' -p no:cacheprovider"
+
+[tool.pyright]
+# Même contrôle de types que NexusAGY (zéro erreur attendue) : sources, tests, banc et labo.
+include = ["src", "tests", "bench", "lab"]
+pythonVersion = "3.14"
+# Les tests importent leurs voisins (test_contract, test_fix_b…, tests/live/drive) ; labo et banc, leurs modules frères.
+extraPaths = ["src", "tests", "tests/live", "lab", "bench", "../../shared"]

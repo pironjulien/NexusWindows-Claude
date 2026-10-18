@@ -17,7 +17,6 @@ import ctypes
 import datetime
 import json
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -25,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lab"))
 import apps  # noqa: E402
 
-from nexus_windows import cdp, foreground, launch, methods, policy, uia  # noqa: E402
+from nexus_windows import cdp, foreground, launch, methods, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
 
 WM_SETFOCUS, WM_KILLFOCUS, WM_ACTIVATE, WM_NCACTIVATE, WM_ACTIVATEAPP = 0x0007, 0x0008, 0x0006, 0x0086, 0x001C
@@ -394,10 +393,6 @@ def save(rows: list[dict], mode: str) -> None:
 def main() -> None:
     uia.com_init()
     auto = uia.Automation()
-    tmp = Path(tempfile.mkdtemp(prefix="nexus-probe-"))
-    # Politique de sonde : l'Electron générique du labo autorisé, ici seulement (jamais le policy.json du poste).
-    policy.POLICY_FILE = tmp / "policy.json"
-    policy.POLICY_FILE.write_text(json.dumps({"allow_launch": [str(apps.ELECTRON)]}), encoding="utf-8")
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     for arg in sys.argv:
         if arg.startswith("--fake="):  # sous-ensemble des messages d'activation simulée : nc,act,focus,app
@@ -414,6 +409,7 @@ def main() -> None:
     launched = launch.launch(exe, args, devtools=True, auto=auto, wait_s=45.0)
     hwnd = launched.hwnd
     rows: list[dict] = []
+    page: cdp.Page | None = None
     try:
         page = cdp.Page(launched.port)
         js(page, OBSERVER)
@@ -484,10 +480,11 @@ def main() -> None:
             matrix_keys(technique, auto, hwnd, page, nodes)
     finally:
         save(rows, mode + ("-edge" if edge else ""))
-        try:
-            page.close()
-        except Exception:  # noqa: BLE001
-            pass
+        if page is not None:  # DevTools injoignable : aucune page à fermer
+            try:
+                page.close()
+            except Exception:  # noqa: BLE001
+                pass
         launch.kill_tree(launched.pid)
         foreground.give_back(user_fg) if w.foreground() != user_fg and w.IsWindow(user_fg) else None
 

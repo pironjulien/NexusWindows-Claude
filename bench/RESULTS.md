@@ -101,7 +101,7 @@ Saisie de 2 000 caractères avec 20 sauts de ligne :
 
 ## Cinquième passage — Steam, interface CEF dans des fenêtres SDL (0.6.0, 14 octobre)
 Steam réel de Julien, connecté, en lecture seule, fenêtres recouvertes par les siennes ; sonde
-`bench/steam_probe.py` par le vrai serveur MCP (résultats bruts non publiés : ils contiennent l'interface d'un compte Steam réel).
+`bench/steam_probe.py` par le vrai serveur MCP (résultats : `results/2026-10-14_*-steam.json`).
 
 | Constat mesuré | Conséquence dans le code |
 |---|---|

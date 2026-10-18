@@ -119,6 +119,20 @@ def user_idle_ms() -> int:
     return (now - last) & _MASK
 
 
+def user_input_since(started: float, started_tick: int) -> bool:
+    """Julien a-t-il touché clavier, boutons ou molette depuis `started` (time.monotonic) / `started_tick`
+    (GetTickCount relevé au même instant) ? Raw Input si disponible (entrées injectées écartées). Repli sans Raw
+    Input : dernière entrée du système postérieure au début, hors de nos propres entrées datées (mark_own_input)."""
+    if physical.available():
+        return physical.since(started)
+    last, now = w.last_input_tick(), w.GetTickCount()
+    after = (last - started_tick) & _MASK
+    if after == 0 or after > ((now - started_tick) & _MASK):
+        return False
+    start, end = _OWN_INPUT
+    return not (start and _between(last, start, end))
+
+
 def wait_typing_pause(quiet_s: float = QUIET_S, max_wait_s: float = 4.0) -> bool:
     """Attend que Julien marque une pause (rien au clavier, aux boutons ni à la molette depuis quiet_s, et aucun
     bouton tenu : un glisser en cours n'est pas une pause, Raw Input ne voyant que les transitions). Faux s'il reste
@@ -369,15 +383,7 @@ class Activation:
         self.pids = pids or set()
 
     def interrupted(self) -> bool:
-        if physical.available():
-            return physical.since(self.started)
-        # Repli sans Raw Input : dernière entrée du système postérieure au début, hors de nos propres entrées datées.
-        last, now = w.last_input_tick(), w.GetTickCount()
-        after = (last - self.started_tick) & _MASK
-        if after == 0 or after > ((now - self.started_tick) & _MASK):
-            return False
-        start, end = _OWN_INPUT
-        return not (start and _between(last, start, end))
+        return user_input_since(self.started, self.started_tick)
 
     def give_back(self) -> None:
         """Rend le premier plan à Julien si c'est encore la cible qui l'a (s'il est passé ailleurs entre-temps, on ne

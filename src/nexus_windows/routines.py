@@ -8,16 +8,20 @@ rejeu, chaque cible est retrouvée par son nom dans l'état réel et chaque éta
 L'application est identifiée par son exécutable (nom, chemin, taille, date) : une mise à jour est signalée au rejeu,
 qui reste possible puisque chaque étape est revérifiée ; un rejeu raté marque la routine « à revoir ».
 
-Texte variable : `{{nom}}` dans un champ d'étape, valeur donnée au rejeu par params={"nom": "…"}.
+Texte variable : `{{nom}}`, valeur donnée au rejeu par params={"nom": "…"}, seulement dans les champs de texte
+(`text`, `check.value`, `check.contains`) : jamais dans une cible, une touche ou un chemin de menu (une cible « {{b}} »
+remplie en « 120,340 » deviendrait un clic par point). Un texte tapé (`type`, `set`) n'est fait QUE de modèles `{{x}}` :
+tout texte fixe y est refusé à l'enregistrement. Au rejeu, un paramètre manquant ou inconnu est refusé, et les étapes
+remplies repassent la règle des cibles sémantiques.
 Fichiers : ~/.claude/nexus-claude/routines/<exécutable>.json (local au poste, hors OneDrive).
 
 Miroir entre les PC de Julien : NexusClaude/routines/<exécutable>.json dans le dépôt (synchronisé par OneDrive, suivi
 par Git). Il ne garde que la définition des routines (étapes, empreinte, titre, date d'enregistrement), jamais leurs
-statistiques de rejeu, et JAMAIS de texte saisi en clair : une routine dont un texte saisi (`text`, `check.value`,
-`check.contains`) n'est pas un modèle `{{x}}` reste locale au poste. Fusion par date : pour chaque routine, la version
-enregistrée (ou oubliée : pierre tombale datée) le plus récemment l'emporte, dans les deux sens. Le serveur synchronise
-au démarrage et réécrit le miroir de l'application à chaque routine enregistrée ou oubliée ; scripts/sync-routines.ps1
-fait de même hors serveur (étape de Sync-NexusPoste).
+statistiques de rejeu, et JAMAIS de texte saisi en clair : une routine dont un texte (`text`, `check.value`,
+`check.contains`) n'est pas fait que de modèles `{{x}}` reste locale au poste. Fusion par date : pour chaque routine, la
+version enregistrée (ou oubliée : pierre tombale datée) le plus récemment l'emporte, dans les deux sens. Le serveur
+synchronise au démarrage et réécrit le miroir de l'application à chaque routine enregistrée ou oubliée ;
+scripts/sync-routines.ps1 fait de même hors serveur (étape de Sync-NexusPoste).
 """
 
 from __future__ import annotations
@@ -126,6 +130,49 @@ def summary(app: str) -> str:
     return f"Routines enregistrées pour {app} : {', '.join(parts)} — act(routine=…, params=…)."
 
 
+TEXT_PARAM_FIELDS = ("value", "contains")  # champs de check où un {{x}} est permis (avec `text` de l'étape)
+TYPING = ("type", "set")  # étapes dont `text` est tapé
+
+
+def _template_only(value: str) -> bool:
+    """Valeur faite UNIQUEMENT d'un ou plusieurs modèles {{x}} (et d'espaces) : aucun texte fixe."""
+    return bool(PARAM.search(value)) and not PARAM.sub("", value).strip()
+
+
+def _params_in(value: Any) -> bool:
+    return bool(PARAM.search(json.dumps(value, ensure_ascii=False)))
+
+
+def misplaced(steps: list[dict[str, Any]]) -> str:
+    """Premier {{x}} hors des champs de texte (`text`, `check.value`, `check.contains`), ou « » : rempli au rejeu, il
+    changerait une cible, une touche ou un menu (« {{b}} » → « 120,340 » : clic par point)."""
+    allowed = "permis seulement dans text, check.value, check.contains"
+    for index, step in enumerate(steps, 1):
+        for key, value in step.items():
+            if key == "text":
+                continue
+            if key == "check" and isinstance(value, dict):
+                for sub, inner in value.items():
+                    if sub not in TEXT_PARAM_FIELDS and _params_in(inner):
+                        return f"étape {index} : {{{{x}}}} dans check.{sub} ({allowed})"
+            elif _params_in(value):
+                return f"étape {index} : {{{{x}}}} dans {key} ({allowed})"
+    return ""
+
+
+def fixed_text(steps: list[dict[str, Any]]) -> str:
+    """Premier texte tapé (type, set) qui contient du texte fixe, ou « » : il serait gardé en clair (et le miroir
+    OneDrive/Git en recevrait une copie). Seuls des modèles {{x}} remplis au rejeu sont permis."""
+    for index, step in enumerate(steps, 1):
+        text = step.get("text")
+        if step.get("do") in TYPING and isinstance(text, str) and text.strip() and not _template_only(text):
+            return (
+                f"étape {index} : texte tapé fixe (seuls des modèles {{{{x}}}} sont permis, valeur donnée au rejeu par "
+                "params)"
+            )
+    return ""
+
+
 def unreusable(steps: list[dict[str, Any]]) -> str:
     """Pourquoi ce lot ne peut pas devenir une routine (cible non sémantique), ou « »."""
     for index, step in enumerate(steps, 1):
@@ -147,7 +194,7 @@ def unreusable(steps: list[dict[str, Any]]) -> str:
 def remember(app: str, name: str, steps: list[dict[str, Any]], fingerprint: dict[str, Any], title: str) -> None:
     if not NAME.match(name):
         raise RoutineError(f"Nom de routine « {name} » : lettres, chiffres, espaces, « . », « - », 60 caractères.")
-    reason = unreusable(steps)
+    reason = unreusable(steps) or misplaced(steps) or fixed_text(steps)
     if reason:
         raise RoutineError(reason)
     with _LOCK:
@@ -206,13 +253,35 @@ def _fill(value: Any, params: dict[str, str], missing: set[str]) -> Any:
     return value
 
 
-def expand(entry: dict[str, Any], params: dict[str, str] | None) -> list[dict[str, Any]]:
-    """Étapes de la routine, paramètres remplacés ; tout paramètre manquant est refusé (rien n'est exécuté)."""
+def fill(steps: list[dict[str, Any]], params: dict[str, str] | None) -> list[dict[str, Any]]:
+    """Étapes, modèles {{x}} remplacés par params ; un paramètre manquant (il serait tapé tel quel) ou inconnu (faute
+    de frappe : la valeur voulue n'irait nulle part) est refusé, rien n'est exécuté."""
+    params = params or {}
+    expected = set(PARAM.findall(json.dumps(steps, ensure_ascii=False)))
+    unknown = sorted(set(params) - expected)
+    if unknown:
+        wanted = f"attendus : {', '.join(sorted(expected))}" if expected else "aucun paramètre attendu"
+        raise RoutineError(f"Paramètres inconnus : {', '.join(unknown)} ({wanted}).")
     missing: set[str] = set()
-    steps = _fill(entry.get("steps", []), params or {}, missing)
+    filled = _fill(steps, params, missing)
     if missing:
         raise RoutineError(f"Paramètres manquants : {', '.join(sorted(missing))} (params={{…}}).")
-    return steps
+    return filled
+
+
+def expand(entry: dict[str, Any], params: dict[str, str] | None) -> list[dict[str, Any]]:
+    """Étapes de la routine, paramètres remplacés (fill) ; la routine (enregistrée avant ces règles, reprise du miroir
+    ou modifiée à la main) est refusée si un {{x}} sort des champs de texte, ou si une étape remplie vise un numéro ou
+    un point : rien n'est exécuté."""
+    steps = entry.get("steps", [])
+    reason = misplaced(steps)
+    if reason:
+        raise RoutineError(f"Routine refusée : {reason}.")
+    filled = fill(steps, params)
+    reason = unreusable(filled)
+    if reason:
+        raise RoutineError(f"Routine refusée après remplissage des paramètres : {reason}.")
+    return filled
 
 
 def changed(entry: dict[str, Any], fingerprint: dict[str, Any]) -> bool:
@@ -239,15 +308,17 @@ def plain_text(entry: dict[str, Any]) -> str:
     for index, step in enumerate(entry.get("steps") or [], 1):
         if not isinstance(step, dict):
             continue
-        check = step.get("check") if isinstance(step.get("check"), dict) else {}
+        check = step.get("check")
+        if not isinstance(check, dict):
+            check = {}
         fields = [
             ("text", step.get("text")),
             ("check.value", check.get("value")),
             ("check.contains", check.get("contains")),
         ]
         for field, value in fields:
-            if isinstance(value, str) and value.strip() and not PARAM.search(value):
-                return f"étape {index}, {field}"
+            if isinstance(value, str) and value.strip() and not _template_only(value):
+                return f"étape {index}, {field}"  # texte fixe, même mêlé à un {{x}} (« IBAN FR76… {{nom}} »)
     return ""
 
 

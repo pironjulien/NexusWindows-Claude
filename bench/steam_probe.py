@@ -14,6 +14,7 @@ Résultats : bench/results/AAAA-MM-JJ_HHMM-steam.json
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import sys
 import time
@@ -119,7 +120,8 @@ async def main(devtools: bool, foreground: bool) -> list[dict]:
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")
+    if isinstance(sys.stdout, io.TextIOWrapper):  # console ordinaire (pas une sortie remplacée)
+        sys.stdout.reconfigure(encoding="utf-8")
     out = asyncio.run(main("--devtools" in sys.argv, "--foreground" in sys.argv))
     path = ROOT / "results" / time.strftime("%Y-%m-%d_%H%M-steam.json")
     path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")

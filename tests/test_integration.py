@@ -48,8 +48,8 @@ def test_keystrokes_go_through_slices(monkeypatch):
 def test_clearing_uses_one_activation_and_delete(monkeypatch):
     field = node("Edit", "Notes", value="abc")
     auto = FakeAuto()
-    auto.set_focus = lambda element: None
-    auto.select_all_text = lambda element: None
+    monkeypatch.setattr(auto, "set_focus", lambda element: None, raising=False)
+    monkeypatch.setattr(auto, "select_all_text", lambda element: None, raising=False)
     ex = executor(make_view(field), auto)
     keys: list[int] = []
 

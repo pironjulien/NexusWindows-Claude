@@ -10,13 +10,17 @@ import dataclasses
 import hashlib
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import comtypes
 
-from . import capture, cdp, foreground, methods, policy, realinput, snapshot, uia, worker
+from . import capture, cdp, foreground, methods, realinput, snapshot, uia, worker
 from . import win32 as w
+
+if TYPE_CHECKING:
+    from . import keys
 
 UIA_ONLY = {"WPF", "XAML", "UWP", "WinUI", "DirectUI"}
 NO_KEYBOARD_MESSAGES = {"XAML", "UWP", "WinUI", "DirectUI", "Tk"}  # WM_CHAR/WM_KEYDOWN postés ignorés (mesuré)
@@ -31,15 +35,6 @@ NATIVE_PROXY_CLASSES = (
     "listbox", "combolbox", "combobox", "systabcontrol32", "syslistview32", "systreeview32", "sysheader32",
     "toolbarwindow32", "rebarwindow32", "msctls_statusbar32", "#32768",
 )  # fmt: skip
-# Zones du shell où un double-clic, un clic droit, la touche « applications » ou Maj+F10 EXÉCUTENT un fichier : la liste
-# d'une boîte de fichiers (DirectUIHWND/SHELLDLL_DefView d'une #32770) et les menus contextuels shell (#32768). Le clic
-# simple de sélection, le nom de fichier et les boutons Ouvrir/Enregistrer restent permis.
-SHELL_VIEW_CLASSES = ("SHELLDLL_DefView", "DirectUIHWND")
-FILE_DIALOG_CLASS = "#32770"
-SHELL_MENU_CLASS = "#32768"
-VK_APPS = 0x5D
-VK_F10 = 0x79
-VK_SHIFT = 0x10
 ITEM_ROLES = {"ListItem", "TreeItem", "DataItem", "TabItem", "RadioButton"}
 TEXT_ROLES = {"Edit", "Document", "ComboBox"}
 CHOICE_ROLES = {
@@ -250,6 +245,68 @@ class ExecutorBase:
         # Document web visé quand la fenêtre en porte plusieurs (Steam : cadre « Steam » et magasin) : sa page
         # DevTools et sa zone de rendu, pas celles du titre de la fenêtre.
         self.document: uia.Node | None = None
+        # confirm=true de l'étape en cours (ordre explicite ou oui de Julien) : lève la confirmation de act_confirm.
+        self.confirm = False
+
+    if TYPE_CHECKING:
+        # Méthodes que les familles (act_*) s'empruntent entre elles, réunies dans actions.Executor : déclarées ici
+        # pour le contrôle de types seulement (aucune à l'exécution : l'ordre de résolution reste celui d'Executor).
+        # act_confirm
+        def _confirm_click(self, e: snapshot.Element, button: str = "left") -> None: ...
+        def _confirm_point(self, x: int, y: int, button: str = "left") -> None: ...
+        def _confirm_keys(self, combos: list[keys.Combo], spec: str, element: snapshot.Element | None) -> None: ...
+        def _confirm_text(self, element: snapshot.Element | None, text: str) -> None: ...
+        def _focused_target_element(self) -> snapshot.Element | None: ...
+        # act_pointer
+        def _point_of(self, e: snapshot.Element) -> tuple[int, int]: ...
+        def _window_under(self, x: int, y: int) -> int: ...
+        def _post_click(self, x: int, y: int, button: str = "left", count: int = 1) -> int: ...
+        def _element_under(self, x: int, y: int, roles: set[str] | None = None) -> snapshot.Element | None: ...
+        @staticmethod
+        def _hit(view: snapshot.View, x: int, y: int) -> tuple[uia.Node, int] | None: ...
+        def _real_write(self, e: snapshot.Element, text: str, replace: bool) -> None: ...
+
+        # act_uia
+        def click_element(
+            self, e: snapshot.Element, button: str = "left", count: int = 1, close_list: bool = True
+        ) -> Outcome: ...
+        def _value_is(self, e: snapshot.Element, expected: str, timeout_s: float = 1.0) -> bool: ...
+
+        # act_chromium
+        def _click_chromium(self, e: snapshot.Element, page: cdp.Page | None, what: str) -> Outcome: ...
+        def _page_if_free(self) -> cdp.Page | None: ...
+        def _cdp_click(self, page: cdp.Page, x: int, y: int, button: str = "left", count: int = 1) -> str: ...
+        def _css_point(self, page: cdp.Page, x: int, y: int) -> tuple[float, float]: ...
+        @staticmethod
+        def _cdp_focus_at(page: cdp.Page, cx: float, cy: float, editable: bool = False) -> None: ...
+        @staticmethod
+        def _cdp_refuse_secret(page: cdp.Page) -> None: ...
+        @staticmethod
+        def _cdp_names(combo: keys.Combo) -> tuple[str, str]: ...
+        def _cdp_write(self, page: cdp.Page, e: snapshot.Element, text: str, replace: bool) -> None: ...
+        def _is_multiline_chromium(self, e: snapshot.Element) -> bool: ...
+        def _focus_web_content(self) -> None: ...
+        def _select_by_typing(self, e: snapshot.Element, option: str) -> Outcome: ...
+        def _sim_top(self, e: snapshot.Element | None = None) -> int: ...
+        def _sim_activation(
+            self, e: snapshot.Element | None = None
+        ) -> AbstractContextManager[methods.SimulatedActivation]: ...
+        def _take_focus(self, e: snapshot.Element, timeout_s: float = 0.5) -> None: ...
+        def _sim_focus(self, e: snapshot.Element) -> str: ...
+
+        # act_win32
+        def _element_hwnd_class(self, e: snapshot.Element) -> tuple[int, str]: ...
+        def _ancestor_hwnd(self, e: snapshot.Element, classes: tuple[str, ...]) -> int: ...
+        @staticmethod
+        def _sibling_index(e: snapshot.Element, role: str) -> int | None: ...
+        @staticmethod
+        def _msaa_item(e: snapshot.Element, fw: str) -> bool: ...
+        @staticmethod
+        def _win32_combo_of(e: snapshot.Element) -> int: ...
+        def _win32_item_chain(self, e: snapshot.Element) -> list[tuple[str, Callable[[], Any]]]: ...
+        def _ensure_active(self) -> None: ...
+        def _keystrokes(self, e: snapshot.Element, text: str, replace: bool, simulated: bool = False) -> str: ...
+        def _post_combos(self, combos: list[keys.Combo], fw: str, sent: list[str], simulated: bool = False) -> None: ...
 
     @property
     def view(self) -> snapshot.View:
@@ -375,8 +432,8 @@ class ExecutorBase:
         ident = None
         if isinstance(spec, int):
             ident = spec
-        elif isinstance(spec, str) and snapshot._ID.match(spec):
-            ident = int(snapshot._ID.match(spec).group(1))
+        elif isinstance(spec, str) and (match := snapshot._ID.match(spec)):
+            ident = int(match.group(1))
             bare = spec.strip()
             if bare.isdigit():
                 view = self._rebuild() if self.acted else self.view
@@ -615,102 +672,3 @@ class ExecutorBase:
     def _refuse_secret(props: dict, label: str) -> None:
         if props.get("password"):
             raise ActionError(f"{label} est un champ de mot de passe : je n'y écris pas (règle de sécurité).")
-
-    @staticmethod
-    def _refuse_command_surface(e: snapshot.Element) -> None:
-        """Barre d'adresse de l'Explorateur ou d'une boîte de fichiers : ce qu'on y tape s'exécute (« cmd » + Entrée).
-        Reconnue par les classes des ancêtres UIA, ou à défaut des fenêtres parentes Win32."""
-        inside = False
-        node: uia.Node | None = e.node
-        for _ in range(16):
-            if node is None or inside:
-                break
-            inside = str(node.props.get("class_name") or "") in policy.COMMAND_SURFACE_CLASSES
-            node = node.parent
-        hwnd = e.node.hwnd
-        for _ in range(16):
-            if not hwnd or inside:
-                break
-            inside = w.class_name(hwnd) in policy.COMMAND_SURFACE_CLASSES
-            hwnd = w.handle(w.GetParent(hwnd))
-        if inside and not policy._allow_shell():
-            raise ActionError(
-                f"{e.describe()} est une barre d'adresse : ce qui y est tapé peut lancer une commande (règle de "
-                "sécurité). Choisir le dossier ou le fichier dans la liste, ou passer par le shell."
-            )
-
-    def _window_classes(self, e: snapshot.Element | None, point: tuple[int, int] | None) -> tuple[set[str], str]:
-        """Classes des fenêtres ancêtres d'un élément (ou de la fenêtre sous un point) et processus de la fenêtre de
-        premier niveau. Les classes viennent des nœuds UIA de l'instantané (class_name), puis des fenêtres Win32
-        parentes — ainsi la boîte de fichiers et le menu shell sont reconnus même quand l'élément n'a pas de hwnd propre."""
-        classes: set[str] = set()
-        top = 0
-        if e is not None:
-            node: uia.Node | None = e.node
-            for _ in range(24):
-                if node is None:
-                    break
-                name = str(node.props.get("class_name") or "")
-                if name:
-                    classes.add(name)
-                node = node.parent
-            hwnd = e.node.hwnd
-        else:
-            top = self._window_under(*point)
-            hwnd = w.deepest_child_at(top, *point)
-        while hwnd:
-            classes.add(w.class_name(hwnd))
-            top = hwnd
-            hwnd = w.handle(w.GetParent(hwnd))
-            if len(classes) > 48:
-                break
-        root = w.root(top) if top else 0
-        process = w.process_name(w.window_pid(root)).lower() if root else ""
-        if not process and e is not None:
-            process = self.view.info.process.lower()
-        return classes, process
-
-    def _file_dialog_open(self) -> bool:
-        """Une boîte de dialogue de fichiers (#32770 contenant une liste shell) est-elle ouverte dans la cible ? Un menu
-        contextuel #32768 posé au-dessus exécuterait un fichier, même si le menu appartient au processus de l'application."""
-        for root in self.view.roots.values():
-            classes = {str(node.props.get("class_name") or "") for node in root.walk()}
-            if FILE_DIALOG_CLASS in classes and any(c in classes for c in SHELL_VIEW_CLASSES):
-                return True
-        for hwnd in self.windows:
-            if w.class_name(hwnd) == FILE_DIALOG_CLASS and any(
-                w.class_name(child) in SHELL_VIEW_CLASSES for child in w.enum_children(hwnd)
-            ):
-                return True
-        return False
-
-    def _shell_surface(
-        self, e: snapshot.Element | None = None, point: tuple[int, int] | None = None
-    ) -> tuple[bool, bool]:
-        """(liste d'une boîte de fichiers, menu contextuel shell) pour cet élément ou ce point."""
-        classes, process = self._window_classes(e, point)
-        in_file_list = FILE_DIALOG_CLASS in classes and any(c in classes for c in SHELL_VIEW_CLASSES)
-        in_shell_menu = SHELL_MENU_CLASS in classes and (process == "explorer.exe" or self._file_dialog_open())
-        return in_file_list, in_shell_menu
-
-    def _refuse_shell_view(
-        self, e: snapshot.Element | None = None, *, point: tuple[int, int] | None = None, dangerous: bool = False
-    ) -> None:
-        """Refuse les gestes qui, dans une boîte de fichiers ou un menu contextuel du shell, exécuteraient un fichier.
-        - menu contextuel shell (#32768 de l'Explorateur ou au-dessus d'une boîte de fichiers) : TOUT geste refusé,
-          car une entrée s'y déclenche au simple clic ;
-        - liste d'une boîte de fichiers (sous SHELLDLL_DefView ou DirectUIHWND d'une #32770) : seuls les gestes
-          « dangereux » (clic droit, double-clic, touche « applications », Maj+F10) sont refusés ; le clic simple de
-          sélection, le nom de fichier et les boutons Ouvrir/Enregistrer restent permis."""
-        in_file_list, in_shell_menu = self._shell_surface(e, point)
-        if in_shell_menu:
-            raise ActionError(
-                "Menu contextuel du shell : une entrée y exécute ou supprime un fichier au simple clic (règle de "
-                "sécurité). Fermer le menu (Échap) ; pour agir sur un fichier, passer par le shell de Claude Code."
-            )
-        if in_file_list and dangerous:
-            raise ActionError(
-                "Boîte de fichiers : clic droit, double-clic, touche « applications » et Maj+F10 y exécuteraient un "
-                "fichier (règle de sécurité). Clic simple pour sélectionner, puis le bouton Ouvrir ou Enregistrer ; "
-                "pour lancer un fichier, passer par le shell de Claude Code."
-            )

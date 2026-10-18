@@ -6,7 +6,41 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
-Drop-down list fixes measured by the cross-agent bench of 2026-10-16 (17/20 in the morning, 19/20 after).
+Version 0.8.2 (`nexus_windows.__version__`), prepared for the first release on PyPI and the official MCP registry.
+It gathers the private 0.8.0 (shared guard-rail policy), 0.8.1 (suspended Store apps) and 0.8.2 (directories and
+packaging) changes, plus the drop-down list fixes measured by the cross-agent bench of 2026-10-16.
+
+### Added
+- MCP tool annotations on every tool (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  `openWorldHint`).
+- Startup outside Windows (`offwindows.py`): in the Linux container MCP directories such as Glama use, the server
+  answers `initialize` and `tools/list`; every tool call answers that Windows is required. `comtypes` and
+  `windows-capture` are installed on Windows only. `tests/test_startup.py` runs on Windows and on Linux (new CI job).
+- Shared guard-rail policy, one file for this server and NexusWindows for Antigravity (`garde-fous.json`, bundled in
+  `src/nexus_windows/shared`): hard blocks (secure desktop, Windows credential prompts, password managers, now also
+  for reading) and confirmation of irreversible gestures (`confirm: true` on the step: pay, buy, transfer, send,
+  publish, delete permanently, format, uninstall, reset, cancel a subscription, delete an account, make a repository
+  public), checked on what the gesture triggers (click by `[N]`, name or point, double-click, Enter, Ctrl+Enter,
+  Space, Alt+letter, typed line break, DevTools pages). Missing or unreadable policy: every action refused.
+- Store apps (UWP, WinUI) suspended by Windows because they never had the foreground are resumed with
+  `IPackageDebugSettings.Resume`, without foreground nor persistent setting, at launch and before each `look` or
+  `act` on them (`packages.py`).
+- PyPI packaging (license, URLs, keywords, classifiers, `mcp-name` line) and a `publish.yml` workflow using Trusted
+  Publishing, triggered by a GitHub release; GitHub Actions `tests.yml`; `glama.json`; README Privacy section.
+
+### Removed
+- Refusals with no safety value when the user already lets Claude run commands: consoles and Terminal, the Run
+  dialog, taskbar, desktop, Start, Search, File Explorer, address bars, shell file dialogs and context menus, registry
+  editor, MMC consoles, Task Manager, other AI agents and IDEs; at launch, interpreter, console, script-host and
+  debugger lists. The local `policy.json` (`allow_processes`, `allow_shell`, `allow_launch`) is no longer read.
+- Chromium switches that run a command are no longer refused; only those that open a browser session stay refused
+  (`--remote-debugging-*`, `--load-extension`, `--disable-web-security`, a profile chosen by the model).
+
+### Changed
+- The Claude desktop app may be driven (no permission prompt reaches it in "bypass permissions" mode); the rule stays:
+  never click one of Claude's own permission prompts.
+- The handle-leak test warms up for 45 s before measuring (a one-off allocation was taken for a leak).
+- `pyproject.toml`: English description, no author e-mail.
 
 ### Fixed
 - Win32/WinForms drop-down lists without an ExpandCollapse pattern: `expand`, `collapse` and `click` on the list now

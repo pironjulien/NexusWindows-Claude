@@ -87,19 +87,20 @@ def _read_file() -> None:
 
 
 def _read_one(path: Path, seen: str) -> None:
+    global _latched_until
     try:
         info = path.stat()
         mtime = info.st_mtime
         version = (info.st_mtime_ns, path.read_bytes())  # octets bruts : aucun encodage ne peut le rendre illisible
     except OSError:
         return
-    with _LATCH:
+    left = min(max(HOLD_S - (time.time() - mtime), 0.0), HOLD_S)
+    with _LATCH:  # version notée vue ET arrêt posé d'un seul bloc : aucun autre fil ne voit l'une sans l'autre
         if version == globals()[seen]:
             return
         globals()[seen] = version
-    left = min(max(HOLD_S - (time.time() - mtime), 0.0), HOLD_S)
-    if left > 0:
-        _latch(left)
+        if left > 0:
+            _latched_until = max(_latched_until, _now() + left)
 
 
 def remaining_s() -> float:

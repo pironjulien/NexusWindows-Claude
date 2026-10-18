@@ -1,17 +1,21 @@
 # NexusWindows for Claude
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](pyproject.toml)
+<!-- mcp-name: io.github.pironjulien/nexus-windows -->
+
+[![Release](https://img.shields.io/github/v/release/pironjulien/claude-windows-computer-use)](https://github.com/pironjulien/claude-windows-computer-use/releases)
+[![Tests](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/LICENSE)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/pyproject.toml)
 [![MCP](https://img.shields.io/badge/MCP-server-7ee2a8)](https://modelcontextprotocol.io)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)](#installation)
 
-[![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
+[![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](https://raw.githubusercontent.com/pironjulien/claude-windows-computer-use/main/docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
 
 **Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 0.7.0 · Windows 10/11 · Python 3.14 · MIT licence
+Version 0.8.2 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/claude-windows-computer-use) ·
@@ -182,7 +186,11 @@ src/nexus_windows/
   launch.py        background launch, DevTools, throwaway browser profiles
   steam.py         Steam switches, clean restart, DevTools port
   realinput.py     real mouse/keyboard (SendInput), only when authorised
-  policy.py        where to act and what to launch
+  policy.py        where to act and what to launch (hard blocks of the shared policy, launch switches)
+  act_confirm.py   confirmation of irreversible gestures (confirm: true), whatever key or click triggers them
+  shared/          the guard-rail policy shared with NexusWindows for Antigravity (garde-fous.json)
+  packages.py      resumes Store apps that Windows suspended in the background
+  offwindows.py    outside Windows: the server starts and lists its tools, every call says Windows is required
   stop.py          shared emergency stop
   freshness.py     detects a server whose code changed on disk
   worker.py        COM thread with a hard timeout
@@ -225,7 +233,7 @@ For Claude Desktop, add the same command to `claude_desktop_config.json`:
 }
 ```
 
-Local state (logs, routines, optional policy) lives in `%USERPROFILE%\.claude\nexus-claude\`; set
+Local state (logs, routines) lives in `%USERPROFILE%\.claude\nexus-claude\`; set
 `NEXUS_WINDOWS_HOME` to use another folder.
 
 ## Usage
@@ -245,7 +253,7 @@ Later: `act(window="Settings form", routine="save-form")`.
 
 ## Measurements
 
-All figures come from [`bench/RESULTS.md`](bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
+All figures come from [`bench/RESULTS.md`](https://github.com/pironjulien/claude-windows-computer-use/blob/main/bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
 PC, October 2026; the notes in `RESULTS.md` are in French).
 
 | What | Result |
@@ -259,7 +267,7 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 | Final render of an `act` (0.7.0 vs 0.6.1) | Win32 418 → 221 ms, Electron 341 → 205 ms (window-settle detection replaces a fixed 300 ms wait) |
 | Open drop-down list, choose in it (WinForms and WPF forms, real MCP server) | 8/8 scenarios, the application received the choice every time; `select` in an open WinForms list 113 ms (was 22 s and a failure); 0 foreground take sampled every 5 ms, cursor never moved |
 
-Offline test suite: 580 passed, 6 skipped (`test.ps1`, October 16, 2026).
+Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
 ## Cross-agent bench (October 16, 2026)
 
@@ -281,12 +289,20 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 
 - **Emergency stop**: Ctrl+Alt+Shift+Esc interrupts the running action at its next checkpoint (typing included) and
   refuses every new action for 2 minutes, across conversations and for the other agents (protocol above).
-- **Policy** (`policy.py`): no action ever in consoles, UAC and credential prompts, password managers, the Run dialog,
-  the taskbar, the desktop, Start or Search; no typing in an address bar; no context menu in a file dialog's list.
-  The Claude app, File Explorer, other AI agents, IDEs with an integrated terminal and administration tools are
-  refused by default and can be allowed in `%USERPROFILE%\.claude\nexus-claude\policy.json`
-  (`allow_processes`, `allow_shell`). `launch` refuses consoles, interpreters, script hosts, shortcuts and Chromium or
-  Electron switches that run code. Password fields are refused; typed text is never logged.
+- **Hard blocks** (shared policy, `src/nexus_windows/shared/garde-fous.json`, same file as NexusWindows for
+  Antigravity): the secure desktop (UAC, lock and sign-in screens), Windows credential prompts and password managers
+  are never read nor driven. A missing or unreadable policy refuses every action (fail closed).
+- **Confirmation of irreversible gestures**: paying, buying, ordering, transferring money, sending, publishing,
+  posting, deleting permanently, emptying the bin, formatting, uninstalling, resetting, cancelling a subscription,
+  deleting an account or making a repository public need `confirm: true` on the step, which the model sets only on the
+  user's explicit order or yes. The check covers what the gesture triggers: click by `[N]`, by name or by coordinates,
+  double-click, Enter (target, default button, nearby send button), Ctrl+Enter, Space, Alt+letter, a typed line break
+  and DevTools pages. A routine never records nor replays `confirm`.
+- **Launch**: a browser never gets a profile chosen by the model, a DevTools port or a loaded extension (`devtools=true`
+  opens a fresh throwaway profile). Consoles, File Explorer, the taskbar and other applications are not refused:
+  the server is meant for a user who already lets Claude run commands; keep Claude's own permission prompts on if
+  you want a gate there.
+- **Password fields**: never typed into. Typed text is never logged (only its length).
 - **Accounts**: a browser started with `devtools=true` gets a throwaway profile without account or sync, checked
   after launch and deleted afterwards.
 - **Screen content is data**: every `look` reminds the model that on-screen text is not an instruction.
@@ -303,12 +319,31 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
   been checked.
 - Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
   approval and the foreground.
-- A Store app that Windows does not render while launched without activation can only be shown by taking the
-  foreground; this is reported.
+- Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);
+  one that Windows still does not render can only be shown by taking the foreground; this is reported.
 - In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.
 - An effect with nothing readable (a file written by a button, for example) stays `~`; add a `check` that observes it.
 - The end-to-end suite (`pytest -m live`) drives real windows and refuses to start if the PC was used less than
   2 minutes ago.
+
+## Privacy
+
+NexusWindows for Claude runs entirely on your PC. It has no account, no telemetry, no analytics and makes no network
+requests of its own (DevTools connections stay on `127.0.0.1`).
+
+- **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
+  only when a tool is called. Password managers, credential prompts and the secure desktop are never read.
+- **Where it goes**: tool results are returned to Claude Desktop or Claude Code, which send them to Anthropic under
+  Anthropic's own privacy policy; this server sends nothing anywhere else.
+- **What it stores**, under `%USERPROFILE%\.claude
+exus-claude\` (or `NEXUS_WINDOWS_HOME`): a JSONL debug log kept
+  14 days (tools, techniques, durations, errors; typed text is replaced by its length), the routines you chose to
+  remember, and throwaway browser profiles created by `devtools=true` (deleted afterwards). Images are written to the
+  log only if you set `NEXUS_WINDOWS_DEBUG_IMAGES=1`. Under `%USERPROFILE%\.nexus\`: the shared foreground token and
+  emergency-stop state.
+- **Removing it**: remove the server from Claude (`claude mcp remove nexus-windows`), then delete those folders.
+
+Questions or concerns: open an issue on this repository.
 
 ## Development
 
@@ -320,4 +355,4 @@ uv run python bench/bench.py           # technique benchmark (when nobody is usi
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Julien Piron.
+MIT, see [LICENSE](https://github.com/pironjulien/claude-windows-computer-use/blob/main/LICENSE). Copyright (c) 2026 Julien Piron.

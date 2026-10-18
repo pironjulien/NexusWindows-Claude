@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 import time
 from contextlib import contextmanager
 
@@ -91,9 +92,50 @@ def test_checkpoint_error_stops_the_wait():
 def test_reentrant_inside_the_process():
     with agentlock.hold("lot"):
         with agentlock.hold("activation brève"):
-            assert agentlock._depth == 2
-        assert agentlock._depth == 1 and json.loads(agentlock.PATH.read_text(encoding="utf-8"))["purpose"] == "lot"
-    assert agentlock._depth == 0
+            assert agentlock._depth() == 2
+        assert agentlock._depth() == 1 and json.loads(agentlock.PATH.read_text(encoding="utf-8"))["purpose"] == "lot"
+    assert agentlock._depth() == 0
+
+
+def test_another_thread_waits_like_another_agent():
+    """Appel abandonné (délai dépassé) dont le fil tient encore le jeton, puis appel suivant dans un autre fil : le
+    nouveau attend le verrou de fichier au lieu de s'imbriquer ; quand l'ancien le rend, le nouveau tient le vrai
+    verrou jusqu'au bout, et personne ne finit avec une profondeur négative."""
+    inside, leave = threading.Event(), threading.Event()
+
+    def abandoned():
+        with agentlock.hold("appel abandonné"):
+            inside.set()
+            leave.wait(5)
+
+    thread = threading.Thread(target=abandoned)
+    thread.start()
+    try:
+        assert inside.wait(5)
+        with pytest.raises(agentlock.Busy, match="NexusClaude tient la souris"):
+            with agentlock.hold("appel suivant", wait_s=0.2):
+                pytest.fail("deux fils dans le jeton en même temps")
+        with agentlock.hold("appel suivant", wait_s=5, checkpoint=leave.set):
+            thread.join(5)
+            assert not thread.is_alive() and agentlock._depth() == 1
+            handle = agentlock._open()
+            try:
+                assert not agentlock._try_lock(handle)  # vrai verrou toujours tenu après la sortie de l'ancien fil
+            finally:
+                agentlock._CloseHandle(handle)
+            assert agentlock.other_holder() is None
+        assert agentlock._depth() == 0 and agentlock._owners == 0
+        with agentlock.hold("après"):  # le verrou réel est encore pris par la suite
+            handle = agentlock._open()
+            try:
+                assert not agentlock._try_lock(handle)
+            finally:
+                agentlock._CloseHandle(handle)
+        with other_agent():
+            assert agentlock.other_holder() is not None  # un autre agent reste visible
+    finally:
+        leave.set()
+        thread.join(5)
 
 
 def test_released_when_the_holder_process_dies(tmp_path):
@@ -106,6 +148,7 @@ def test_released_when_the_holder_process_dies(tmp_path):
         "assert agentlock._try_lock(h); print('held', flush=True); time.sleep(30)"
     )
     proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True)
+    assert proc.stdout is not None
     try:
         assert proc.stdout.readline().strip() == "held"
         assert agentlock.other_holder() is not None

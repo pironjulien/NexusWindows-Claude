@@ -23,6 +23,7 @@ from .act_base import (
     _hit_in,
     _locate,
     _roots_top_down,
+    _short,
     _top_down,
 )
 
@@ -38,17 +39,37 @@ class PointerActions(ExecutorBase):
         return self.click_element(target, button=button, count=count)
 
     def _point_of(self, e: snapshot.Element) -> tuple[int, int]:
-        rect = e.rect
-        if rect is None or e.props.get("offscreen"):
+        """Point visé pour un élément : centre de sa partie visible dans sa fenêtre. Hors champ (défilé hors vue, ou
+        sans position), il est d'abord ramené à l'écran (UIA ScrollIntoView) puis RELU ; toujours hors champ : refus,
+        rien n'est envoyé (le centre de l'ancien rectangle viserait l'élément qui occupe désormais ce point)."""
+        if e.rect is None or e.props.get("offscreen"):
+            cause = ""
             try:
                 self.auto.scroll_into_view(e.node.element)
+            except EXPECTED as error:
+                cause = f" ; ScrollIntoView impossible : {_short(error)}"
+            try:
                 e.node.props.update(self._refresh(e.node.element))
-                rect = e.rect
-            except EXPECTED:
-                pass
+            except EXPECTED as error:
+                cause += f" ; relecture impossible : {_short(error)}"
+            if e.rect is None or e.props.get("offscreen"):
+                raise ActionError(
+                    f"{e.describe()} est hors de la zone visible, même après ScrollIntoView{cause} : rien n'a été "
+                    "envoyé. Faire défiler (scroll) jusqu'à lui, puis relire (look)."
+                )
+        rect = e.rect
         if rect is None:
             raise ActionError(f"{e.describe()} n'a pas de position à l'écran.")
-        return rect.center
+        window = e.window if e.window in self.windows else self.hwnd
+        if not w.IsWindow(window):  # fenêtre disparue : rien pour découper, l'envoi échouera de lui-même
+            return rect.center
+        visible = rect.intersect(w.frame_rect(window))
+        if visible is None:
+            raise ActionError(
+                f"{e.describe()} est en dehors de sa fenêtre (défilé hors vue ?) : rien n'a été envoyé. Faire défiler "
+                "(scroll) jusqu'à lui, puis relire (look)."
+            )
+        return visible.center
 
     def _window_under(self, x: int, y: int) -> int:
         """Fenêtre de la cible sous un point écran, par la géométrie : surgissantes et dialogues du haut vers le bas,
@@ -115,7 +136,7 @@ class PointerActions(ExecutorBase):
     def click_point(self, x: int, y: int, button: str = "left", count: int = 1) -> Outcome:
         """Clic à un point : l'élément de la cible sous le point s'il est actionnable, sinon DevTools ou messages."""
         view = self.view
-        self._refuse_shell_view(point=(x, y), dangerous=button == "right" or count >= 2)
+        self._confirm_point(x, y, button)
         image_xy = self._screen_to_image(x, y)
         if button == "left":
             element = self._element_under(x, y)
@@ -198,7 +219,7 @@ class PointerActions(ExecutorBase):
         amount = max(1, min(int(amount or 3), 50))
         view = self._rebuild() if self.acted else self.view
         element = None
-        point = None
+        point: tuple[int, int] | None = None
         if spec not in (None, ""):
             kind, target = self.resolve(spec, SCROLL_ROLES)
             if kind == "point":
@@ -233,11 +254,12 @@ class PointerActions(ExecutorBase):
         where = f" de {snapshot.Element(0, container, 0, self.hwnd).describe()}" if container is not None else ""
         chain: list[tuple[str, Callable[[], Any]]] = []
         vertical = direction in ("up", "down")
+        scroll_uia: Callable[[], str] | None = None
         if container is not None:
             step = 4  # ScrollAmount_SmallIncrement
             back = 1  # ScrollAmount_SmallDecrement
 
-            def scroll_uia() -> str:
+            def _scroll_uia() -> str:
                 before = self.auto.scroll_percent(container.element)
                 axis = 1 if vertical else 0
                 if before is not None and before[axis] < 0:
@@ -268,30 +290,34 @@ class PointerActions(ExecutorBase):
                     "vérifier sur l'image avant de recommencer."
                 )
 
-        if point is None:
-            point = element.rect.center if element is not None and element.rect else view.info.rect.center
+            scroll_uia = _scroll_uia
+
+        # Point final (techniques ci-dessous) : celui donné, sinon le centre de l'élément ou de la fenêtre.
+        aim: tuple[int, int] = point or (
+            element.rect.center if element is not None and element.rect else view.info.rect.center
+        )
         delta = 120 * amount * (1 if direction in ("up", "left") else -1)
         horizontal = not vertical
         page = self._get_page()
         if page is not None:  # DevTools d'abord : molette de confiance, effet immédiat
 
             def scroll_cdp() -> None:
-                cx, cy = self._css_point(page, *point)
+                cx, cy = self._css_point(page, *aim)
                 page.wheel(cx, cy, -delta if not horizontal else 0, -delta if horizontal else 0)
 
             chain.append(("DevTools molette", scroll_cdp))
-        if container is not None:
+        if scroll_uia is not None:
             chain.append(("UIA Scroll", scroll_uia))
         process = w.process_name(w.window_pid(self.hwnd)).lower()
         if view.framework not in NO_MOUSE_MESSAGES and process not in BROWSERS_WITHOUT_MESSAGE_WHEEL:
             chain.append(
                 (
                     "molette par messages",
-                    self._watched(lambda: methods.post_wheel(self._window_under(*point), *point, delta, horizontal)),
+                    self._watched(lambda: methods.post_wheel(self._window_under(*aim), *aim, delta, horizontal)),
                 )
             )
         return self._try_or_foreground(
-            chain, f"défilement {direction} ×{amount}{where}", lambda: realinput.wheel(*point, delta, horizontal)
+            chain, f"défilement {direction} ×{amount}{where}", lambda: realinput.wheel(*aim, delta, horizontal)
         )
 
     # --- Glisser et survol : DevTools si disponible, sinon vraie souris -------------------------------------------

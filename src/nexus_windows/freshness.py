@@ -15,9 +15,12 @@ import threading
 import time
 from pathlib import Path
 
-from . import __version__
+from . import __version__, policy
 
 PACKAGE = Path(__file__).resolve().parent
+# Module de la politique commune (shared/garde_fous.py) : chargé une fois, comme le paquet. Ses DONNÉES
+# (garde-fous.json) sont relues à chaque changement, sans redémarrage.
+SHARED_MODULE = policy.SHARED_DIR / "garde_fous.py"
 CHECK_EVERY_S = 30.0
 STALE = "serveur nexus-windows dépassé : reconnecter (/mcp) ou nouvelle conversation"
 
@@ -26,7 +29,7 @@ def fingerprint(root: Path = PACKAGE) -> str:
     """Empreinte des sources Python du paquet (noms et contenus) ; « » si illisibles."""
     digest = hashlib.sha256()
     try:
-        for path in sorted(root.glob("*.py")):
+        for path in [*sorted(root.glob("*.py")), SHARED_MODULE]:
             digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
     except OSError:
         return ""

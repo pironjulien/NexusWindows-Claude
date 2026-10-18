@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import pytest
 
-from nexus_windows import agentlock, foreground, policy, routines, stop
+from nexus_windows import agentlock, foreground, launch, log, routines, stop
+
+
+@pytest.fixture(autouse=True)
+def log_isolated(monkeypatch, tmp_path):
+    """Journal de chaque test dans un dossier à lui, jamais le vrai ~/.claude/nexus-claude/logs (que l'outil logs et
+    Julien relisent), ni le dossier d'état du poste (profils DevTools jetables)."""
+    home = tmp_path / "nexus-claude"
+    monkeypatch.setattr(log, "ROOT", home)
+    monkeypatch.setattr(log, "LOG_DIR", home / "logs")
+    monkeypatch.setattr(log, "IMAGE_DIR", home / "logs" / "images")
+    monkeypatch.setattr(launch, "PROFILES", home / "devtools-profiles")
 
 
 @pytest.fixture(autouse=True)
@@ -17,13 +28,6 @@ def routines_isolated(monkeypatch, tmp_path):
 def routines_mirror_isolated(monkeypatch, tmp_path):
     """Miroir des routines (NexusClaude/routines, synchronisé par OneDrive) jamais écrit par un test : dossier à lui."""
     monkeypatch.setattr(routines, "MIRROR", tmp_path / "routines-miroir")
-
-
-@pytest.fixture(autouse=True)
-def policy_isolated(monkeypatch, tmp_path):
-    """Politique par défaut dans chaque test, jamais le policy.json du poste (les autorisations de Julien, comme
-    allow_shell, changeraient sinon le résultat des tests selon la machine). Un test qui en veut une l'écrit ici."""
-    monkeypatch.setattr(policy, "POLICY_FILE", tmp_path / "policy.json")
 
 
 @pytest.fixture(autouse=True)

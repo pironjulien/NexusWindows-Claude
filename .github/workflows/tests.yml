@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: test.ps1 (unit tests, ruff; offline)
+        shell: pwsh
+        run: ./test.ps1
+
+  startup-linux:
+    # What MCP directories (Glama) check in a Linux container: the server starts and lists its tools.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: initialize + tools/list over stdio
+        run: |
+          uv sync --frozen --quiet
+          uv run --frozen pytest -q --noconftest tests/test_startup.py

@@ -23,11 +23,12 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import comtypes
 import comtypes.client
 
-from . import foreground, log, policy, snapshot, steam, uia
+from . import foreground, log, packages, policy, snapshot, steam, uia
 from . import win32 as w
 
 _START_APPS: list[dict] | None = None
@@ -141,6 +142,9 @@ class IApplicationActivationManager(comtypes.IUnknown):
             (["out"], ctypes.POINTER(ctypes.c_ulong), "processId"),
         ),
     ]
+    if TYPE_CHECKING:  # méthode créée par comtypes depuis _methods_ (paramètre « out » rendu comme résultat)
+
+        def ActivateApplication(self, appUserModelId: str, arguments: str | None, options: int) -> int: ...
 
 
 CLSID_APPLICATION_ACTIVATION_MANAGER = comtypes.GUID("{45BA127D-10A8-46EA-8AB7-56EA9078943C}")
@@ -726,7 +730,6 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
     qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), ou fenêtre dont le titre porte le
     nom du document. Faute de preuve, la note le dit (jamais « ouvert » supposé)."""
     folder = path.is_dir()
-    policy.check_open_document(str(path))
     via = "dossier" if folder else "document"
     notes: list[str] = []
     pid = shell_open(path)
@@ -743,7 +746,7 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
             and w.root(fg) not in before
             and not foreground.user_is_switching()
             and (
-                w.class_name(w.root(fg)) in policy.SOFT_DENY_CLASSES
+                w.class_name(w.root(fg)) in policy.EXPLORER_CLASSES
                 if folder
                 else path.stem.lower() in w.window_text(w.root(fg)).lower()
             )  # jamais une fenêtre que Julien vient d'ouvrir lui-même : seulement celle du dossier ou du document
@@ -948,6 +951,10 @@ def launch(
         # Pendant l'attente (jusqu'à 3 s), la garde rend aussitôt le premier plan si l'application le prend.
         with foreground.Watch(hwnd, front=user_front, tail_s=0) as watch:
             ready = wait_content(auto, hwnd)
+            if not ready and packages.resume_suspended(hwnd, {pid} if pid else None):
+                # Suspendue par Windows (lancée sans activation) : reprise, sans premier plan, puis contenu relu.
+                notes.append("application Store suspendue par Windows : reprise sans premier plan")
+                ready = wait_content(auto, hwnd)
         if watch.stolen:
             took_back = took_back or not watch.failed
         if not ready:

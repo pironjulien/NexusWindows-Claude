@@ -44,6 +44,7 @@ PROPS = {
     "password": U.UIA_IsPasswordPropertyId,
     "help": U.UIA_HelpTextPropertyId,
     "accelerator": U.UIA_AcceleratorKeyPropertyId,
+    "access_key": U.UIA_AccessKeyPropertyId,
     "value": U.UIA_ValueValuePropertyId,
     "readonly": U.UIA_ValueIsReadOnlyPropertyId,
     "range_value": U.UIA_RangeValueValuePropertyId,

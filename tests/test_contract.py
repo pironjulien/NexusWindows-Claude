@@ -6,11 +6,11 @@ Julien ou l'application change l'interface entre deux appels.
 
 from __future__ import annotations
 
-import json
+from typing import cast
 
 import pytest
 
-from nexus_windows import actions, cdp, foreground, methods, server, snapshot, uia
+from nexus_windows import actions, cdp, foreground, log, methods, server, snapshot, uia
 from nexus_windows import win32 as w
 
 ROLE_IDS = {v: k for k, v in uia.CONTROL_TYPES.items()}
@@ -25,7 +25,7 @@ class FakeEl:
 class FakeAuto:
     def __init__(self) -> None:
         self.calls: list[tuple[str, object]] = []
-        self.at_point = None
+        self.at_point: FakeEl | None = None
 
     def refresh(self, element: FakeEl) -> dict:
         if element.live.get("gone"):
@@ -83,7 +83,25 @@ def make_view(*nodes: uia.Node) -> snapshot.View:
     return snapshot.View(HWND, info, [HWND], elements, snapshot.frame_for(info.rect), framework="WPF")
 
 
-def executor(view: snapshot.View, auto: FakeAuto, shown: snapshot.View | None = None, rebuilt=None):
+def as_auto(auto: object) -> uia.Automation:
+    """Faux UI Automation : les doubles de test (FakeAuto et ses variantes) imitent la part d'uia.Automation que le
+    moteur appelle ; ce point unique les présente au typage comme le vrai."""
+    return cast(uia.Automation, auto)
+
+
+class FakeCall:
+    """Faux journal d'appel : _run_steps n'y appelle que step()."""
+
+    def step(self, **_) -> None:
+        pass
+
+
+def as_call(call: object | None = None) -> log.Call:
+    """Faux log.Call (FakeCall par défaut) présenté au typage comme le vrai, sans rien écrire dans le journal."""
+    return cast(log.Call, call if call is not None else FakeCall())
+
+
+def executor(view: snapshot.View, auto: object, shown: snapshot.View | None = None, rebuilt=None):
     state = {"view": view}
 
     def get_view(rebuild: bool) -> snapshot.View:
@@ -93,9 +111,16 @@ def executor(view: snapshot.View, auto: FakeAuto, shown: snapshot.View | None = 
 
     if shown is not None and not shown.displayed:  # le modèle a vu toute la liste
         shown.displayed = {e.id: snapshot.identity(e.props) for e in shown.elements}
-    ex = actions.Executor(auto, HWND, get_view, lambda: None, get_shown=lambda: shown)
+    ex = actions.Executor(as_auto(auto), HWND, get_view, lambda: None, get_shown=lambda: shown)
     ex._pids = {7}
     return ex
+
+
+def under(ex: actions.Executor, x: int, y: int, roles: set[str] | None = None) -> snapshot.Element:
+    """Élément sous le point, qui doit exister (le test échoue sinon)."""
+    found = ex._element_under(x, y, roles)
+    assert found is not None
+    return found
 
 
 # --- P1 : état périmé ---------------------------------------------------------------------------------------
@@ -344,59 +369,75 @@ def test_expect_already_present_is_not_proof():
     button = node("Button", "Lancer", has_invoke=True)
     status = node("Text", "Terminé")
     ex = executor(make_view(button, status), FakeAuto())
-
-    class Call:
-        def step(self, **_):
-            pass
-
-    report, failed = server._run_steps(ex, [server.Step(do="click", target="Lancer", expect="Terminé")], HWND, Call())
+    steps = [server.Step(do="click", target="Lancer", expect="Terminé")]
+    report, failed = server._run_steps(ex, steps, HWND, as_call())
     assert not failed and "non probant" in report[0] and report[0].split()[1] == "~"
 
 
 # --- Politique de sécurité ------------------------------------------------------------------------------------
-def test_policy_hard_and_soft_denies(tmp_path, monkeypatch):
+def test_policy_hard_block_only(tmp_path):
+    """Accord du 18/10 : seuls le bureau sécurisé, les identifiants, les gestionnaires de mots de passe et la fenêtre de
+    rien d'autre ; consoles, Exécuter, Claude, autres agents, Explorateur et barre des tâches sont libres."""
     from nexus_windows import policy
 
-    monkeypatch.setattr(policy, "POLICY_FILE", tmp_path / "policy.json")
-    assert policy.act_refusal("WindowsTerminal.exe", "x", "t")
-    assert policy.act_refusal("explorer.exe", "#32770", "Exécuter")
-    assert policy.act_refusal("Codex.exe", "x", "Codex")
-    assert policy.act_refusal("claude.exe", "x", "Claude")  # refusé par défaut
-    assert policy.act_refusal("notepad.exe", "Notepad", "Sans titre") is None
-    (tmp_path / "policy.json").write_text('{"allow_processes": ["codex.exe", "claude.exe"]}', encoding="utf-8")
-    assert policy.act_refusal("codex.exe", "x", "Codex") is None  # surchargeable par Julien
-    assert policy.act_refusal("claude.exe", "x", "Claude") is None  # surchargeable par Julien
-    assert policy.act_refusal("keepass.exe", "x", "KeePass")  # jamais surchargeable
+    for process, cls, title in [
+        ("consent.exe", "x", "Contrôle de compte d'utilisateur"),
+        ("LockApp.exe", "x", ""),
+        ("CredentialUIBroker.exe", "x", "Sécurité Windows"),
+        ("svchost.exe", "Credential Dialog Xaml Host", "Sécurité Windows"),
+        ("KeePassXC.exe", "x", "KeePass"),
+    ]:
+        assert policy.act_refusal(process, cls, title), process
+    for process, cls, title in [
+        ("WindowsTerminal.exe", "CASCADIA_HOSTING_WINDOW_CLASS", "pwsh"),
+        ("conhost.exe", "ConsoleWindowClass", "cmd"),
+        ("explorer.exe", "#32770", "Exécuter"),
+        ("explorer.exe", "CabinetWClass", "Documents"),
+        ("explorer.exe", "Shell_TrayWnd", ""),
+        ("SearchHost.exe", "Windows.UI.Core.CoreWindow", "Rechercher"),
+        ("regedit.exe", "RegEdit_RegEdit", "Éditeur du Registre"),
+        ("Antigravity.exe", "Chrome_WidgetWin_1", "Antigravity"),  # l'AUTRE agent : permis
+        ("Codex.exe", "x", "Codex"),
+        ("notepad.exe", "Notepad", "Sans titre"),
+    ]:
+        assert policy.act_refusal(process, cls, title) is None, process
+    assert policy.act_refusal("claude.exe", "Chrome_WidgetWin_1", "Claude") is None  # relecture du 18/10
+    (tmp_path / "policy.json").write_text('{"allow_processes": ["keepassxc.exe"]}', encoding="utf-8")
+    assert policy.act_refusal("KeePassXC.exe", "x", "KeePass")  # plus aucune surcharge locale du blocage dur
+
+
+def test_policy_unreadable_fails_closed(monkeypatch, tmp_path):
+    from nexus_windows import policy
+
+    monkeypatch.setattr(policy.garde_fous, "POLICY_FILE", tmp_path / "absent.json")
+    with pytest.raises(policy.PolicyError, match="échec fermé"):
+        policy.act_refusal("notepad.exe", "Notepad", "")
 
 
 @pytest.mark.parametrize(
     ("path", "args"),
     [
-        ("C:\\Windows\\System32\\cmd.exe", ""),
+        (r"C:\Windows\System32\cmd.exe", ""),
         ("pwsh.exe", "-c x"),
-        ("C:\\x\\script.ps1", ""),
-        ("C:\\x\\raccourci.lnk", ""),
-        ("explorer.exe", "C:\\x\\installeur.msi"),
-        ("C:\\Windows\\System32\\whoami.exe", ""),  # programme console (sous-système PE 3)
+        (r"C:\x\script.ps1", ""),
+        (r"C:\Windows\System32\whoami.exe", ""),
+        (r"C:\x\electron.exe", "app.js"),
     ],
 )
-def test_launch_refuses_code_execution(path, args):
+def test_launch_allows_consoles_and_interpreters(path, args):
     from nexus_windows import policy
 
-    with pytest.raises(policy.PolicyError):
-        policy.check_launch_exe(path, args)
+    policy.check_launch_exe(path, args)  # le shell de Claude fait déjà tout : plus de double verrou
 
 
 def test_launch_allows_gui_and_folders(tmp_path):
     from nexus_windows import policy
 
-    policy.check_launch_exe("C:\\Windows\\System32\\notepad.exe", "")
+    policy.check_launch_exe(r"C:\Windows\System32\notepad.exe", "")
     policy.check_launch_exe("explorer.exe", str(tmp_path))
-    with pytest.raises(policy.PolicyError):
-        policy.check_launch_app_id("Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "Terminal")
+    policy.check_launch_app_id("Microsoft.WindowsTerminal_8wekyb3d8bbwe!App", "Terminal")
 
 
-# --- Annulation : un appel abandonné ne finit pas son action dans le dos de Julien ---------------------------
 def test_abandoned_job_stops_at_next_checkpoint():
     import threading
 
@@ -469,11 +510,6 @@ def test_stopped_batch_keeps_its_report(tmp_path, monkeypatch):
     monkeypatch.setattr(server.w, "IsWindow", lambda h: True)  # la fenêtre simulée reste ouverte
     button = node("Button", "Lancer", has_invoke=True)
     ex = executor(make_view(button), FakeAuto())
-
-    class Call:
-        def step(self, **_):
-            pass
-
     original = ex.click
 
     def click_then_stop(*args, **kwargs):
@@ -484,7 +520,7 @@ def test_stopped_batch_keeps_its_report(tmp_path, monkeypatch):
     ex.click = click_then_stop
     steps = [server.Step(do="click", target="Lancer"), server.Step(do="click", target="Lancer")]
     with pytest.raises(worker.Stopped) as caught:
-        server._run_steps(ex, steps, HWND, Call())
+        server._run_steps(ex, steps, HWND, as_call())
     text = str(caught.value)
     assert text.startswith("1. ~ clic sur Button") and "2. ⛔ click interrompu" in text
 
@@ -562,7 +598,8 @@ def test_point_on_modal_overlay_does_not_reach_the_button_below():
     view = make_view(button)
     assert executor(view, FakeAuto())._element_under(30, 20) is None
     root.children = [overlay, button]  # sans voile par-dessus : le bouton est bien sous le point
-    assert executor(view, FakeAuto())._element_under(30, 20).node is button
+    under = executor(view, FakeAuto())._element_under(30, 20)
+    assert under is not None and under.node is button
 
 
 def test_present_matches_whole_words_and_unreadable_is_unknown():
@@ -576,43 +613,18 @@ def test_present_matches_whole_words_and_unreadable_is_unknown():
     assert executor(empty, FakeAuto()).present("42") is None
 
 
-def test_command_surface_refused():
-    from nexus_windows import policy
-
+def test_address_bar_is_free():
     band = node("Pane", "", class_name="Address Band Root")
     edit = node("Edit", "Adresse", has_value=True)
     edit.parent = band
     auto = FakeAuto()
-    with pytest.raises(actions.ActionError, match="barre d'adresse"):
-        executor(make_view(edit), auto).write("Adresse", "cmd", replace=True)
-    assert auto.calls == []
-    policy.POLICY_FILE.write_text('{"allow_shell": true}', encoding="utf-8")  # autorisée par Julien
-    executor(make_view(edit), auto).write("Adresse", "Documents", replace=True)
+    executor(make_view(edit), auto).write("Adresse", "cmd", replace=True)
     assert auto.calls
-
-
-def test_shell_surfaces_and_explorer_refused(tmp_path, monkeypatch):
-    from nexus_windows import policy
-
-    monkeypatch.setattr(policy, "POLICY_FILE", tmp_path / "policy.json")
-    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "")
-    assert policy.act_refusal("SearchHost.exe", "Windows.UI.Core.CoreWindow", "Rechercher")
-    assert policy.act_refusal("explorer.exe", "CabinetWClass", "Documents")
-    (tmp_path / "policy.json").write_text('{"allow_processes": ["explorer.exe"]}', encoding="utf-8")
-    assert policy.act_refusal("explorer.exe", "CabinetWClass", "Documents") is None
-    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "")  # la barre des tâches, jamais par défaut
-    (tmp_path / "policy.json").write_text(
-        '{"allow_shell": true, "allow_processes": ["explorer.exe"]}', encoding="utf-8"
-    )
-    assert policy.act_refusal("explorer.exe", "Shell_TrayWnd", "") is None  # débloqué quand allow_shell: true
-    assert policy.act_refusal("SearchHost.exe", "Windows.UI.Core.CoreWindow", "Rechercher") is None
 
 
 @pytest.mark.parametrize(
     ("args", "devtools"),
     [
-        ("--gpu-launcher=calc.exe", False),
-        ("--renderer-cmd-prefix=cmd", False),
         ("--remote-debugging-port=9222", False),
         (r"--load-extension=C:\x", False),
         (r"--user-data-dir=C:\Users\user\AppData\Local\Microsoft\Edge\User Data", True),
@@ -623,17 +635,6 @@ def test_chromium_switches_refused(args, devtools):
 
     with pytest.raises(policy.PolicyError):
         policy.check_launch_exe(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", args, devtools)
-
-
-def test_generic_electron_needs_julien_allowance(tmp_path, monkeypatch):
-    from nexus_windows import policy
-
-    monkeypatch.setattr(policy, "POLICY_FILE", tmp_path / "policy.json")
-    electron = str(tmp_path / "electron.exe")
-    with pytest.raises(policy.PolicyError, match="interpréteur"):
-        policy.check_launch_exe(electron, "app.js")
-    (tmp_path / "policy.json").write_text(json.dumps({"allow_launch": [electron]}), encoding="utf-8")
-    policy.check_launch_exe(electron, "app.js")
 
 
 def test_disable_features_are_merged_into_one_switch():

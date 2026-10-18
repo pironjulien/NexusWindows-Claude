@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 import pytest
+from test_contract import as_auto
 from test_fix_G2 import JULIEN, TARGET, _store_launch
 
 from nexus_windows import launch, policy, stop, worker
@@ -58,23 +59,15 @@ def test_watch_thread_survives_any_error(stop_file, monkeypatch):
     assert calls["n"] >= 3 and alive  # l'erreur est journalisée, le fil continue
 
 
-@pytest.mark.parametrize(
-    ("source", "suffix", "reason"),
-    [
-        ("findstr.exe", ".bin", "programme console"),
-        ("findstr.exe", ".dat", "programme console"),
-        ("notepad.exe", ".dat", "autre nom que .exe"),
-    ],
-)
-def test_renamed_program_is_refused(tmp_path, monkeypatch, source, suffix, reason):
-    monkeypatch.setattr(policy, "POLICY_FILE", tmp_path / "policy.json")
+@pytest.mark.parametrize(("source", "suffix"), [("findstr.exe", ".bin"), ("notepad.exe", ".dat")])
+def test_renamed_program_is_allowed(tmp_path, source, suffix):
+    """Accord du 18/10 : un programme renommé n'est plus refusé (le shell de Claude fait déjà tout)."""
     original = SYSTEM32 / source
     if not original.exists():
         pytest.skip(f"{original} absent")
     copy = tmp_path / f"renomme{suffix}"
     shutil.copyfile(original, copy)
-    with pytest.raises(policy.PolicyError, match=reason):
-        policy.check_launch_exe(str(copy), "")
+    policy.check_launch_exe(str(copy), "")
 
 
 def test_steal_during_wait_content_is_given_back_at_once(monkeypatch):
@@ -94,7 +87,7 @@ def test_steal_during_wait_content_is_given_back_at_once(monkeypatch):
         return True
 
     monkeypatch.setattr(launch, "wait_content", wait_content)
-    result = launch.launch("Calculatrice", auto=object())
+    result = launch.launch("Calculatrice", auto=as_auto(object()))
     assert gave and gave[-1] == JULIEN and result.returned
     assert steal["back"] - steal["at"] < 0.2  # rendu pendant l'attente, pas à la fin du lancement
     assert any("rendu aussitôt" in n for n in result.notes)

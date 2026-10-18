@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from nexus_windows import launch as launcher
-from nexus_windows import policy
 
 
 def test_openable(tmp_path):
@@ -23,21 +22,6 @@ def test_openable(tmp_path):
     assert launcher.openable(sys.executable) is None
     assert launcher.openable(str(tmp_path / "absent.txt")) is None
     assert launcher.openable("") is None
-
-
-@pytest.mark.parametrize("name", ["a.bat", "a.ps1", "a.lnk", "a.url", "a.msix", "a.appinstaller", "a.search-ms"])
-def test_open_refuses_scripts_shortcuts_installers(tmp_path, name):
-    target = tmp_path / name
-    target.write_text("x", encoding="utf-8")
-    with pytest.raises(policy.PolicyError):
-        policy.check_open_document(str(target))
-
-
-def test_open_allows_documents_and_folders(tmp_path):
-    doc = tmp_path / "rapport.pdf"
-    doc.write_text("x", encoding="utf-8")
-    policy.check_open_document(str(doc))
-    policy.check_open_document(str(tmp_path))
 
 
 def test_opened_window_prefers_new_and_needs_full_name_for_old(monkeypatch, tmp_path):
@@ -83,7 +67,7 @@ def test_close_refuses_an_explorer_window_with_several_tabs(monkeypatch):
 
     from nexus_windows import server, snapshot
 
-    closed: list[int] = []
+    closed: list[tuple] = []
     monkeypatch.setattr(server.SESSION, "resolve_window", lambda window: 55)
     monkeypatch.setattr(snapshot, "window_info", lambda hwnd: type("I", (), {"label": lambda self: "Explorateur"})())
     monkeypatch.setattr(server, "_check_actionable_window", lambda hwnd: None)

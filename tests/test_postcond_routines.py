@@ -5,19 +5,14 @@ from __future__ import annotations
 import json
 
 import pytest
-from test_contract import HWND, FakeAuto, executor, make_view, node
+from test_contract import HWND, FakeAuto, as_auto, as_call, executor, make_view, node
 
 from nexus_windows import actions, postcond, routines, server
 
 
-class Call:
-    def step(self, **_):
-        pass
-
-
 def run(ex, *steps):
     symbols: list[str] = []
-    report, failed = server._run_steps(ex, list(steps), HWND, Call(), symbols)
+    report, failed = server._run_steps(ex, list(steps), HWND, as_call(), symbols)
     return report, failed, symbols
 
 
@@ -26,7 +21,7 @@ def test_check_verified_after_set():
     field = node("Edit", "Nom", has_value=True, value="")
     ex = executor(make_view(field), FakeAuto())
     report, failed, symbols = run(
-        ex, server.Step(do="set", target="Nom", text="Julien", check={"target": "Nom", "value": "Julien"})
+        ex, server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien"))
     )
     assert not failed and symbols == ["✓"] and "vérifié" in report[0]
 
@@ -36,7 +31,7 @@ def test_check_already_true_sends_nothing():
     auto = FakeAuto()
     report, failed, symbols = run(
         executor(make_view(field), auto),
-        server.Step(do="set", target="Nom", text="Julien", check={"target": "Nom", "value": "Julien"}),
+        server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien")),
     )
     assert not failed and symbols == ["="] and auto.calls == [] and "déjà vrai" in report[0]
 
@@ -47,7 +42,9 @@ def test_check_not_met_stops_the_batch():
     ex = executor(make_view(button, status), FakeAuto())
     report, failed, symbols = run(
         ex,
-        server.Step(do="click", target="Lancer", timeout=0.2, check={"target": "Text:En attente", "value": "Fini"}),
+        server.Step(
+            do="click", target="Lancer", timeout=0.2, check=server.Check(target="Text:En attente", value="Fini")
+        ),
         server.Step(do="click", target="Lancer"),
     )
     assert failed and symbols == ["✗"] and "NON ATTEINT" in report[0] and "non exécutées" in report[-1]
@@ -58,7 +55,8 @@ def test_check_unreadable_state_is_unknown_not_success():
     label = node("Text", "Statut")  # aucun motif Toggle : « coché » n'est pas publié
     ex = executor(make_view(button, label), FakeAuto())
     report, failed, symbols = run(
-        ex, server.Step(do="click", target="Lancer", timeout=0.2, check={"target": "Text:Statut", "checked": True})
+        ex,
+        server.Step(do="click", target="Lancer", timeout=0.2, check=server.Check(target="Text:Statut", checked=True)),
     )
     assert not failed and symbols == ["~"] and "issue inconnue" in report[0]
 
@@ -76,11 +74,13 @@ def test_check_exists_false_waits_for_disappearance():
     auto = Closing()
     open_view, closed_view = make_view(button, dialog), make_view(button)
     open_view.node_count = closed_view.node_count = 12  # lecture complète : une absence y est probante
-    ex = actions.Executor(auto, HWND, lambda rebuild: closed_view if state["closed"] else open_view, lambda: None)
+    ex = actions.Executor(
+        as_auto(auto), HWND, lambda rebuild: closed_view if state["closed"] else open_view, lambda: None
+    )
     ex._pids = {7}
     report, failed, symbols = run(
         ex,
-        server.Step(do="click", target="Fermer", check={"target": "Confirmer la suppression", "exists": False}),
+        server.Step(do="click", target="Fermer", check=server.Check(target="Confirmer la suppression", exists=False)),
     )
     assert not failed and symbols == ["✓"] and "absent" in report[0]
 
@@ -160,14 +160,16 @@ def test_server_remember_only_fully_proven_batches():
 def test_server_routine_steps_and_notes():
     routines.remember("test.exe", "r", [{"do": "set", "target": "Nom", "text": "{{x}}"}], FP, "T")
     notes: list[str] = []
-    steps = server._routine_steps("test.exe", FP | {"size": 99}, "r", {"x": "abc"}, notes)
+    steps, template = server._routine_steps("test.exe", FP | {"size": 99}, "r", {"x": "abc"}, notes)
+    assert template[0].text == "{{x}}"
     assert steps[0].text == "abc" and steps[0].do == "set"
     assert any("mise à jour" in n for n in notes)
 
 
 def test_template_steps_run_with_params_and_refuse_missing_values():
-    template = [server.Step(do="set", target="Nom", text="{{nom}}", check={"target": "Nom", "value": "{{nom}}"})]
+    template = [server.Step(do="set", target="Nom", text="{{nom}}", check=server.Check(target="Nom", value="{{nom}}"))]
     filled = server._filled(template, {"nom": "Julien"})
+    assert filled[0].check is not None
     assert filled[0].text == "Julien" and filled[0].check.value == "Julien"
     assert template[0].text == "{{nom}}"  # le modèle reste intact pour l'enregistrement
     with pytest.raises(actions.ActionError, match="nom"):

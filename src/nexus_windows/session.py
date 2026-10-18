@@ -217,7 +217,7 @@ class Session:
         removed = launch.remove_profile(profile) if profile is not None else False
         log.event("devtools-compte", {"pid": pid, "port": port, "raison": reason, "profil_supprime": removed})
         self.drop_process(pid)
-        for other in list(self.pages):
+        for other in {k[0] if isinstance(k, tuple) else k for k in self.pages}:  # clé (hwnd, titre) : son hwnd
             if other == hwnd or not w.IsWindow(other):
                 self.forget(other)
         raise launch.AccountError(

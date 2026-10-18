@@ -20,7 +20,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
-import json
 import os
 import re
 import sys
@@ -144,12 +143,11 @@ BATCH = [
 BATCH_EVENTS = ["clic", "coche on", "coche off", "couleur Vert", "liste Bravo"]
 
 
-def server_params(policy: dict | None = None) -> StdioServerParameters:
-    """Serveur MCP réel, isolé : journaux, profils DevTools et politique dans un dossier de test (jamais ceux de
-    Julien). La politique de test peut autoriser l'Electron générique du labo (refusé par défaut : il exécute du JS)."""
+def server_params() -> StdioServerParameters:
+    """Serveur MCP réel, isolé : journaux et profils DevTools dans un dossier de test (jamais ceux de Julien). La
+    politique est la commune (shared/garde-fous.json)."""
     home = apps.STATE / "server-home"
     home.mkdir(parents=True, exist_ok=True)
-    (home / "policy.json").write_text(json.dumps(policy or {}), encoding="utf-8")
     env = {**os.environ, "NEXUS_WINDOWS_HOME": str(home), "PYTHONIOENCODING": "utf-8"}
     return StdioServerParameters(command=sys.executable, args=["-m", "nexus_windows"], env=env)
 
@@ -342,6 +340,7 @@ async def drive(kind: str) -> list[tuple[str, bool, str]]:
             print(f"== {kind} : {head[0][:100]}")
             if kind == "win32":  # application non adaptée au DPI : l'image doit être pleine (pas de bande noire)
                 image = image_of(look)
+                assert image is not None, "look sans image"
                 corner = image.crop((image.width - 60, image.height - 60, image.width - 10, image.height - 10))
                 px = corner.tobytes()  # RVB : 3 octets par pixel
                 dark = sum(1 for i in range(0, len(px), 3) if px[i] + px[i + 1] + px[i + 2] < 60) / (50 * 50)
@@ -365,8 +364,9 @@ async def drive(kind: str) -> list[tuple[str, bool, str]]:
                 if expect is None and kind in WEB:
                     expect = WEB_EXPECT.get(label)
                 if expect is not None:
-                    seen = events.collect(1.5, lambda s: any(expect(e) for e in s))
-                    ok = ok and any(expect(e) for e in seen)
+                    wanted = expect  # fixé pour le lambda (expect est réaffecté à chaque tour)
+                    seen = events.collect(1.5, lambda s: any(wanted(e) for e in s))
+                    ok = ok and any(wanted(e) for e in seen)
                     report += f"   ⇒ {[e[:60] for e in seen[-3:]]}"
                 if label in READ_BACK:
                     ok = ok and "relu ✓" in report
@@ -440,6 +440,8 @@ async def drive_calc() -> list[tuple[str, bool, str]]:
         fg0 = w.foreground()
         result = await client.call_tool("launch", {"app": "Calculatrice", "then": "elements"})
         print("== calc : " + text_of(result).splitlines()[0][:100])
+        for note in (line for line in text_of(result).splitlines() if "Store" in line or "contenu" in line):
+            print("   lancement : " + note[:160])  # application suspendue, reprise, contenu vide : la cause visible
         try:
             # launch rend la main dès la fenêtre ; l'arbre UIA de la Calculatrice arrive ensuite, par étapes.
             names = ("Un", "Deux", "Plus", "Trois", "Zéro", "Est égal à")
@@ -482,7 +484,7 @@ async def drive_devtools(kind: str) -> list[tuple[str, bool, str]]:
         exe = apps.ELECTRON
         args = f'"{apps.LAB / "electron_main.js"}" --lab-x=150 --lab-y=110'
     rows: list[tuple[str, bool, str]] = []
-    async with Client(server_params({"allow_launch": [str(apps.ELECTRON)]}), read_timeout_seconds=120) as client:
+    async with Client(server_params(), read_timeout_seconds=120) as client:
         fg0 = w.foreground()
         result = await client.call_tool("launch", {"app": str(exe), "args": args, "devtools": True, "then": "elements"})
         text = text_of(result)

@@ -167,10 +167,10 @@ def test_multiline_chromium_written_without_any_activation(monkeypatch):
 def test_take_focus_is_read_back(monkeypatch):
     field = node("Edit", "Notes", framework="Chrome")
     auto = FakeAuto()
-    auto.take_focus = lambda element: element.live.update(focused=True)
+    monkeypatch.setattr(auto, "take_focus", lambda element: element.live.update(focused=True), raising=False)
     ex = executor(_chromium_view(field), auto)
     ex._take_focus(ex.resolve("Notes")[1])
-    auto.take_focus = lambda element: None  # accSelect accepté sans effet
+    monkeypatch.setattr(auto, "take_focus", lambda element: None)  # accSelect accepté sans effet
     field.element.live["focused"] = False
     with pytest.raises(methods.MethodError, match="non relu"):
         ex._take_focus(ex.resolve("Notes")[1], timeout_s=0.05)
@@ -178,7 +178,7 @@ def test_take_focus_is_read_back(monkeypatch):
     def refused(element):
         raise uia.UIAError("motif Legacy absent")
 
-    auto.take_focus = refused
+    monkeypatch.setattr(auto, "take_focus", refused)
     with pytest.raises(methods.MethodError, match="impossible"):
         ex._take_focus(ex.resolve("Notes")[1])
 

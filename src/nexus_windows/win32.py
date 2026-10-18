@@ -395,7 +395,7 @@ def known_folder(guid: str) -> str | None:
     try:
         if SHGetKnownFolderPath(ctypes.create_string_buffer(raw, 16), 0, None, ctypes.byref(path)) != 0:
             return None
-        return ctypes.wstring_at(path.value)
+        return ctypes.wstring_at(path.value) if path.value else None
     finally:
         CoTaskMemFree(path)  # à libérer même en cas d'échec (documentation de SHGetKnownFolderPath)
 

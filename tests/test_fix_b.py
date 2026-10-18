@@ -195,6 +195,7 @@ def test_old_switcher_does_not_excuse_a_steal(monkeypatch):
     watch._check()
     desk.fg = 0  # plus de premier plan pendant plus d'une seconde
     watch._check()
+    assert watch._switcher_seen is not None
     watch._switcher_seen -= 2 * foreground.SWITCH_WINDOW_S
     desk.fg = TARGET
     watch._check()
@@ -471,6 +472,7 @@ def test_front_is_not_undone_by_a_running_watch(monkeypatch):
     with foreground.Watch(TARGET) as watch:  # garde d'un appel précédent, encore en cours (traîne comprise)
         assert realinput.put_in_front(TARGET)
         time.sleep(0.15)  # la garde tourne après la fin de la suspension
+    assert watch._thread is not None
     watch._thread.join(2)
     assert desk.gave_back == [] and watch.front == TARGET and watch.stolen == 0
 
@@ -483,6 +485,7 @@ def test_front_without_adoption_would_be_undone(monkeypatch):
         deadline = time.monotonic() + 2
         while not desk.gave_back and time.monotonic() < deadline:
             time.sleep(0.01)
+    assert watch._thread is not None
     watch._thread.join(2)
     assert desk.gave_back == [JULIEN]
 
@@ -710,6 +713,31 @@ def test_lab_guard_gives_foreground_back(monkeypatch):
     desk.fg = OTHER  # Julien passe à une autre de ses fenêtres : le labo ne la lui reprend pas
     guard.finish(0.1)
     assert desk.gave_back == [JULIEN] and guard.taken == 1 and desk.fg == OTHER
+
+
+def test_lab_browser_followed_through_its_profile_after_relaunch(monkeypatch, tmp_path):
+    """Constat du 16/10 : Edge se relance (le processus lancé quitte avec 0, une copie au même profil garde la
+    fenêtre). La fenêtre du labo est cherchée chez le détenteur du profil, et close() ferme aussi cette copie."""
+    from nexus_windows import launch
+
+    apps = _lab()
+
+    class Dead:
+        pid = 40
+
+        def poll(self):
+            return 0
+
+    holder = {"pid": 70}
+    killed = []
+    monkeypatch.setattr(launch, "descendants", lambda pid: {pid, pid + 1})
+    monkeypatch.setattr(apps, "profile_browser_pid", lambda profile: holder["pid"])
+    monkeypatch.setattr(apps.os, "kill", lambda pid, sig: killed.append(pid) or holder.update(pid=0))
+    app = apps.LabApp("edge", Dead(), profile=tmp_path / "edge-profile")  # type: ignore[arg-type]
+    assert app.pids() == {40, 41, 70, 71}
+    app.close()
+    assert killed == [70] and holder["pid"] == 0
+    assert apps.LabApp("win32", Dead()).pids() == {40, 41}  # type: ignore[arg-type]
 
 
 # --- Code mort retiré ---------------------------------------------------------------------------------------------

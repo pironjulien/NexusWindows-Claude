@@ -107,32 +107,37 @@ def _compare(props: dict, check: dict[str, Any]) -> Verdict:
     return Verdict(True, ", ".join(seen))
 
 
-def _find(executor, target: Any) -> tuple[Any | None, str]:
-    """Élément visé par la postcondition, sans rien faire défiler. (élément ou None si absent, cause si illisible)."""
+def _find(executor, target: Any) -> tuple[Any | None, str, str]:
+    """Élément visé par la postcondition, sans rien faire défiler : (élément ou None si absent, cause si illisible,
+    note si le nom ne correspond qu'en partie)."""
     from .actions import ActionError  # import local : actions importe ce module
 
     if isinstance(target, int) or (isinstance(target, str) and snapshot._ID.match(target)):
         try:
-            return executor.resolve(target)[1], ""
+            return executor.resolve(target)[1], "", ""
         except ActionError as error:
-            return None, str(error)
+            return None, str(error), ""
     view = executor._rebuild()
     try:
-        return snapshot.pick(view, str(target))[0], ""
+        element, note = snapshot.pick(view, str(target))
+        return element, "", note
     except snapshot.AmbiguousTarget as error:
         raise ActionError(f"check : {error}") from None
     except snapshot.TargetError:
         pass
     hidden = snapshot.scrolled_away(view)  # présent mais hors de vue (page défilée) : il existe quand même
     try:
-        return snapshot.pick(dataclasses.replace(view, elements=hidden), str(target))[0], ""
+        element, note = snapshot.pick(dataclasses.replace(view, elements=hidden), str(target))
+        return element, "", note
     except snapshot.TargetError:
-        return None, executor._unreadable(view)
+        return None, executor._unreadable(view), ""
 
 
 def evaluate(executor, check: dict[str, Any]) -> Verdict:
-    """État actuel de la postcondition (relu en direct)."""
-    element, unreadable = _find(executor, check["target"])
+    """État actuel de la postcondition (relu en direct). Un nom qui ne correspond qu'en partie (« Newsletter » pour
+    « Newsletter partenaires ») ne prouve rien : issue inconnue, jamais vraie ni fausse (une étape « déjà faite » à
+    tort serait sautée en silence) ; vrai ou faux exigent le nom exact ou un [N]."""
+    element, unreadable, partial = _find(executor, check["target"])
     if element is None:
         if check.get("exists") is False:
             if unreadable:
@@ -141,6 +146,8 @@ def evaluate(executor, check: dict[str, Any]) -> Verdict:
         if unreadable:
             return Verdict(None, f"introuvable, lecture incomplète ({unreadable})")
         return Verdict(False, "introuvable")
+    if partial:
+        return Verdict(None, f"{partial} ; nom exact ou [N] requis pour une postcondition")
     try:
         props = executor._refresh(element.node.element)
     except uia.UIAError as error:

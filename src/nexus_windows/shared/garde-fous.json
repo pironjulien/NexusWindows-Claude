@@ -1,0 +1,91 @@
+{
+  "_": "Politique unique des garde-fous de bureau de Claude (nexus-windows) et d'Antigravity (Computer Use NexusAGY). Accord Claude–Antigravity du 18/10/2026 (journal-trinite.md, entrée « Garde-fous »). Tout ce qui n'est pas ici est libre. Lue par garde_fous.py (même dossier). Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
+  "version": 1,
+  "blocage_dur": {
+    "_": "Jamais lu ni piloté (règles 1 et 2 de l'accord : pas d'auto-élévation, pas de fuite de secrets). Chaque agent applique les catégories listées pour lui dans « agents ».",
+    "bureau_securise": {
+      "raison": "invite UAC, écran de verrouillage ou ouverture de session (bureau sécurisé)",
+      "processus": ["consent.exe", "lockapp.exe", "logonui.exe"],
+      "classes": []
+    },
+    "identifiants_windows": {
+      "raison": "fenêtre d'identifiants Windows",
+      "processus": ["credentialuibroker.exe"],
+      "classes": ["Credential Dialog Xaml Host"]
+    },
+    "gestionnaires_mots_de_passe": {
+      "raison": "gestionnaire de mots de passe",
+      "prefixes_processus": ["keepass", "bitwarden", "1password", "dashlane", "nordpass", "roboform", "lastpass"]
+    }
+  },
+  "agents": {
+    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 18/10 (accord) : Antigravity reste le recours pour les invites d'identifiants Windows (Claude ne tape pas de mot de passe) ; la fenêtre de l'agent lui-même n'est bloquée pour aucun des deux (aucune demande d'autorisation n'y passe : Julien travaille en « ignorer les permissions », Antigravity n'en affiche pas).",
+    "claude": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe"],
+    "antigravity": ["bureau_securise", "gestionnaires_mots_de_passe"]
+  },
+  "confirmation": {
+    "_": "Confirmation étanche : un geste dont la cible porte l'un de ces mots exige confirm=true, posé seulement sur l'ordre explicite de Julien ou après son oui. Ni Entrée, ni Espace, ni Ctrl+Entrée, ni Alt+lettre, ni un clic en coordonnées ne la contournent. Mise en production, push et déploiement des projets de Julien : jamais ici (autorisés durablement). Verbes d'action seulement : « Boîte d'envoi », « Éléments envoyés » ne comptent pas (rôles non actifs).",
+    "motifs": [
+      "pay(er|ez)?",
+      "paiement",
+      "payment",
+      "achet(er|ez)",
+      "buy",
+      "purchase",
+      "checkout",
+      "commander",
+      "(valider|passer|confirmer|finaliser) (la |ma |votre )?commande",
+      "place (the |your )?order",
+      "virement",
+      "vir(er|ez)",
+      "transfer(er|ez)? (de l |l )?argent",
+      "transfer money",
+      "envoy(er|ez)",
+      "envoie",
+      "send",
+      "publi(er|ez)",
+      "publish",
+      "post(er|ez)",
+      "supprim(er|ez) definitivement",
+      "delete (permanently|forever)",
+      "permanently delete",
+      "vider (la )?corbeille",
+      "empty (the )?(trash|recycle bin)",
+      "desinstall(er|ez)",
+      "uninstall",
+      "^format(er|ez)$",
+      "format(er|ez) (le |ce |la |cette |un |une )?(disque|lecteur|volume|partition|cle|carte)",
+      "format (the |this )?(disk|drive|partition|volume)",
+      "reinitialis(er|ez)(?! (les |la |le )?(filtres?|zoom|affichage|vue|recherche|tri|mise en page))",
+      "factory reset",
+      "reset (this pc|(the )?app|to factory( settings)?|all settings)",
+      "resili(er|ez)",
+      "(cancel|terminate) (my |your |the )?(subscription|contract|plan|membership)",
+      "(supprim(er|ez)|ferm(er|ez)) (mon |votre |le )compte",
+      "(delete|close) (my |your |the )?account",
+      "(effac(er|ez)|supprim(er|ez)) (toutes )?(les |mes |vos )?donnees",
+      "(erase|wipe|clear) (all )?(data|everything|device)",
+      "(rendre|passer) (le |ce )?(depot |repository |repo )?(en )?public",
+      "(make|change to|set to) (this |the )?(repository |repo )?public"
+    ],
+    "contextes": [
+      {
+        "_": "Verbe générique à confirmer seulement quand le TITRE de la fenêtre parle d'argent.",
+        "titre": "paiement|payer|payment|virement|transfer money|wire transfer|iban|carte bancaire|credit card|checkout",
+        "verbes": "confirm(er|ez)?|valid(er|ez)|submit|soumettre|ok",
+        "quoi": "paiement ou virement"
+      },
+      {
+        "titre": "format(er|age|ting)?",
+        "verbes": "demarrer|start|ok|confirm(er|ez)?|valid(er|ez)",
+        "quoi": "formatage"
+      }
+    ],
+    "roles_non_actifs": [
+      "ListItem", "TreeItem", "DataItem", "TabItem", "HeaderItem", "Header", "List", "Tree", "Tab", "DataGrid",
+      "Table", "Edit", "Document", "ComboBox", "CheckBox", "RadioButton", "Slider", "Spinner", "ScrollBar",
+      "StatusBar", "TitleBar", "ToolTip", "ProgressBar", "Calendar"
+    ],
+    "roles_declencheurs": ["Button", "SplitButton", "Hyperlink", "MenuItem"]
+  }
+}

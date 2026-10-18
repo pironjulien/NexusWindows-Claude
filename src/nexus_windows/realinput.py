@@ -10,7 +10,7 @@ import ctypes
 import time
 from contextlib import contextmanager
 
-from . import foreground, keys, physical, stop, worker
+from . import foreground, keys, stop, worker
 from . import win32 as w
 
 
@@ -21,15 +21,22 @@ class ForegroundError(RuntimeError):
 _LAST_MOVE: tuple[int, int] | None = None  # dernière position où NOUS avons mis le curseur
 _ALLOWED: set[int] = set()  # fenêtres de la cible pendant un emprunt autorisé
 _TOKEN = None  # suspension de la garde, renouvelée lot par lot
+_SINCE: tuple[float, int] | None = None  # début de l'emprunt (time.monotonic, GetTickCount) : entrées de Julien après
 
 
 def _guard(x: int | None = None, y: int | None = None) -> None:
-    """Avant chaque lot d'entrées réelles : la cible doit être devant, et le point viser une de ses fenêtres.
-    Sinon (Julien a repris la main, une autre fenêtre s'est intercalée) on s'arrête au lieu d'écrire chez lui."""
+    """Avant chaque lot d'entrées réelles : Julien ne doit pas avoir touché clavier, boutons ou molette depuis le début
+    de l'emprunt, la cible doit être devant, et le point viser une de ses fenêtres. Sinon (Julien a repris la main,
+    une autre fenêtre s'est intercalée) on s'arrête au lieu d'écrire chez lui."""
     if not _ALLOWED:
         raise ForegroundError("Entrée réelle hors d'un emprunt autorisé : refusée.")
     if stop.remaining_s() > 0:
         raise ForegroundError(stop.message())
+    if _SINCE is not None and foreground.user_input_since(*_SINCE):
+        raise foreground.UserInterrupted(
+            "Julien a utilisé le clavier ou la souris pendant la vraie souris/clavier : arrêt, rien d'autre envoyé ; "
+            "ce qui précède a pu arriver dans la cible : vérifier la cible (look)"
+        )
     if w.root(w.foreground()) not in _ALLOWED:
         raise ForegroundError(
             "La cible n'est plus au premier plan (Julien a repris la main ?) : arrêt, rien d'autre envoyé."
@@ -66,6 +73,13 @@ def _absolute(x: int, y: int) -> tuple[int, int]:
     left, top = w.GetSystemMetrics(w.SM_XVIRTUALSCREEN), w.GetSystemMetrics(w.SM_YVIRTUALSCREEN)
     width, height = w.GetSystemMetrics(w.SM_CXVIRTUALSCREEN), w.GetSystemMetrics(w.SM_CYVIRTUALSCREEN)
     return round((x - left) * 65535 / max(1, width - 1)), round((y - top) * 65535 / max(1, height - 1))
+
+
+def _at(flags: int, x: int, y: int, data: int = 0) -> w.INPUT:
+    """Événement souris AU point (x, y) de l'écran : déplacement absolu sur le bureau virtuel joint au bouton ou à la
+    molette, pour que l'événement tombe là où on vise même si Julien bouge la souris au même moment."""
+    ax, ay = _absolute(x, y)
+    return _mouse(flags | w.MOUSEEVENTF_MOVE | w.MOUSEEVENTF_ABSOLUTE | w.MOUSEEVENTF_VIRTUALDESK, ax, ay, data)
 
 
 def bring_to_front(hwnd: int) -> bool:
@@ -116,12 +130,14 @@ class Hold:
         self.previous = previous
         self.cursor = cursor
         self.started = time.monotonic()
+        self.started_tick = w.GetTickCount()
         self.user_took_over = False
 
     def checkpoint(self) -> None:
-        """Entre deux étapes : Julien a-t-il repris la main (touche, clic, molette) ? Alors le lot s'arrête et le
-        premier plan lui reste. Sinon, la cible est remise devant si une autre fenêtre s'est intercalée."""
-        if physical.available() and physical.since(self.started):
+        """Entre deux étapes : Julien a-t-il repris la main (touche, clic, molette ; Raw Input, sinon GetLastInputInfo
+        hors de nos entrées) ? Alors le lot s'arrête et le premier plan lui reste. Sinon, la cible est remise devant si
+        une autre fenêtre s'est intercalée."""
+        if foreground.user_input_since(self.started, self.started_tick):
             self.user_took_over = True
             raise foreground.UserInterrupted(
                 "Julien a utilisé le clavier ou la souris pendant le lot au premier plan : lot arrêté, premier plan "
@@ -139,6 +155,12 @@ _HOLD: Hold | None = None
 
 def current_hold() -> Hold | None:
     return _HOLD
+
+
+def _target_still_front(windows: set[int], pids: set[int]) -> bool:
+    """Le premier plan est-il encore à la cible ? Sinon Julien (ou une autre de ses fenêtres) l'a pris entre-temps : on
+    ne lui impose pas l'ancienne fenêtre (comme foreground.Activation.give_back)."""
+    return foreground.belongs_to(w.foreground(), windows, pids, set())
 
 
 @contextmanager
@@ -161,6 +183,7 @@ def _held(hwnd: int, windows: set[int] | None):
     worker.check_cancelled()
     previous = w.foreground()
     allowed = set(windows or foreground.target_windows(hwnd))
+    pids = foreground.target_pids(hwnd, list(allowed))
     hold = Hold(hwnd, allowed, previous, w.cursor_pos())
     _LAST_MOVE = None
     with foreground.suspended():
@@ -175,7 +198,7 @@ def _held(hwnd: int, windows: set[int] | None):
         time.sleep(0.05)
         if _LAST_MOVE is not None and w.cursor_pos() == _LAST_MOVE:
             w.SetCursorPos(*hold.cursor)
-        if not hold.user_took_over and previous and previous not in allowed:
+        if not hold.user_took_over and previous and previous not in allowed and _target_still_front(allowed, pids):
             with foreground.suspended():
                 foreground.give_back(previous, exclude=allowed)
                 foreground.adopt_foreground()
@@ -195,16 +218,19 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
 
 @contextmanager
 def _borrowed(hwnd: int, windows: set[int] | None):
-    global _LAST_MOVE, _ALLOWED, _TOKEN
+    global _LAST_MOVE, _ALLOWED, _TOKEN, _SINCE
     if not foreground.wait_typing_pause():
         raise foreground.BusyUser("Julien utilise la souris ou le clavier : emprunt reporté, rien n'a été envoyé.")
     worker.check_cancelled()  # arrêt d'urgence demandé pendant l'attente : rien n'est mis devant
     previous = w.foreground()
     cursor = w.cursor_pos()
     _LAST_MOVE = None
-    allowed = windows or foreground.target_windows(hwnd)
+    allowed = set(windows or foreground.target_windows(hwnd))
+    pids = foreground.target_pids(hwnd, list(allowed))
+    outer = _SINCE  # emprunt imbriqué : on garde le début du plus ancien
     with foreground.suspended() as token:
         _TOKEN = token
+        _SINCE = outer or (time.monotonic(), w.GetTickCount())
         try:
             if not bring_to_front(hwnd):
                 raise ForegroundError(
@@ -215,11 +241,12 @@ def _borrowed(hwnd: int, windows: set[int] | None):
         finally:
             _ALLOWED = set()
             _TOKEN = None
+            _SINCE = outer
             time.sleep(0.05)
             if _LAST_MOVE is not None and w.cursor_pos() == _LAST_MOVE:
                 w.SetCursorPos(*cursor)
-            if previous and previous not in allowed:
-                foreground.give_back(previous, exclude=set(allowed))
+            if previous and previous not in allowed and _target_still_front(allowed, pids):
+                foreground.give_back(previous, exclude=allowed)
 
 
 def move(x: int, y: int, check_point: bool = True) -> None:
@@ -238,29 +265,34 @@ _BTN = {
 
 
 def click(x: int, y: int, button: str = "left", count: int = 1) -> None:
-    move(x, y)
-    time.sleep(0.03)
+    """Déplacement, appuis et relâchements en UN SEUL SendInput, chacun avec les coordonnées absolues du point :
+    Windows ne glisse aucune autre entrée au milieu, le clic ne peut pas tomber sous le curseur de Julien."""
+    global _LAST_MOVE
+    _guard(x, y)
     down, up = _BTN[button]
-    for _ in range(count):
-        _send(_mouse(down), _mouse(up))
-        time.sleep(0.04)
+    _send(_at(0, x, y), *[_at(flag, x, y) for _ in range(count) for flag in (down, up)])
+    _LAST_MOVE = w.cursor_pos()
 
 
 def drag(x1: int, y1: int, x2: int, y2: int, steps: int = 12) -> None:
-    move(x1, y1)
-    time.sleep(0.05)
-    _send(_mouse(w.MOUSEEVENTF_LEFTDOWN))
+    global _LAST_MOVE
+    _guard(x1, y1)
+    _send(_at(0, x1, y1), _at(w.MOUSEEVENTF_LEFTDOWN, x1, y1))  # appui au point de départ, quoi que fasse Julien
+    _LAST_MOVE = w.cursor_pos()
     try:
         for i in range(1, steps + 1):  # la destination peut être une autre fenêtre (glisser vers une autre appli)
-            move(x1 + (x2 - x1) * i // steps, y1 + (y2 - y1) * i // steps, check_point=False)
             time.sleep(0.015)
+            move(x1 + (x2 - x1) * i // steps, y1 + (y2 - y1) * i // steps, check_point=False)
     finally:
         _send(_mouse(w.MOUSEEVENTF_LEFTUP))
 
 
 def wheel(x: int, y: int, delta: int, horizontal: bool = False) -> None:
-    move(x, y)
-    _send(_mouse(w.MOUSEEVENTF_HWHEEL if horizontal else w.MOUSEEVENTF_WHEEL, data=delta))
+    """Molette au point, déplacement absolu joint dans le même SendInput (comme click)."""
+    global _LAST_MOVE
+    _guard(x, y)
+    _send(_at(0, x, y), _at(w.MOUSEEVENTF_HWHEEL if horizontal else w.MOUSEEVENTF_WHEEL, x, y, delta))
+    _LAST_MOVE = w.cursor_pos()
 
 
 def type_text(text: str) -> None:

@@ -14,6 +14,7 @@ import json
 import socket
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -114,7 +115,9 @@ SELECTORS = {
 }
 
 
-def run_method(app: apps.LabApp, tree: uia.Node, task: str, method: str, page: cdp.Page | None, turn: int = 0):
+def run_method(
+    app: apps.LabApp, tree: uia.Node, task: str, method: str, page: cdp.Page | None, turn: int = 0
+) -> Callable[..., object]:
     """Exécute la technique ; renvoie un prédicat d'événement ou une fonction de relecture.
 
     `turn` alterne l'option visée (Bravo/Charlie, Vert/Bleu) pour qu'un essai change toujours l'état.
@@ -152,40 +155,54 @@ def run_method(app: apps.LabApp, tree: uia.Node, task: str, method: str, page: c
     needs_node = task in ("button", "check", "text", "combo", "list", "menu")
     if needs_node and node is None:
         raise methods.MethodError("élément introuvable dans l'arbre UIA")
+
+    def need() -> uia.Node:
+        """Élément de la tâche, que les techniques qui agissent sur un élément exigent."""
+        if node is None:
+            raise methods.MethodError("élément introuvable dans l'arbre UIA")
+        return node
+
+    def need_center() -> tuple[int, int]:
+        """Centre de l'élément de la tâche, qui doit publier son rectangle."""
+        rect = need().rect
+        if rect is None:
+            raise methods.MethodError("élément sans rectangle")
+        return rect.center
+
     auto = AUTO_ASF if method.endswith("_asf") else AUTO
     base = method.removesuffix("_asf")
 
     if base == "uia_invoke":
-        auto.invoke(node.element)
+        auto.invoke(need().element)
     elif base == "uia_toggle":
-        auto.toggle(node.element)
+        auto.toggle(need().element)
     elif base == "uia_legacy":
-        auto.legacy_default_action(node.element)
+        auto.legacy_default_action(need().element)
     elif base == "uia_select":
-        auto.select(node.element)
+        auto.select(need().element)
     elif base == "uia_value":
         if task == "combo":
-            auto.set_value(node.element, color)
+            auto.set_value(need().element, color)
         else:
-            auto.set_value(node.element, TEXT)
+            auto.set_value(need().element, TEXT)
     elif base == "legacy_value":
-        auto.legacy_set_value(node.element, TEXT)
+        auto.legacy_set_value(need().element, TEXT)
     elif base == "uia_combo_item":
-        item = find(node, ("ListItem",), color) or find(tree, ("ListItem",), color)
+        item = find(need(), ("ListItem",), color) or find(tree, ("ListItem",), color)
         if item is None:
-            auto.expand(node.element)
+            auto.expand(need().element)
             time.sleep(0.3)
             item = find(AUTO.tree(app.hwnd), ("ListItem",), color)
         if item is None:
             raise methods.MethodError(f"option « {color} » introuvable")
         auto.select(item.element)
         try:
-            auto.collapse(node.element)
+            auto.collapse(need().element)
         except uia.UIAError:
             pass
     elif base in ("uia_menu", "uia_menu_invoke", "uia_menu_legacy"):
         {"uia_menu": auto.expand, "uia_menu_invoke": auto.invoke, "uia_menu_legacy": auto.legacy_default_action}[base](
-            node.element
+            need().element
         )
         time.sleep(0.3)
         item = None
@@ -204,24 +221,24 @@ def run_method(app: apps.LabApp, tree: uia.Node, task: str, method: str, page: c
         if task == "zone":
             point = zone_point(tree)
         else:
-            point = node.rect.center
+            point = need_center()
         if point is None:
             raise methods.MethodError("pas de point")
         methods.post_click(app.hwnd, *point)
     elif base == "win32_bn":
-        if not node.hwnd:
+        if not need().hwnd:
             raise methods.MethodError("élément sans HWND")
-        methods.win32_button_click(node.hwnd)
+        methods.win32_button_click(need().hwnd)
     elif base == "win32_edit":
-        if not node.hwnd:
+        if not need().hwnd:
             raise methods.MethodError("élément sans HWND")
-        methods.win32_edit_replace(node.hwnd, TEXT)
+        methods.win32_edit_replace(need().hwnd, TEXT)
     elif base == "win32_combo":
-        if not node.hwnd:
+        if not need().hwnd:
             raise methods.MethodError("élément sans HWND")
-        methods.win32_combo_select(node.hwnd, color)
+        methods.win32_combo_select(need().hwnd, color)
     elif base == "win32_list":
-        parent = node.parent
+        parent = need().parent
         hwnd = parent.hwnd if parent else 0
         if not hwnd:
             raise methods.MethodError("liste sans HWND")
@@ -229,7 +246,7 @@ def run_method(app: apps.LabApp, tree: uia.Node, task: str, method: str, page: c
     elif base == "win32_menu":
         methods.win32_menu_command(app.hwnd, "Fichier > Action menu")
     elif base == "msg_chars":
-        target = node.hwnd or methods.post_click(app.hwnd, *node.rect.center)
+        target = need().hwnd or methods.post_click(app.hwnd, *need_center())
         methods.post_chars(target, TEXT)
     elif base == "msg_wheel":
         point = zone_point(tree)
@@ -271,13 +288,14 @@ def run_method(app: apps.LabApp, tree: uia.Node, task: str, method: str, page: c
             deadline = time.monotonic() + 1.5
             value = None
             while time.monotonic() < deadline:
-                value = read_value(node)
+                value = read_value(need())
                 if value is not None and value.endswith(TEXT):
                     return value
                 time.sleep(0.05)
             return None
 
         return verify
+    assert expect is not None  # seule la tâche « text » n'a pas de prédicat d'événement
     return expect
 
 
@@ -337,7 +355,7 @@ def bench_kind(kind: str) -> list[dict]:
                 fg0, cur0, tick0 = w.foreground(), w.cursor_pos(), w.last_input_tick()
                 title0 = w.window_text(app.hwnd)
                 t0 = time.perf_counter()
-                row = {"kind": kind, "task": task, "method": method}
+                row: dict[str, object] = {"kind": kind, "task": task, "method": method}
                 try:
                     check = run_method(app, tree, task, method, page, turn)
                     row["call_ms"] = round((time.perf_counter() - t0) * 1000)

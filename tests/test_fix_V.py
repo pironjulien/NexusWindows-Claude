@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import comtypes
 import pytest
-from test_contract import HWND, FakeAuto, make_view, node
+from test_contract import HWND, FakeAuto, as_auto, make_view, node
 
 from nexus_windows import actions, methods, snapshot, uia
 from nexus_windows import win32 as w
@@ -72,7 +72,7 @@ def test_rich_form_never_counts_more_than_the_text():
 
 
 def test_text_done_accepts_rich_form():
-    ex = actions.Executor(FakeAuto(), HWND, lambda rebuild: None, lambda: None)
+    ex = actions.Executor(as_auto(FakeAuto()), HWND, lambda rebuild: make_view(), lambda: None)
     read = "Bonjour Julien,\nVoici le compte rendu de la réunion.\nCordialement"
     assert ex._text_done(read, "\n", COURRIEL, replace=True)
     assert ex._text_done(read, "\n", COURRIEL, replace=False)
@@ -88,7 +88,7 @@ class FlushAuto(FakeAuto):
     def scroll_into_view(self, element) -> None:
         self.calls.append(("scroll_into_view", element))
         if self.fail:
-            raise comtypes.COMError(-2147220991, "élément disparu", None)
+            raise comtypes.COMError(-2147220991, "élément disparu", (None, None, None, None, None))
 
     def refresh(self, element) -> dict:
         self.calls.append(("refresh", element))
@@ -128,17 +128,17 @@ def test_root_web_documents_skip_inner_frames():
 def test_flush_scrolls_root_document_only_when_covered(covered):
     tree = web_tree()
     auto = FlushAuto()
-    assert snapshot.flush_web(auto, HWND) is None  # aucun document connu : rien
+    assert snapshot.flush_web(as_auto(auto), HWND) is None  # aucun document connu : rien
     snapshot.remember_web_documents(HWND, tree)
-    assert snapshot.flush_web(auto, HWND) is True
+    assert snapshot.flush_web(as_auto(auto), HWND) is True
     assert auto.calls == [("scroll_into_view", tree.children[0].element)]
     covered["fg"] = HWND  # au premier plan : dessinée et publiée, rien n'attend
-    assert snapshot.flush_web(auto, HWND) is None and len(auto.calls) == 1
+    assert snapshot.flush_web(as_auto(auto), HWND) is None and len(auto.calls) == 1
 
 
 def test_flush_failure_forgets_documents(covered):
     snapshot.remember_web_documents(HWND, web_tree())
-    assert snapshot.flush_web(FlushAuto(fail=True), HWND) is False
+    assert snapshot.flush_web(as_auto(FlushAuto(fail=True)), HWND) is False
     assert HWND not in snapshot._ROOT_DOCUMENTS  # relus au prochain arbre
     snapshot.remember_web_documents(HWND, node("Pane", "Bloc-notes"))
     assert HWND not in snapshot._ROOT_DOCUMENTS
@@ -154,7 +154,7 @@ def test_executor_reads_flush_before_refresh_in_chromium(covered):
     item = node("ListItem", "Charlie", framework="Chrome", has_selection_item=True)
     snapshot.remember_web_documents(HWND, web_tree(item))
     auto = FlushAuto()
-    ex = actions.Executor(auto, HWND, lambda rebuild: chromium_view(item), lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: chromium_view(item), lambda *a: None)
     ex._refresh(item.element)
     assert [c[0] for c in auto.calls] == ["scroll_into_view", "refresh"]  # publication déclenchée, puis relue
 
@@ -163,7 +163,7 @@ def test_executor_reads_do_not_flush_outside_chromium(covered):
     box = node("CheckBox", "Option", has_toggle=True, toggle=0)
     snapshot.remember_web_documents(HWND, web_tree())
     auto = FlushAuto()
-    ex = actions.Executor(auto, HWND, lambda rebuild: make_view(box), lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: make_view(box), lambda *a: None)
     ex._refresh(box.element)
     assert [c[0] for c in auto.calls] == ["refresh"]
 
@@ -186,7 +186,7 @@ class LateSelection(FakeAuto):
 def test_effect_seen_in_title_is_upgraded_to_read_back_selection():
     item = node("ListItem", "Charlie", framework="Chrome", has_selection_item=True, selected=False)
     auto = LateSelection(item)
-    ex = actions.Executor(auto, HWND, lambda rebuild: make_view(item), lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: make_view(item), lambda *a: None)
     e = make_view(item).elements[0]
     before = (ex._signature_own(e), ((1, "Labo Web — prêt"),), None)
     change = ex._own_state_change(e, before, "effet constaté : fenêtre « Labo Web — liste Charlie »")
@@ -196,7 +196,7 @@ def test_effect_seen_in_title_is_upgraded_to_read_back_selection():
 def test_effect_without_state_pattern_is_left_as_is():
     button = node("Button", "Valider", framework="Chrome", has_invoke=True)
     auto = FakeAuto()
-    ex = actions.Executor(auto, HWND, lambda rebuild: make_view(button), lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: make_view(button), lambda *a: None)
     e = make_view(button).elements[0]
     seen = "effet constaté : fenêtre « Labo Web — clic 1 »"
     assert ex._own_state_change(e, (("x",), (), None), seen) == seen
@@ -204,7 +204,7 @@ def test_effect_without_state_pattern_is_left_as_is():
 
 def test_effect_state_never_proved_stays_honest():
     item = node("ListItem", "Charlie", framework="Chrome", has_selection_item=True, selected=False)
-    ex = actions.Executor(FakeAuto(), HWND, lambda rebuild: make_view(item), lambda *a: None)
+    ex = actions.Executor(as_auto(FakeAuto()), HWND, lambda rebuild: make_view(item), lambda *a: None)
     e = make_view(item).elements[0]
     before = (ex._signature_own(e), (), None)
     seen = "effet constaté : changement visible"
@@ -254,7 +254,7 @@ def test_name_scrolled_out_of_view_is_brought_into_view():
             state["view"] = after
         return state["view"]
 
-    ex = actions.Executor(auto, HWND, get_view, lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, get_view, lambda *a: None)
     ex._pids = {7}
     kind, element = ex.resolve("Gel", {"Edit"})
     assert auto.scrolled == [gel.element] and element.name == "Gel"
@@ -264,7 +264,7 @@ def test_name_scrolled_out_of_view_is_brought_into_view():
 def test_partial_name_never_scrolls_the_page():
     _, before, after = scrolled_page()
     auto = ScrollAuto()
-    ex = actions.Executor(auto, HWND, lambda rebuild: before, lambda *a: None)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: before, lambda *a: None)
     ex._pids = {7}
     with pytest.raises(actions.ActionError, match="Aucun élément « Ge »"):
         ex.resolve("Ge", {"Edit"})

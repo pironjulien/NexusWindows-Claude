@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT / "tests" / "live"))
 sys.path.insert(0, str(ROOT / "lab"))
 
 import apps  # noqa: E402
-import drive  # noqa: E402
+import drive  # noqa: E402  (tests/live ajouté à sys.path juste au-dessus)
 from mcp import Client  # noqa: E402
 
 from nexus_windows import win32 as w  # noqa: E402

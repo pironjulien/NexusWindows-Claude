@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "live"))
 
-import drive  # noqa: E402
+import drive  # noqa: E402  (tests/live ajouté à sys.path juste au-dessus)
 
 # Refus assumés (raccourcis Ctrl impossibles en arrière-plan en WPF) : le test exige qu'ils restent des refus
 # explicites, jamais de faux succès. Chromium sans DevTools les reçoit désormais par activation simulée (0.7.0).

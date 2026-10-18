@@ -34,6 +34,7 @@ try:
         if len(list(tree.walk())) > 25:
             break
         time.sleep(0.4)
+    assert tree is not None
     editor = next(
         (n for n in tree.walk() if n.name == "Éditeur" and n.control_type in ("Edit", "Document", "Group")), None
     )
@@ -41,9 +42,11 @@ try:
         "éditeur :",
         editor and (editor.control_type, {k: v for k, v in editor.props.items() if k.startswith("has_") and v}),
     )
+    assert editor is not None, "éditeur introuvable"
+    editor_el = editor.element  # pour les lambdas ci-dessous (variable de module : non affinée dedans)
     for label, action in (
-        ("uia_value", lambda: auto.set_value(editor.element, "Salut UIA")),
-        ("legacy_value", lambda: auto.legacy_set_value(editor.element, "Salut legacy")),
+        ("uia_value", lambda: auto.set_value(editor_el, "Salut UIA")),
+        ("legacy_value", lambda: auto.legacy_set_value(editor_el, "Salut legacy")),
     ):
         app.drain()
         with foreground.Watch(app.hwnd) as guard:

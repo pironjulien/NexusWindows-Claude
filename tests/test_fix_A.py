@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import ctypes
 import re
+from typing import cast
 
 import pytest
 from PIL import Image
-from test_contract import HWND, ROLE_IDS, FakeAuto, FakeEl, executor, make_view, node
+from test_contract import HWND, ROLE_IDS, FakeAuto, FakeEl, as_auto, as_call, executor, make_view, node, under
 
 from nexus_windows import (
     act_base,
@@ -23,6 +24,7 @@ from nexus_windows import (
     act_wait,
     act_win32,
     actions,
+    cdp,
     methods,
     server,
     snapshot,
@@ -65,7 +67,7 @@ def chains(ex: actions.Executor) -> list[list[str]]:
 def changing_screen(ex: actions.Executor) -> None:
     """L'empreinte visuelle change à chaque lecture : une action par messages « a un effet visible »."""
     counter = iter(range(1_000_000))
-    ex._fingerprint = lambda: next(counter)
+    ex._fingerprint = lambda: (next(counter),)
 
 
 class FoldingAuto(FakeAuto):
@@ -163,7 +165,7 @@ def test_point_on_msaa_item_is_found_with_its_ancestors(monkeypatch):
     ex = executor(view, auto)
     ex._windows = {HWND, DROP}
     ex.acted = False
-    element = ex._element_under(100, 50)
+    element = under(ex, 100, 50)
     assert element.node is bleu and element.node.parent is dropped and element.window == DROP
 
 
@@ -176,7 +178,7 @@ def test_point_on_text_climbs_to_the_wanted_role(monkeypatch):
     ex = executor(make_view(button), auto)
     ex._windows = {HWND}
     ex.acted = False
-    assert ex._element_under(20, 15).node is button
+    assert under(ex, 20, 15).node is button
 
 
 @pytest.fixture
@@ -296,7 +298,7 @@ def test_point_shared_by_two_popups_hits_the_upper_one(monkeypatch, role, name):
     ex = executor(view, auto)
     ex._windows, ex.acted = {HWND, DIALOG, TOP}, False
     monkeypatch.setattr(actions.w, "window_at", lambda x, y: 999)  # cible recouverte par une fenêtre de Julien
-    assert ex._element_under(110, 110).node is upper
+    assert under(ex, 110, 110).node is upper
     outcome = ex.click_point(110, 110)
     assert outcome.ok and auto.calls == [("invoke", upper.element)]  # rien sur le dialogue du dessous
 
@@ -307,7 +309,7 @@ def test_real_stacking_order_wins_over_snapshot_order(monkeypatch):
     monkeypatch.setattr(actions.w, "window_at", lambda x, y: 999)
     ex = executor(view, FakeAuto())
     ex._windows, ex.acted = {HWND, DIALOG, TOP}, False
-    assert ex._element_under(110, 110).node is button
+    assert under(ex, 110, 110).node is button
 
 
 def test_upper_popup_without_wanted_role_blocks_what_is_below(monkeypatch):
@@ -354,6 +356,10 @@ def test_message_wheel_goes_to_the_popup_under_the_point(popup_over_main):
 
 
 # --- 4. Un seul cadre de coordonnées --------------------------------------------------------------------------------
+# render sans UI Automation : session.view est simulé par la fixture.
+NO_AUTO = as_auto(None)
+
+
 @pytest.fixture
 def shifted(monkeypatch):
     """Image montrée sans surgissante, puis un menu s'ouvre AU-DESSUS de la fenêtre (l'origine du cadre recule)."""
@@ -382,7 +388,7 @@ def shifted(monkeypatch):
 def test_list_only_uses_the_frame_of_the_last_image(shifted):
     session, before, after, supprimer = shifted
     session.mark_image(before)
-    text = server.render(None, HWND, "elements")[0]
+    text = server.render(NO_AUTO, HWND, "elements")[0]
     assert "dernière image (800×300" in text
     listed = dict(re.findall(r"« (\w+) ».*?(@-?\d+,-?\d+|\(hors de l'image\))", text))
     assert listed == {"Supprimer": "@180,30", "Exporter": "(hors de l'image)"}
@@ -390,31 +396,33 @@ def test_list_only_uses_the_frame_of_the_last_image(shifted):
     ex.get_frame = lambda: session.frames.get(HWND)
     ex._windows, ex.acted = {HWND, POPUP}, False
     kind, point = ex.resolve(listed["Supprimer"][1:])
-    assert kind == "point" and ex._element_under(*point).node is supprimer  # l'élément listé, pas un autre
+    assert kind == "point" and under(ex, *point).node is supprimer  # l'élément listé, pas un autre
     assert session.frames[HWND] is before.frame
 
 
 def test_zoom_never_replaces_the_reference_frame(shifted):
     session, before, after, _ = shifted
     session.mark_image(before)
-    out = server.render(None, HWND, "both", region=[0, 0, 100, 50])
+    out = server.render(NO_AUTO, HWND, "both", region=[0, 0, 100, 50])
     assert len(out) == 2 and session.frames[HWND] is before.frame and "zoom" in out[0]
-    server.render(None, HWND, "both")  # image complète : elle devient la référence
+    server.render(NO_AUTO, HWND, "both")  # image complète : elle devient la référence
     assert session.frames[HWND] is after.frame
 
 
 def test_list_only_without_any_image_memorizes_its_frame(shifted):
     session, _, after, _ = shifted
-    server.render(None, HWND, "elements")
+    server.render(NO_AUTO, HWND, "elements")
     assert session.frames[HWND] is after.frame
 
 
 def test_list_only_after_a_resize_omits_coordinates(shifted):
     session, before, after, _ = shifted
     session.frames[HWND] = snapshot.frame_for(w.Rect(100, 400, 600, 700), "normal", (100, 400), (500, 300))
-    text = server.render(None, HWND, "elements")[0]
+    text = server.render(NO_AUTO, HWND, "elements")[0]
     assert "omises" in text and "changé de taille" in text and "@" not in text.split("données à lire")[1]
-    out = server.render(None, HWND, "elements", region=[0, 0, 10, 10])  # zoom dans une image périmée : image complète
+    out = server.render(
+        NO_AUTO, HWND, "elements", region=[0, 0, 10, 10]
+    )  # zoom dans une image périmée : image complète
     assert len(out) == 2 and session.frames[HWND] is after.frame
 
 
@@ -441,6 +449,11 @@ class FakePage:
         self.field.live["value"] = (self.field.live.get("value") or "") + text
 
 
+def as_page(page: FakePage) -> cdp.Page:
+    """Fausse page DevTools présentée au typage comme la vraie (evaluate et insert_text seulement)."""
+    return cast(cdp.Page, page)
+
+
 class ScrollingAuto(FakeAuto):
     def __init__(self, moves: bool) -> None:
         super().__init__()
@@ -462,7 +475,7 @@ def test_devtools_write_scrolls_into_view_and_never_types(monkeypatch, moves):
     page = FakePage(editor.element)
     auto = ScrollingAuto(moves)
     ex = executor(view, auto)
-    ex.get_page = lambda: page
+    ex.get_page = lambda: as_page(page)
     ex._web_viewport = lambda: w.Rect(0, 0, 400, 300)
     monkeypatch.setattr(actions.foreground, "brief_activation", lambda *a, **k: pytest.fail("activation brève"))
     if moves:
@@ -483,7 +496,7 @@ def test_devtools_select_never_falls_back_to_typing(monkeypatch):
     page = FakePage(combo.element)
     page.evaluate = lambda script: 1 if "devicePixelRatio" in script else False  # <select> introuvable au point
     ex = executor(view, FakeAuto())
-    ex.get_page = lambda: page
+    ex.get_page = lambda: as_page(page)
     ex._web_viewport = lambda: w.Rect(0, 0, 400, 300)
     monkeypatch.setattr(actions.foreground, "brief_activation", lambda *a, **k: pytest.fail("activation brève"))
     with pytest.raises(actions.ActionError) as caught:
@@ -516,8 +529,8 @@ def test_covered_chromium_window_reaches_web_content(monkeypatch):
     view, button = web_window()
     ex = executor(view, FakeAuto())
     ex._windows, ex.acted = {HWND}, False
-    assert ex._element_under(140, 215).node is button
-    assert ex._element_under(140, 215, roles=actions.CHECK_ROLES).node is button
+    assert under(ex, 140, 215).node is button
+    assert under(ex, 140, 215, roles=actions.CHECK_ROLES).node is button
 
 
 def test_web_veil_inside_the_page_still_blocks(monkeypatch):
@@ -559,14 +572,10 @@ def test_expect_after_an_incomplete_view_is_not_proof(monkeypatch):
             state["view"] = views.pop(0)
         return state["view"]
 
-    ex = actions.Executor(FakeAuto(), 0, get_view, lambda: None)
+    ex = actions.Executor(as_auto(FakeAuto()), 0, get_view, lambda: None)
     ex._pids = {7}
-
-    class Call:
-        def step(self, **_):
-            pass
-
-    report, failed = server._run_steps(ex, [server.Step(do="click", target="Lancer", expect="Terminé")], 0, Call())
+    steps = [server.Step(do="click", target="Lancer", expect="Terminé")]
+    report, failed = server._run_steps(ex, steps, 0, as_call())
     assert not failed and "non probant" in report[0] and report[0].split()[1] == "~"
 
 
@@ -586,8 +595,9 @@ def test_tree_reports_truncation_only_when_nodes_are_cut():
 
     root = ComEl([ComEl([]), ComEl([])])
     auto = uia.Automation.__new__(uia.Automation)
-    auto._cache = None
-    auto.uia = type("UIA", (), {"ElementFromHandleBuildCache": lambda _self, hwnd, cache: root})()
+    # Faux COM : Automation créé sans __init__, sans demande de cache ni vrai UI Automation.
+    fake_uia = type("UIA", (), {"ElementFromHandleBuildCache": lambda _self, hwnd, cache: root})()
+    vars(auto).update(_cache=None, uia=fake_uia)
     assert auto.tree(1, max_nodes=3).truncated is False  # exactement 3 nœuds : rien n'est coupé
     tree = auto.tree(1, max_nodes=2)
     assert tree.truncated is True and len(tree.children) == 1
@@ -608,7 +618,7 @@ def test_build_view_flags_truncation_and_missing_web_content(monkeypatch):
             root.truncated = True
             return root
 
-    view = snapshot.build_view(TreeAuto(), HWND)
+    view = snapshot.build_view(as_auto(TreeAuto()), HWND)
     assert view.truncated and view.web_missing and view.roots[HWND].name == "T"
     assert "tronqué" in server._header(view, [], view.frame, True)
 
@@ -731,7 +741,7 @@ def test_first_name_rebuilds_only_an_older_snapshot(fresh, rebuilt):
         asked.append(rebuild)
         return view
 
-    ex = actions.Executor(FakeAuto(), HWND, get_view, lambda: None, fresh=fresh)
+    ex = actions.Executor(as_auto(FakeAuto()), HWND, get_view, lambda: None, fresh=fresh)
     ex._pids = {7}
     ex.resolve("Valider")
     assert (True in asked) is rebuilt

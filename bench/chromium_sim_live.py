@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "tests" / "live"))
 sys.path.insert(0, str(ROOT / "lab"))
 
 import apps  # noqa: E402
-import drive  # noqa: E402
+import drive  # noqa: E402  (tests/live ajouté à sys.path juste au-dessus)
 from mcp import Client  # noqa: E402
 
 from nexus_windows import win32 as w  # noqa: E402
@@ -52,7 +52,7 @@ async def main(kind: str) -> None:
     rows: list[dict] = []
     fg0 = w.foreground()
     plain: apps.LabApp | None = None
-    async with Client(drive.server_params({"allow_launch": [str(apps.ELECTRON)]}), read_timeout_seconds=180) as client:
+    async with Client(drive.server_params(), read_timeout_seconds=180) as client:
         if kind == "occult":
             # Application déjà ouverte, sans commutateur, puis occultée (hors écran) : moteur de rendu « hidden ».
             plain = _spawn_plain_electron()

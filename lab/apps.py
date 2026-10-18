@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -82,9 +83,10 @@ class _ForegroundGuard:
     """Rend le premier plan à Julien dès qu'un processus du labo (lancé ou descendant) le prend, du lancement jusqu'à
     GUARD_TAIL_S après l'apparition de la fenêtre."""
 
-    def __init__(self, pid: int, user_fg: int) -> None:
+    def __init__(self, pid: int, user_fg: int, pids: Callable[[], set[int]] | None = None) -> None:
         self.user_fg = user_fg
         self.pid = pid
+        self.pids = pids  # processus du labo relus en cours de route (navigateur relancé) ; défaut : pid et descendants
         self.until: float | None = None
         self.taken = 0
         self._thread = threading.Thread(target=self._run, name="lab-foreground-guard", daemon=True)
@@ -98,7 +100,8 @@ class _ForegroundGuard:
         pids, refreshed = {self.pid}, 0.0
         while self.until is None or time.monotonic() < self.until:
             if time.monotonic() - refreshed > 0.3:
-                pids, refreshed = descendants(self.pid), time.monotonic()
+                pids = self.pids() if self.pids is not None else descendants(self.pid)
+                refreshed = time.monotonic()
             fg = w.foreground()
             if fg and fg != self.user_fg and w.window_pid(w.root(fg)) in pids:
                 self.taken += 1
@@ -118,6 +121,18 @@ class LabApp:
     hwnd: int = 0
     events: queue.Queue = field(default_factory=queue.Queue)
     extra: dict = field(default_factory=dict)
+    profile: Path | None = None  # navigateur du labo : son dossier de profil, qui le désigne même relancé
+
+    def pids(self) -> set[int]:
+        """Processus de l'application : le lancé et ses descendants, plus, pour un navigateur, le processus qui tient
+        son profil (Edge peut se relancer : le processus lancé meurt et la fenêtre appartient à sa copie)."""
+        from nexus_windows.launch import descendants
+
+        out = descendants(self.proc.pid)
+        holder = profile_browser_pid(self.profile) if self.profile else 0
+        if holder:
+            out |= descendants(holder)
+        return out
 
     def last_events(self, wait_s: float = 0.0) -> list[str]:
         out: list[str] = []
@@ -140,6 +155,37 @@ class LabApp:
                 self.proc.wait(5)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+        if self.profile:
+            close_profile_browser(self.profile)  # copie relancée par le navigateur lui-même : jamais laissée ouverte
+
+
+def profile_browser_pid(profile: Path) -> int:
+    """Processus Chromium (Edge) qui tient le profil `profile` : celui de sa fenêtre de messages
+    « Chrome_MessageWindow », dont le titre est le dossier du profil (ProcessSingleton de Chromium) ; 0 sans."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.FindWindowExW.argtypes = (wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR)
+    user32.FindWindowExW.restype = wintypes.HWND
+    user32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
+    hwnd = user32.FindWindowExW(wintypes.HWND(-3), None, "Chrome_MessageWindow", str(profile))  # HWND_MESSAGE
+    if not hwnd:
+        return 0
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
+
+
+def close_profile_browser(profile: Path, timeout_s: float = 5.0) -> None:
+    """Ferme le navigateur du labo qui tient `profile` (profil propre au labo : jamais un navigateur de Julien)."""
+    deadline = time.monotonic() + timeout_s
+    while (pid := profile_browser_pid(profile)) and time.monotonic() < deadline:
+        try:
+            os.kill(pid, 15)  # TerminateProcess sous Windows ; ses processus enfants se ferment avec lui
+        except OSError:
+            pass
+        time.sleep(0.2)
 
 
 def _startupinfo() -> subprocess.STARTUPINFO:
@@ -183,15 +229,18 @@ def _spawn(kind: str, cmd: list[str]) -> tuple[LabApp, queue.Queue]:
     return app, ready
 
 
-def _find_window(pids: set[int] | None, title_prefix: str, timeout_s: float) -> int:
+def _find_window(pids: Callable[[], set[int]] | None, title_prefix: str, timeout_s: float) -> int:
+    """Fenêtre visible de premier niveau dont le titre commence par title_prefix, d'un des processus pids() (relus à
+    chaque tour : un navigateur peut se relancer sous un autre processus)."""
     from nexus_windows import win32 as w
 
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
+        current = pids() if pids is not None else None
         for hwnd in w.enum_windows():
             if not w.IsWindowVisible(hwnd) or w.owner(hwnd):
                 continue
-            if w.window_text(hwnd).startswith(title_prefix) and (pids is None or w.window_pid(hwnd) in pids):
+            if w.window_text(hwnd).startswith(title_prefix) and (current is None or w.window_pid(hwnd) in current):
                 return hwnd
         time.sleep(0.1)
     return 0
@@ -208,7 +257,7 @@ def launch(kind: str, x: int = 120, y: int = 120, cdp_port: int = 0, timeout_s: 
     require_julien_away()
     user_fg = w.foreground()  # relevé AVANT le lancement : une fenêtre du labo peut le prendre dès sa création
     app, ready = _start(kind, x, y, cdp_port)
-    guard = _ForegroundGuard(app.proc.pid, user_fg)
+    guard = _ForegroundGuard(app.proc.pid, user_fg, app.pids)
     try:
         _wait_window(app, ready, timeout_s)
     finally:
@@ -251,6 +300,9 @@ def _start(kind: str, x: int, y: int, cdp_port: int) -> tuple[LabApp, queue.Queu
             raise FileNotFoundError("Microsoft Edge introuvable.")
         profile = STATE / "edge-profile"
         profile.mkdir(parents=True, exist_ok=True)
+        # Copie d'un lancement précédent encore ouverte sur ce profil : la nouvelle commande lui serait confiée (le
+        # processus lancé quitterait aussitôt) et sa fenêtre resterait sur le bureau de Julien.
+        close_profile_browser(profile)
         cmd = [
             str(exe),
             f"--user-data-dir={profile}",
@@ -266,6 +318,7 @@ def _start(kind: str, x: int, y: int, cdp_port: int) -> tuple[LabApp, queue.Queu
         if cdp_port:
             cmd.append(f"--remote-debugging-port={cdp_port}")
         app, ready = _spawn(kind, cmd)
+        app.profile = profile
     else:
         raise ValueError(f"Type d'application inconnu : {kind}")
     return app, ready
@@ -281,7 +334,7 @@ def _wait_window(app: LabApp, ready: queue.Queue, timeout_s: float) -> None:
         app.hwnd = int(data["top"])
     else:
         title = "Labo Web"
-        app.hwnd = _find_window({app.proc.pid}, title, timeout_s)  # fenêtre créée par le processus navigateur
+        app.hwnd = _find_window(app.pids, title, timeout_s)  # fenêtre du navigateur, même relancé
         if not app.hwnd:
             app.close()
             raise TimeoutError(f"{app.kind} : fenêtre « {title} » introuvable en {timeout_s} s.")

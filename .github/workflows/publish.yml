@@ -1,0 +1,52 @@
+name: Publish to PyPI
+
+# Trusted Publishing (OIDC): no token stored in the repository. PyPI side, once: a trusted publisher for this
+# repository, workflow publish.yml, environment pypi. A published GitHub release vX.Y.Z then uploads that version.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Version matches the release tag, README carries the MCP registry name
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          echo "pyproject version: $version"
+          if [ "${{ github.event_name }}" = "release" ] && [ "${{ github.event.release.tag_name }}" != "v$version" ]; then
+            echo "Tag ${{ github.event.release.tag_name }} does not match v$version"; exit 1
+          fi
+          grep -q 'mcp-name: io.github.pironjulien/nexus-windows' README.md
+      - run: uv build
+      - name: Startup check from the built wheel
+        run: |
+          uv sync --frozen --quiet
+          uv pip install --quiet --reinstall dist/*.whl
+          uv run --frozen --no-sync pytest -q --noconftest tests/test_startup.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/nexus-windows/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

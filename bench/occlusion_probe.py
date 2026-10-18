@@ -28,6 +28,7 @@ try:
         if len(list(tree.walk())) > 25:
             break
         time.sleep(0.4)
+    assert tree is not None
     button = next(n for n in tree.walk() if n.control_type == "Button" and n.name == "Valider")
     for _ in range(3):
         auto.invoke(button.element)

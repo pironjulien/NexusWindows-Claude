@@ -62,11 +62,12 @@ from .act_base import (  # noqa: F401
     framework_of,
 )
 from .act_chromium import ChromiumActions
+from .act_confirm import ConfirmActions, ConfirmationRequired  # noqa: F401  (réexporté)
 from .act_pointer import PointerActions
 from .act_uia import UiaActions
 from .act_wait import WaitActions
 from .act_win32 import Win32Actions
 
 
-class Executor(UiaActions, ChromiumActions, Win32Actions, PointerActions, WaitActions):
+class Executor(UiaActions, ChromiumActions, Win32Actions, PointerActions, WaitActions, ConfirmActions):
     """Exécuteur des étapes d'une fenêtre cible : réunion des familles (voir les modules act_*)."""

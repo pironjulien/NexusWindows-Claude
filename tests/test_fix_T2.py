@@ -15,7 +15,7 @@ import time
 from collections import deque
 
 import pytest
-from test_contract import FakeAuto, node
+from test_contract import FakeAuto, as_auto, as_call, make_view, node
 from test_fix_b import JULIEN, TARGET, Desk
 
 from nexus_windows import actions, foreground, methods, server, snapshot, stop, uia
@@ -232,7 +232,7 @@ def test_typed_prefix_replace_and_append():
 
 def test_text_done_blank_rich_editor_counts_as_empty():
     """Constat 2 : un éditeur riche vide (<p><br></p>) vaut « \\n » ; son paragraphe est rempli par le texte."""
-    ex = actions.Executor(FakeAuto(), HWND, lambda rebuild: None, lambda: None)
+    ex = actions.Executor(as_auto(FakeAuto()), HWND, lambda rebuild: make_view(), lambda: None)
     two = "Bonjour Julien\nVoici le compte rendu"
     assert ex._text_done(two, "\n", two, replace=False)  # avant : 36 >= 1 + 36 faux
     assert ex._text_done("Bonjour Julien\n", "\n", "Bonjour Julien\n", replace=False)
@@ -446,7 +446,7 @@ def _chromium_executor(monkeypatch, sim: Chromium, name: str, extra: tuple = ())
     )
     elements = [snapshot.Element(i + 1, n, 0, HWND) for i, n in enumerate(nodes)]
     view = snapshot.View(HWND, info, [HWND], elements, snapshot.frame_for(info.rect), framework="Chromium")
-    ex = actions.Executor(EditorAuto(sim), HWND, lambda rebuild: view, lambda: None)
+    ex = actions.Executor(as_auto(EditorAuto(sim)), HWND, lambda rebuild: view, lambda: None)
     ex._pids = {7}
     monkeypatch.setattr(actions.w, "root", lambda h: h)
     monkeypatch.setattr(actions.foreground, "activate", lambda hwnd, timeout_s=0.4: sim.activate() or True)
@@ -503,13 +503,8 @@ def test_partial_typing_fails_the_step_and_stops_the_batch(monkeypatch):
     ex.auto.invoke = lambda element: auto_calls.append(element)
     monkeypatch.setattr(server.w, "IsWindow", lambda h: True)
     sim.unreadable_after = 6  # l'élément est recréé pendant la frappe
-
-    class Call:
-        def step(self, **_):
-            pass
-
     steps = [server.Step(do="type", target="Message", text=LONG6), server.Step(do="click", target="Envoyer")]
-    report, failed = server._run_steps(ex, steps, HWND, Call())
+    report, failed = server._run_steps(ex, steps, HWND, as_call())
     assert failed and report[0].startswith("1. ✗") and "partiellement tapé" in report[0], report
     assert "(étapes 2 à 2 non exécutées)" in report[1] and auto_calls == []
 

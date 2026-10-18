@@ -122,7 +122,8 @@ class ChromiumActions(ExecutorBase):
             return a is not b
         from PIL import ImageChops
 
-        diff = ImageChops.difference(a, b).point(lambda v: 255 if v > 24 else 0)
+        diff = ImageChops.difference(a, b)
+        diff = diff.point([255 if v > 24 else 0 for v in range(256)] * len(diff.getbands()))  # seuil par canal
         return sum(1 for v in diff.getdata() if v) >= 4
 
     def _effect(self, e: snapshot.Element, fn: Callable[[], Any], settle_s: float = 1.0) -> Callable[[], str]:
@@ -297,7 +298,9 @@ class ChromiumActions(ExecutorBase):
         window = e.window if e is not None and e.window in self.windows else self.hwnd
         return w.root(window) or self.hwnd
 
-    def _sim_activation(self, e: snapshot.Element | None = None):
+    def _sim_activation(
+        self, e: snapshot.Element | None = None
+    ) -> contextlib.AbstractContextManager[methods.SimulatedActivation]:
         return methods.simulated_activation(self._sim_top(e), self.windows)
 
     def _take_focus(self, e: snapshot.Element, timeout_s: float = 0.5) -> None:

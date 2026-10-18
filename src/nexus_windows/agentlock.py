@@ -99,9 +99,17 @@ def _release(handle: int) -> None:
         _CloseHandle(handle)
 
 
+# Imbrication comptée PAR FIL : un appel abandonné (délai dépassé) dont le fil tient encore le jeton ne le partage
+# pas avec le fil de l'appel suivant. Un autre fil du même processus ouvre son propre handle et attend le verrou de
+# fichier comme un autre agent (LockFileEx exclut deux handles, même dans un seul processus).
 _STATE = threading.Lock()
-_handle: int | None = None
-_depth = 0
+_local = threading.local()  # depth : profondeur d'imbrication du fil ; handle : son verrou réel
+_owners = 0  # fils de ce processus qui tiennent le verrou réel (0 ou 1 : il est exclusif)
+
+
+def _depth() -> int:
+    """Profondeur d'imbrication de hold() dans le fil courant (0 : il ne tient pas le jeton)."""
+    return getattr(_local, "depth", 0)
 
 
 def _read_holder() -> dict:
@@ -113,8 +121,8 @@ def _read_holder() -> dict:
 
 def other_holder() -> dict | None:
     """Autre agent qui tient le jeton en ce moment ({owner, pid, since, purpose}, champs possiblement vides), ou None
-    (libre, ou tenu par nous)."""
-    if _depth:
+    (libre, ou tenu par un fil de ce processus)."""
+    if _owners:
         return None
     try:
         handle = _open()
@@ -139,21 +147,17 @@ def describe(holder: dict) -> str:
 
 @contextmanager
 def hold(purpose: str, wait_s: float = WAIT_S, checkpoint: Callable[[], None] | None = None):
-    """Bloc où nous tenons le jeton. Réentrant dans le processus. Attend au plus wait_s qu'un autre agent le rende
-    (checkpoint appelé à chaque tour : arrêt d'urgence, appel abandonné), sinon Busy."""
-    global _handle, _depth
-    with _STATE:
-        if _depth:
-            _depth += 1
-            nested = True
-        else:
-            nested = False
-    if nested:
+    """Bloc où nous tenons le jeton. Réentrant dans le même fil ; un autre fil attend comme un autre agent. Attend au
+    plus wait_s que le détenteur le rende (checkpoint appelé à chaque tour : arrêt d'urgence, appel abandonné), sinon
+    Busy."""
+    global _owners
+    depth = _depth()
+    if depth:
+        _local.depth = depth + 1
         try:
             yield
         finally:
-            with _STATE:
-                _depth -= 1
+            _local.depth = max(_depth() - 1, 0)
         return
     handle = _open()
     try:
@@ -168,11 +172,15 @@ def hold(purpose: str, wait_s: float = WAIT_S, checkpoint: Callable[[], None] | 
         _CloseHandle(handle)
         raise
     _write(handle, json.dumps({"owner": OWNER, "pid": os.getpid(), "since": time.time(), "purpose": purpose}))
+    _local.depth, _local.handle = 1, handle
     with _STATE:
-        _handle, _depth = handle, 1
+        _owners += 1
     try:
         yield
     finally:
-        with _STATE:
-            _handle, _depth = None, 0
-        _release(handle)
+        _local.depth, _local.handle = 0, None
+        try:
+            _release(handle)
+        finally:  # après le vrai déverrouillage : other_holder() ne nous prend jamais pour un autre agent
+            with _STATE:
+                _owners = max(_owners - 1, 0)

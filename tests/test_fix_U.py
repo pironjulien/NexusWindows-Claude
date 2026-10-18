@@ -12,18 +12,18 @@ dans leurs surgissantes et les doublons d'un même contrôle.
 from __future__ import annotations
 
 import pytest
-from test_contract import HWND, FakeAuto, make_view, node
+from test_contract import HWND, FakeAuto, as_auto, make_view, node
 
-from nexus_windows import actions, foreground, launch, physical, policy, realinput, session, snapshot, steam
+from nexus_windows import actions, foreground, launch, physical, policy, realinput, session, snapshot, steam, uia
 from nexus_windows import win32 as w
 
 
-def chrome(role: str, name: str, **props) -> object:
+def chrome(role: str, name: str, **props) -> uia.Node:
     return node(role, name, framework="Chrome", **props)
 
 
 def chromium_executor(view, auto, allow_foreground: bool = False) -> actions.Executor:
-    ex = actions.Executor(auto, HWND, lambda rebuild: view, lambda *a: None, allow_foreground=allow_foreground)
+    ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: view, lambda *a: None, allow_foreground=allow_foreground)
     ex._pids = {7}
     ex._windows = {HWND}
     return ex
@@ -99,6 +99,7 @@ def test_invoke_and_default_action_are_never_both_played():
     auto = FakeAuto()
     ex = chromium_executor(make_view(button), auto)
     ex._watched = _ignored(still=True)
+    ex.confirm = True  # « Envoyer » : accord de Julien
     with pytest.raises(actions.Unconfirmed):
         ex.click("Envoyer")
     assert [c[0] for c in auto.calls] == ["invoke"]
@@ -225,7 +226,7 @@ def test_hold_gives_back_on_error(desk):
 # --- Steam : politique, lancement, DevTools --------------------------------------------------------------------
 @pytest.mark.parametrize("args", ["-cef-enable-debugging", "--devtools-port=9", "/cef-enable-debugging"])
 def test_model_can_never_open_steam_devtools_itself(args):
-    assert "exécute du code ou ouvre un canal" in (policy.switch_refusal(args, chromium=False, browser=False) or "")
+    assert "ouvre un canal" in (policy.switch_refusal(args, chromium=False, browser=False) or "")
 
 
 def test_view_switches_are_allowed():
@@ -324,7 +325,7 @@ def test_viewport_follows_the_targeted_document(monkeypatch):
 
 def test_page_by_document_title_is_requested(monkeypatch):
     asked = []
-    ex = actions.Executor(FakeAuto(), HWND, lambda r: make_view(), lambda title=None: asked.append(title))
+    ex = actions.Executor(as_auto(FakeAuto()), HWND, lambda r: make_view(), lambda title=None: asked.append(title))
     ex.document = chrome("Document", "Bienvenue sur Steam")
     ex._get_page()
     ex.document = None

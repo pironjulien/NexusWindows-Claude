@@ -711,7 +711,7 @@ def capture_view(view: View) -> tuple[Image.Image, list[str]]:
     return canvas, notes
 
 
-_FONT_CACHE: dict[int, ImageFont.ImageFont] = {}
+_FONT_CACHE: dict[int, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 
 
 def _font(size: int):
@@ -739,7 +739,10 @@ def render_image(view: View, physical: Image.Image, marks: str = "auto") -> Imag
     draw = ImageDraw.Draw(image, "RGBA")
     font = _font(11)
     for e in marked(view, marks):
-        x, y = view.frame.to_image(e.rect.left, e.rect.top)
+        rect = e.rect
+        if rect is None:  # marked() n'en rend pas ; relu ici pour le contrôle de types
+            continue
+        x, y = view.frame.to_image(rect.left, rect.top)
         label = str(e.id)
         box = draw.textbbox((0, 0), label, font=font)
         tw, th = box[2] - box[0] + 4, box[3] - box[1] + 3
