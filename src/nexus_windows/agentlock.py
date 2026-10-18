@@ -1,6 +1,6 @@
 """Jeton commun aux agents de Julien (NexusClaude, NexusAGY, NexusCodex) pour la souris et le premier plan.
 
-Protocole : `NexusHarness/shared/foreground-token.md`. Tenir le jeton = verrou exclusif LockFileEx sur l'octet
+Protocole commun : `foreground-token.md`. Tenir le jeton = verrou exclusif LockFileEx sur l'octet
 2^32 de `~/.nexus/foreground.lock` (local au poste, hors OneDrive). Windows le libère à la fermeture du handle,
 donc à la mort du processus : jamais de jeton périmé, aucune date à surveiller. Le détenteur écrit en tête du
 fichier qui il est (diagnostic seulement : seul le verrou fait foi).

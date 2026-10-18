@@ -15,7 +15,7 @@ Toute action en cours s'interrompt au prochain point de contrôle et toute nouve
 le réarme (jamais il ne le lève : un double appui par réflexe ne doit pas relancer l'outil). Aucun chemin de code ne
 le lève avant l'échéance. Limite : un serveur démarré APRÈS la suppression du fichier ne voit pas l'arrêt.
 
-Arrêt COMMUN aux agents de Julien (protocole NexusHarness/shared/emergency-stop.md) : chaque appui écrit aussi
+Arrêt COMMUN aux agents de Julien (protocole commun emergency-stop.md) : chaque appui écrit aussi
 ~/.nexus/stop, que NexusAGY et NexusCodex surveillent ; et ce serveur s'arrête quand l'un d'eux l'écrit (le même
 raccourci, détenu par l'harnais qui l'a obtenu). Le détenteur, quel qu'il soit, bat dans ~/.nexus/stop.owner.
 """
