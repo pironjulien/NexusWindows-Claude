@@ -197,14 +197,16 @@ class Supervisor:
             return
         changed = False
         result = message.get("result")
+        # Note et suivi retirés dans tous les cas : une réponse en erreur JSON-RPC ne doit rien laisser d'orphelin.
+        note = self.notes.pop(request_id, None)
+        listed = request_id in self.tools_requests
+        self.tools_requests.discard(request_id)
         if isinstance(result, dict):
             if self.init_request and request_id == self.init_request.get("id"):
                 result.setdefault("capabilities", {}).setdefault("tools", {})["listChanged"] = True
                 changed = True
-            if request_id in self.tools_requests:
-                self.tools_requests.discard(request_id)
+            if listed:
                 self.client_tools = _tools(result)
-            note = self.notes.pop(request_id, None)
             if note and isinstance(result.get("content"), list):
                 result["content"].insert(0, {"type": "text", "text": note})
                 changed = True

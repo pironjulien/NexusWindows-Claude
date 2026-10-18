@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
+## [Unreleased]
+
+### Fixed
+- Supervisor: the reload note and the `tools/list` tracking are released before the result is checked, so nothing is
+  left pending when the server child answers with a JSON-RPC error (review by Antigravity).
+
 ## [0.9.0] - 2026-10-18
 
 ### Added
