@@ -13,7 +13,8 @@ packaging) changes, plus the drop-down list fixes measured by the cross-agent be
 - MCP tool annotations on every tool (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
   `openWorldHint`).
 - Startup outside Windows (`offwindows.py`): in the Linux container MCP directories such as Glama use, the server
-  answers `initialize` and `tools/list`; every tool call answers that Windows is required. `comtypes` and
+  answers `initialize` and `tools/list`; every desktop tool answers that Windows is required (`logs` still reads
+  the local log). `comtypes` and
   `windows-capture` are installed on Windows only. `tests/test_startup.py` runs on Windows and on Linux (new CI job).
 - Shared guard-rail policy, one file for this server and NexusWindows for Antigravity (`garde-fous.json`, bundled in
   `src/nexus_windows/shared`): hard blocks (secure desktop, Windows credential prompts, password managers, now also

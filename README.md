@@ -190,7 +190,7 @@ src/nexus_windows/
   act_confirm.py   confirmation of irreversible gestures (confirm: true), whatever key or click triggers them
   shared/          the guard-rail policy shared with NexusWindows for Antigravity (garde-fous.json)
   packages.py      resumes Store apps that Windows suspended in the background
-  offwindows.py    outside Windows: the server starts and lists its tools, every call says Windows is required
+  offwindows.py    outside Windows: the server starts and lists its tools, every desktop tool says Windows is required
   stop.py          shared emergency stop
   freshness.py     detects a server whose code changed on disk
   worker.py        COM thread with a hard timeout
@@ -332,11 +332,11 @@ NexusWindows for Claude runs entirely on your PC. It has no account, no telemetr
 requests of its own (DevTools connections stay on `127.0.0.1`).
 
 - **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
-  only when a tool is called. Password managers, credential prompts and the secure desktop are never read.
+  only when a tool is called. Password managers, credential prompts and the secure desktop are never inspected
+  (`look`) nor driven (`act`); `windows` still lists their window titles, like the taskbar does.
 - **Where it goes**: tool results are returned to Claude Desktop or Claude Code, which send them to Anthropic under
   Anthropic's own privacy policy; this server sends nothing anywhere else.
-- **What it stores**, under `%USERPROFILE%\.claude
-exus-claude\` (or `NEXUS_WINDOWS_HOME`): a JSONL debug log kept
+- **What it stores**, under `%USERPROFILE%\.claude\nexus-claude\` (or `NEXUS_WINDOWS_HOME`): a JSONL debug log kept
   14 days (tools, techniques, durations, errors; typed text is replaced by its length), the routines you chose to
   remember, and throwaway browser profiles created by `devtools=true` (deleted afterwards). Images are written to the
   log only if you set `NEXUS_WINDOWS_DEBUG_IMAGES=1`. Under `%USERPROFILE%\.nexus\`: the shared foreground token and
