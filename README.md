@@ -12,6 +12,8 @@
 
 [![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
 
+![NexusWindows: an AI agent fills and submits a form in a window that stays behind another one, then reports five verified steps](docs/assets/demo.webp)
+
 **Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.

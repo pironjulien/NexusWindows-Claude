@@ -6,6 +6,9 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Added
+- README: animated demo recorded from the real tool (docs/assets/demo.webp).
+
 ### Changed
 - Repository renamed to `pironjulien/NexusWindows-Claude`; GitHub redirects the old address.
 
