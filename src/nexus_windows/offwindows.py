@@ -67,8 +67,14 @@ class _StubModule(types.ModuleType):
 def install() -> None:
     if sys.platform == "win32":
         return
-    if not hasattr(ctypes, "WINFUNCTYPE"):  # vrai type ctypes : il sert de champ de structures à l'import
+    # Vrais types ctypes : ils servent de champs de structures et de signatures à l'import.
+    if not hasattr(ctypes, "WINFUNCTYPE"):
         ctypes.WINFUNCTYPE = ctypes.CFUNCTYPE  # type: ignore[attr-defined]
+    if not hasattr(ctypes, "HRESULT"):
+        ctypes.HRESULT = ctypes.c_long  # type: ignore[attr-defined]
+    for name in ("WinError", "FormatError", "GetLastError", "get_last_error", "set_last_error"):
+        if not hasattr(ctypes, name):
+            setattr(ctypes, name, Stub)
     for name in ("WinDLL", "OleDLL"):
         if not hasattr(ctypes, name):
             setattr(ctypes, name, Stub)
