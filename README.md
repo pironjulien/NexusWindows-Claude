@@ -2,15 +2,15 @@
 
 <!-- mcp-name: io.github.pironjulien/nexus-windows -->
 
-[![Release](https://img.shields.io/github/v/release/pironjulien/claude-windows-computer-use)](https://github.com/pironjulien/claude-windows-computer-use/releases)
+[![Release](https://img.shields.io/github/v/release/pironjulien/NexusWindows-Claude)](https://github.com/pironjulien/NexusWindows-Claude/releases)
 [![PyPI](https://img.shields.io/pypi/v/nexus-windows)](https://pypi.org/project/nexus-windows/)
-[![Tests](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/LICENSE)
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/pyproject.toml)
+[![Tests](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/NexusWindows-Claude/blob/main/LICENSE)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://github.com/pironjulien/NexusWindows-Claude/blob/main/pyproject.toml)
 [![MCP](https://img.shields.io/badge/MCP-server-7ee2a8)](https://modelcontextprotocol.io)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)](#installation)
 
-[![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](https://raw.githubusercontent.com/pironjulien/claude-windows-computer-use/main/docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
+[![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
 
 **Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
@@ -19,11 +19,11 @@ foreground window.
 Version 0.9.2 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
-([Claude](https://github.com/pironjulien/claude-windows-computer-use) ·
-[Codex](https://github.com/pironjulien/codex-windows-computer-use) ·
-[Antigravity](https://github.com/pironjulien/antigravity-windows-computer-use)),
-[NexusBrowser](https://julienpiron.fr/nexusbrowser/) ([repo](https://github.com/pironjulien/chrome-computer-use)),
-[NexusAndroid](https://julienpiron.fr/nexusandroid/) ([repo](https://github.com/pironjulien/android-computer-use)).
+([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
+[Codex](https://github.com/pironjulien/NexusWindows-Codex) ·
+[Antigravity](https://github.com/pironjulien/NexusWindows-Antigravity)),
+[NexusBrowser](https://julienpiron.fr/nexusbrowser/) ([repo](https://github.com/pironjulien/NexusBrowser)),
+[NexusAndroid](https://julienpiron.fr/nexusandroid/) ([repo](https://github.com/pironjulien/NexusAndroid)).
 Project page: [julienpiron.fr/nexuswindows](https://julienpiron.fr/nexuswindows/).
 
 ## Why
@@ -129,7 +129,7 @@ cursor and foreground are handed back at the end; any physical input from the us
 ## Working alongside other agents
 
 The server cooperates with other desktop agents on the same PC (it is used next to a Codex layer,
-[NexusWindows for Codex](https://github.com/pironjulien/codex-windows-computer-use), and an Antigravity layer)
+[NexusWindows for Codex](https://github.com/pironjulien/NexusWindows-Codex), and an Antigravity layer)
 through two small file-based protocols. Any agent can implement them.
 
 **Foreground token** (`%USERPROFILE%\.nexus\foreground.lock`): taken only while really holding the mouse or the
@@ -230,8 +230,8 @@ For Claude Desktop, in `claude_desktop_config.json`:
 From a clone (development):
 
 ```powershell
-git clone https://github.com/pironjulien/claude-windows-computer-use.git
-cd claude-windows-computer-use
+git clone https://github.com/pironjulien/NexusWindows-Claude.git
+cd NexusWindows-Claude
 $env:UV_PROJECT_ENVIRONMENT = "$env:LOCALAPPDATA\claude-windows-computer-use\venv"   # optional: venv outside the clone
 uv sync --frozen
 ```
@@ -251,7 +251,7 @@ For Claude Desktop from a clone:
   "mcpServers": {
     "nexus-windows": {
       "command": "uv",
-      "args": ["run", "--project", "C:/path/to/claude-windows-computer-use", "--frozen", "python", "-m", "nexus_windows"],
+      "args": ["run", "--project", "C:/path/to/NexusWindows-Claude", "--frozen", "python", "-m", "nexus_windows"],
       "env": { "PYTHONUTF8": "1" }
     }
   }
@@ -278,7 +278,7 @@ Later: `act(window="Settings form", routine="save-form")`.
 
 ## Measurements
 
-All figures come from [`bench/RESULTS.md`](https://github.com/pironjulien/claude-windows-computer-use/blob/main/bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
+All figures come from [`bench/RESULTS.md`](https://github.com/pironjulien/NexusWindows-Claude/blob/main/bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
 PC, October 2026; the notes in `RESULTS.md` are in French).
 
 | What | Result |
@@ -304,7 +304,7 @@ list, validate. Proof is the result label read back in the application. Physical
 | | Morning | After fixes | Measured |
 |---|---|---|---|
 | This server (0.7.0 + drop-down fixes) | 17/20 | **19/20** | open list read back on both families; `select` in an open WinForms list 113 ms instead of 22 s; application received `Formule=Bravo;Envois=1`; 0 foreground take over 1,371 and 773 samples (20 ms), 0 cursor move, 0 physical input |
-| [NexusWindows for Codex](https://github.com/pironjulien/codex-windows-computer-use) 1.4.0 | 16/20 | **19/20** | every step verified on both families; observe + batch 1.2 to 1.4 s |
+| [NexusWindows for Codex](https://github.com/pironjulien/NexusWindows-Codex) 1.4.0 | 16/20 | **19/20** | every step verified on both families; observe + batch 1.2 to 1.4 s |
 | Antigravity layer | 18/20 | **19/20** | open WinForms list read and chosen; batch status is the worst step |
 
 What still keeps this server from 20: clicking "Validate" stays `~` without an `expect` (the application did receive
@@ -382,4 +382,4 @@ uv run python bench/bench.py           # technique benchmark (when nobody is usi
 
 ## Licence
 
-MIT, see [LICENSE](https://github.com/pironjulien/claude-windows-computer-use/blob/main/LICENSE). Copyright (c) 2026 Julien Piron.
+MIT, see [LICENSE](https://github.com/pironjulien/NexusWindows-Claude/blob/main/LICENSE). Copyright (c) 2026 Julien Piron.

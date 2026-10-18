@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
+## [Unreleased]
+
+### Changed
+- Repository renamed to `pironjulien/NexusWindows-Claude`; GitHub redirects the old address.
+
 ## [0.9.2] - 2026-10-18 — No more freeze after a reload
 
 ### Fixed

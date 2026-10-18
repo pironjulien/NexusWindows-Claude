@@ -25,9 +25,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://julienpiron.fr/nexuswindows/claude/"
-Repository = "https://github.com/pironjulien/claude-windows-computer-use"
-Changelog = "https://github.com/pironjulien/claude-windows-computer-use/blob/main/CHANGELOG.md"
-Issues = "https://github.com/pironjulien/claude-windows-computer-use/issues"
+Repository = "https://github.com/pironjulien/NexusWindows-Claude"
+Changelog = "https://github.com/pironjulien/NexusWindows-Claude/blob/main/CHANGELOG.md"
+Issues = "https://github.com/pironjulien/NexusWindows-Claude/issues"
 
 [project.scripts]
 nexus-windows = "nexus_windows.reloader:main"
