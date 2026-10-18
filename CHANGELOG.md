@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
+## [Unreleased]
+
+### Changed
+- Listed in the official MCP registry (`io.github.pironjulien/nexus-windows`); README installs from PyPI with
+  `uvx --python 3.14 nexus-windows`.
+
 ## [0.9.1] - 2026-10-18
 
 First release on PyPI (`nexus-windows`).

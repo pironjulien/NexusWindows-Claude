@@ -3,6 +3,7 @@
 <!-- mcp-name: io.github.pironjulien/nexus-windows -->
 
 [![Release](https://img.shields.io/github/v/release/pironjulien/claude-windows-computer-use)](https://github.com/pironjulien/claude-windows-computer-use/releases)
+[![PyPI](https://img.shields.io/pypi/v/nexus-windows)](https://pypi.org/project/nexus-windows/)
 [![Tests](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/claude-windows-computer-use/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/LICENSE)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://github.com/pironjulien/claude-windows-computer-use/blob/main/pyproject.toml)
@@ -206,6 +207,28 @@ tests/   unit tests (pytest) and end-to-end tests (pytest -m live)
 
 Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
 
+From [PyPI](https://pypi.org/project/nexus-windows/), with Claude Code (no clone needed):
+
+```powershell
+claude mcp add --scope user --transport stdio -e PYTHONUTF8=1 nexus-windows -- uvx --python 3.14 nexus-windows
+```
+
+For Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "nexus-windows": {
+      "command": "uvx",
+      "args": ["--python", "3.14", "nexus-windows"],
+      "env": { "PYTHONUTF8": "1" }
+    }
+  }
+}
+```
+
+From a clone (development):
+
 ```powershell
 git clone https://github.com/pironjulien/claude-windows-computer-use.git
 cd claude-windows-computer-use
@@ -221,7 +244,7 @@ claude mcp add --scope user --transport stdio `
   nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
 ```
 
-For Claude Desktop, add the same command to `claude_desktop_config.json`:
+For Claude Desktop from a clone:
 
 ```json
 {
