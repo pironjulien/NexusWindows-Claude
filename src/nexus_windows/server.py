@@ -1039,6 +1039,7 @@ def _status_lines() -> list[str]:
     stale = freshness.stale_reason()
     return [
         f"Serveur nexus-windows {__version__}, pid {os.getpid()} : {f'ATTENTION, {stale}' if stale else 'à jour'}",
+        f"Rechargement automatique : {freshness.supervisor_status()}",
         f"Arrêt d'urgence {stop.HOTKEY_LABEL} : {stop.status()}",
         f"Entrées de Julien : {physical.summary()}",
     ]

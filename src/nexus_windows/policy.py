@@ -22,14 +22,9 @@ import sys
 from pathlib import Path
 
 from . import win32 as w
+from .codeprint import SHARED_DIR  # politique vivante (NexusHarness/shared) ou embarquée hors du dépôt
 
 AGENT = "claude"
-# Source du paquet (installé en mode éditable) : NexusHarness/NexusClaude/nexus-windows/src/nexus_windows/policy.py,
-# la politique vivante est NexusHarness/shared. Copie publique et paquet PyPI : pas de dossier commun voisin, la même
-# politique est embarquée dans le paquet (nexus_windows/shared, copiée par l'export public).
-_LIVE_SHARED = Path(os.environ.get("NEXUS_SHARED_DIR") or Path(__file__).resolve().parents[4] / "shared")
-_BUNDLED_SHARED = Path(__file__).resolve().parent / "shared"
-SHARED_DIR = _LIVE_SHARED if (_LIVE_SHARED / "garde_fous.py").is_file() else _BUNDLED_SHARED
 if str(SHARED_DIR) not in sys.path:
     sys.path.insert(0, str(SHARED_DIR))
 import garde_fous  # noqa: E402  (module commun, hors du paquet)

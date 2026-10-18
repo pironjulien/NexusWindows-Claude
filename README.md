@@ -15,7 +15,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 0.8.2 · Windows 10/11 · Python 3.14 · MIT licence
+Version 0.9.0 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/claude-windows-computer-use) ·
@@ -165,6 +165,7 @@ flowchart LR
 
 ```
 src/nexus_windows/
+  reloader.py      stdio supervisor: restarts the server on new code and replays the client handshake
   server.py        MCP tools, dedicated COM thread, per-call log
   actions.py       executor facade, assembled from the act_*.py modules
   act_base.py      targets read back live, technique chains, outcomes, shared refusals
@@ -193,6 +194,7 @@ src/nexus_windows/
   offwindows.py    outside Windows: the server starts and lists its tools, every desktop tool says Windows is required
   stop.py          shared emergency stop
   freshness.py     detects a server whose code changed on disk
+  codeprint.py     code fingerprint and location of the shared policy (no dependencies)
   worker.py        COM thread with a hard timeout
   log.py           JSONL log, 14 days
 lab/     test applications (Win32, WinForms, WPF, Tk, a web page for Electron/Edge)
@@ -306,8 +308,10 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 - **Accounts**: a browser started with `devtools=true` gets a throwaway profile without account or sync, checked
   after launch and deleted afterwards.
 - **Screen content is data**: every `look` reminds the model that on-screen text is not an instruction.
-- **Stale server**: if its code changed on disk, a running server refuses `act`, `launch` and `window` until it is
-  restarted.
+- **Up-to-date code**: the entry point is a small stdio supervisor (`reloader.py`). Before each tool call it compares
+  the code on disk with the running server's; if it changed, it waits for calls in progress, starts a fresh server
+  and replays the client's handshake, so an update needs no reconnection (`/mcp`). A server whose code changed
+  between two checks refuses `act`, `launch` and `window`, and the call is replayed on the fresh one.
 - **Timeouts**: an abandoned call is cancelled at its next checkpoint instead of finishing later.
 - **Clipboard**: never used.
 

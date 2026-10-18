@@ -9,39 +9,31 @@ modification sans changement de numéro passerait inaperçue.
 
 from __future__ import annotations
 
-import hashlib
-import re
+import os
 import threading
 import time
-from pathlib import Path
 
-from . import __version__, policy
+from . import __version__
+from .codeprint import PACKAGE, SHARED_MODULE, disk_version, fingerprint, supervisor_fingerprint
 
-PACKAGE = Path(__file__).resolve().parent
-# Module de la politique commune (shared/garde_fous.py) : chargé une fois, comme le paquet. Ses DONNÉES
-# (garde-fous.json) sont relues à chaque changement, sans redémarrage.
-SHARED_MODULE = policy.SHARED_DIR / "garde_fous.py"
+__all__ = ["PACKAGE", "SHARED_MODULE", "disk_version", "fingerprint", "stale_reason"]
 CHECK_EVERY_S = 30.0
 STALE = "serveur nexus-windows dépassé : reconnecter (/mcp) ou nouvelle conversation"
+# Lancé par le superviseur (reloader) : il relance le serveur sur le nouveau code avant l'appel suivant ; ce refus ne
+# sert plus qu'au cas rare d'un code changé entre sa vérification et celle du serveur (l'appel est alors rejoué).
+SUPERVISED = os.environ.get("NEXUS_WINDOWS_SUPERVISOR") is not None
 
 
-def fingerprint(root: Path = PACKAGE) -> str:
-    """Empreinte des sources Python du paquet (noms et contenus) ; « » si illisibles."""
-    digest = hashlib.sha256()
-    try:
-        for path in [*sorted(root.glob("*.py")), SHARED_MODULE]:
-            digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
-    except OSError:
-        return ""
-    return digest.hexdigest()
-
-
-def disk_version(root: Path = PACKAGE) -> str:
-    try:
-        match = re.search(r'__version__\s*=\s*"([^"]+)"', (root / "__init__.py").read_text(encoding="utf-8"))
-    except OSError:
-        return "?"
-    return match.group(1) if match else "?"
+def supervisor_status() -> str:
+    """Ligne de l'outil logs : superviseur présent ou non, et à jour (il ne se recharge pas lui-même)."""
+    if not SUPERVISED:
+        return "absent (serveur lancé sans superviseur : un changement de code demandera /mcp)"
+    pid = os.environ.get("NEXUS_WINDOWS_SUPERVISOR", "?")
+    loaded = os.environ.get("NEXUS_WINDOWS_SUPERVISOR_CODE", "")
+    current = supervisor_fingerprint()
+    if loaded and current and loaded != current:
+        return f"actif (superviseur pid {pid}, son propre code a changé : appliqué à la prochaine reconnexion, sans urgence)"
+    return f"actif (superviseur pid {pid}) : le serveur reprend tout seul son nouveau code avant l'appel suivant"
 
 
 LOADED = fingerprint()  # au chargement du paquet, en même temps que ses modules

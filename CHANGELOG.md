@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
+## [0.9.0] - 2026-10-18
+
+### Added
+- Automatic reload on new code, without `/mcp`: `python -m nexus_windows` and the `nexus-windows` script now start a
+  stdio supervisor (`reloader.py`, standard library only) that relays the client's MCP link to a server child
+  process. Before each tool call it compares the fingerprint of the code on disk with the running server's; when it
+  changed, it waits for calls in progress, lets the disk settle, starts a fresh server and replays the client's
+  handshake. The reply starts with a note ("nexus-windows rechargé …"; `[N]` numbers are forgotten). A fresh process
+  rather than `importlib.reload`, so guard rails, emergency stop, foreground token and logs restart consistent.
+- A tool list changed by the new code sends `notifications/tools/list_changed` (the `listChanged` capability is
+  announced).
+- A "stale server" refusal between the two checks is replayed on a fresh server (nothing had been done). A server
+  that stops during a call: outcome UNKNOWN, restarted at the next call. Broken new code: a clear error with the end
+  of its error output, nothing done, the next call retries.
+- `logs`: an "automatic reload" line. `tests/test_reloader.py` (9 cases with a simulated child server).
+
+### Changed
+- `codeprint.py`: code fingerprint and shared-policy folder, without dependencies (used by the supervisor,
+  `freshness` and `policy`).
+
 ## [0.8.2] - 2026-10-18
 
 First public release since 0.7.0, prepared for PyPI and the official MCP registry (not on PyPI yet). It gathers the private 0.8.0 (shared guard-rail policy), 0.8.1 (suspended Store apps) and 0.8.2 (directories and

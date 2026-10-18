@@ -1,3 +1,3 @@
-from nexus_windows.server import main
+from nexus_windows.reloader import main
 
 main()

@@ -611,6 +611,17 @@ def test_stale_reason_rechecks_disk_at_most_every_30_s(monkeypatch):
     assert freshness.stale_reason() == ""
 
 
+def test_supervisor_status_in_logs(monkeypatch):
+    monkeypatch.setattr(freshness, "SUPERVISED", False)
+    assert freshness.supervisor_status().startswith("absent")
+    monkeypatch.setattr(freshness, "SUPERVISED", True)
+    monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR", "42")
+    monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR_CODE", freshness.supervisor_fingerprint())
+    assert freshness.supervisor_status().startswith("actif (superviseur pid 42) : le serveur reprend tout seul")
+    monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR_CODE", "ancien")
+    assert "prochaine reconnexion" in freshness.supervisor_status()
+
+
 def test_loaded_fingerprint_matches_disk():
     assert freshness.LOADED and freshness.fingerprint() == freshness.LOADED
 
@@ -652,7 +663,8 @@ def test_logs_show_server_state(tmp_path, monkeypatch):
     monkeypatch.setattr(freshness, "stale_reason", lambda: "")
     out = asyncio.run(server.logs(5))
     lines = out.splitlines()
-    assert "à jour" in lines[0] and lines[1].startswith("Arrêt d'urgence") and lines[2].startswith("Entrées de Julien")
+    assert "à jour" in lines[0] and lines[1].startswith("Rechargement automatique : ")
+    assert lines[2].startswith("Arrêt d'urgence") and lines[3].startswith("Entrées de Julien")
     assert lines[-1] == "Journal vide."
     monkeypatch.setattr(physical, "_ok", True)
     monkeypatch.setattr(physical, "counts", {"physical": 3, "injected": 9})
