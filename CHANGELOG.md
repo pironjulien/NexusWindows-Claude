@@ -26,6 +26,11 @@ Drop-down list fixes measured by the cross-agent bench of 2026-10-16 (17/20 in t
 - `tests/test_fix_W.py`: 18 cases with a simulated ComboBox that cancels on close like Windows.
 - README: drop-down lists, cross-agent bench results.
 
+### Changed
+- README renamed to NexusWindows for Claude, the Claude edition of the NexusWindows family: badges, banner, links
+  to the other Nexus projects and to the project page (julienpiron.fr/nexuswindows). The Why section now states that
+  Anthropic's own computer use is not available on Team and Enterprise plans, while this local MCP server is.
+
 ## [0.7.0] - 2026-10-16
 
 ### Added

@@ -1,11 +1,33 @@
-# claude-windows-computer-use
+# NexusWindows for Claude
 
-An MCP server (`nexus-windows`) that lets Claude see and operate Windows desktop applications **in the background**:
-the user keeps their mouse, keyboard and foreground window while Claude reads a window and acts on it.
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](pyproject.toml)
+[![MCP](https://img.shields.io/badge/MCP-server-7ee2a8)](https://modelcontextprotocol.io)
+[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)](#installation)
+
+[![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
+
+**Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
+and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
+foreground window.
 
 Version 0.7.0 · Windows 10/11 · Python 3.14 · MIT licence
 
+Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
+([Claude](https://github.com/pironjulien/claude-windows-computer-use) ·
+[Codex](https://github.com/pironjulien/codex-windows-computer-use) ·
+[Antigravity](https://github.com/pironjulien/antigravity-windows-computer-use)),
+[NexusBrowser](https://julienpiron.fr/nexusbrowser/) ([repo](https://github.com/pironjulien/chrome-computer-use)),
+[NexusAndroid](https://julienpiron.fr/nexusandroid/) ([repo](https://github.com/pironjulien/android-computer-use)).
+Project page: [julienpiron.fr/nexuswindows](https://julienpiron.fr/nexuswindows/).
+
 ## Why
+
+Anthropic's own computer use (in Cowork and Claude Code inside Claude Desktop) is a beta for Pro and Max
+subscribers: "Team and Enterprise plans don't have access to computer use at this time"
+([Claude Help Center](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork)).
+NexusWindows for Claude is a local MCP server, so it works with Claude Desktop and Claude Code on any plan that
+allows local MCP servers, Team and Enterprise included.
 
 Screenshot-and-click computer use moves the real cursor and brings windows to the front, so the person at the PC has
 to stop working while the agent acts. Most Windows applications can be driven without that: native controls accept
@@ -102,7 +124,7 @@ cursor and foreground are handed back at the end; any physical input from the us
 ## Working alongside other agents
 
 The server cooperates with other desktop agents on the same PC (it is used next to a Codex layer,
-[codex-windows-computer-use](https://github.com/pironjulien/codex-windows-computer-use), and an Antigravity layer)
+[NexusWindows for Codex](https://github.com/pironjulien/codex-windows-computer-use), and an Antigravity layer)
 through two small file-based protocols. Any agent can implement them.
 
 **Foreground token** (`%USERPROFILE%\.nexus\foreground.lock`): taken only while really holding the mouse or the
@@ -249,7 +271,7 @@ list, validate. Proof is the result label read back in the application. Physical
 | | Morning | After fixes | Measured |
 |---|---|---|---|
 | This server (0.7.0 + drop-down fixes) | 17/20 | **19/20** | open list read back on both families; `select` in an open WinForms list 113 ms instead of 22 s; application received `Formule=Bravo;Envois=1`; 0 foreground take over 1,371 and 773 samples (20 ms), 0 cursor move, 0 physical input |
-| [codex-windows-computer-use](https://github.com/pironjulien/codex-windows-computer-use) 1.4.0 | 16/20 | **19/20** | every step verified on both families; observe + batch 1.2 to 1.4 s |
+| [NexusWindows for Codex](https://github.com/pironjulien/codex-windows-computer-use) 1.4.0 | 16/20 | **19/20** | every step verified on both families; observe + batch 1.2 to 1.4 s |
 | Antigravity layer | 18/20 | **19/20** | open WinForms list read and chosen; batch status is the worst step |
 
 What still keeps this server from 20: clicking "Validate" stays `~` without an `expect` (the application did receive
