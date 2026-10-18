@@ -1,7 +1,8 @@
 name: Publish to PyPI
 
 # Trusted Publishing (OIDC): no token stored in the repository. PyPI side, once: a trusted publisher for this
-# repository, workflow publish.yml, environment pypi. A published GitHub release vX.Y.Z then uploads that version.
+# repository, workflow publish.yml, environment pypi; then set the repository variable PYPI_PUBLISH to true. From then
+# on, a published GitHub release vX.Y.Z uploads that version (before that, releases only build and check).
 on:
   release:
     types: [published]
@@ -38,6 +39,7 @@ jobs:
 
   publish:
     needs: build
+    if: vars.PYPI_PUBLISH == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi

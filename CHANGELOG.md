@@ -4,10 +4,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow the server's own version (`nexus_windows.__version__`).
 
-## [Unreleased]
+## [0.8.2] - 2026-10-18
 
-Version 0.8.2 (`nexus_windows.__version__`), prepared for the first release on PyPI and the official MCP registry.
-It gathers the private 0.8.0 (shared guard-rail policy), 0.8.1 (suspended Store apps) and 0.8.2 (directories and
+First public release since 0.7.0, prepared for PyPI and the official MCP registry (not on PyPI yet). It gathers the private 0.8.0 (shared guard-rail policy), 0.8.1 (suspended Store apps) and 0.8.2 (directories and
 packaging) changes, plus the drop-down list fixes measured by the cross-agent bench of 2026-10-16.
 
 ### Added
