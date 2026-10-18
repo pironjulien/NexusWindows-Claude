@@ -65,9 +65,12 @@
       "^format(er|ez)$",
       "format(er|ez) (le |ce |la |cette |un |une )?(disque|lecteur|volume|partition|cle|carte)",
       "format (the |this )?(disk|drive|partition|volume)",
+      "format(er|ez) (le |la |l |ce |cette |votre )?(telephone|appareil|tablette)",
+      "format (the |this |your )?(phone|device|tablet)",
       "reinitialis(er|ez)(?! (les |la |le )?(filtres?|zoom|affichage|vue|recherche|tri|mise en page))",
       "factory reset",
       "reset (this pc|(the )?app|to factory( settings)?|all settings)",
+      "reset (this |the |your )?(pc|phone|device|tablet)",
       "resili(er|ez)",
       "(cancel|terminate) (my |your |the )?(subscription|contract|plan|membership)",
       "(supprim(er|ez)|ferm(er|ez)) (mon |votre |le )compte",
@@ -88,6 +91,12 @@
         "titre": "format(er|age|ting)?",
         "verbes": "demarrer|start|ok|confirm(er|ez)?|valid(er|ez)",
         "quoi": "formatage"
+      },
+      {
+        "_": "« Tout effacer » est libre ailleurs (calculatrice, filtres, notifications) : confirmé seulement sur un écran de réinitialisation de l'appareil (audit NexusAndroid du 18/10).",
+        "titre": "reinitialis(er|ez|ation)|factory reset|donnees d usine|reset (this |the |your )?(pc|phone|device|tablet)|(effacer|supprimer) toutes les donnees|erase all data",
+        "verbes": "tout effacer|effacer tout|tout supprimer|erase everything|delete all|ok|confirm(er|ez)?|valid(er|ez)",
+        "quoi": "réinitialisation de l'appareil"
       }
     ],
     "roles_non_actifs": [
