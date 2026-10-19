@@ -69,9 +69,13 @@ def _validate(data: Any, target: Path) -> None:
         raise GardeFousError(f"politique des garde-fous invalide ({target}) : {error!r}") from error
 
 
+CURRENCIES = str.maketrans({"€": " eur ", "$": " usd ", "£": " gbp ", "¥": " jpy "})
+
+
 def plain(text: Any) -> str:
-    """Texte comparable : sans accents ni casse, apostrophes et ponctuation ramenées à des espaces."""
-    decomposed = unicodedata.normalize("NFKD", str(text or ""))
+    """Texte comparable : sans accents ni casse, apostrophes et ponctuation ramenées à des espaces ; symboles de devise
+    écrits en toutes lettres (« 4,99 € » → « 4 99 eur ») pour que les motifs reconnaissent un bouton prix."""
+    decomposed = unicodedata.normalize("NFKD", str(text or "")).translate(CURRENCIES)
     bare = "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
     return " ".join(re.sub(r"[^0-9a-z]+", " ", bare).split())
 

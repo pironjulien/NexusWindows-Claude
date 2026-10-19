@@ -6,6 +6,10 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Added
+- `.github/workflows/registry.yml`: after each release reaches PyPI, `server.json` is published to the official MCP
+  registry by GitHub OIDC (no token, no manual login), as NexusAndroid does.
+
 ## [0.9.3] - 2026-10-19 — Neutral texts for any client
 
 ### Changed
