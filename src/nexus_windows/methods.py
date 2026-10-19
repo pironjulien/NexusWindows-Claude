@@ -71,8 +71,8 @@ def post(target: int, msg: int, wparam: int, lparam: int) -> None:
     if not w.PostMessageW(target, msg, wparam, lparam):
         error = ctypes.get_last_error()
         if error == ERROR_ACCESS_DENIED:
-            raise MethodError("Windows bloque les messages vers cette application (élevée, UIPI).")
-        raise MethodError(f"PostMessage refusé (erreur {error}).")
+            raise MethodError("Windows blocks messages to this application (elevated, UIPI).")
+        raise MethodError(f"PostMessage refused (error {error}).")
 
 
 def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1) -> int:
@@ -100,7 +100,7 @@ def post_wheel(top: int, x: int, y: int, delta: int, horizontal: bool = False) -
 def _notify_parent(control: int, code: int) -> None:
     parent = w.handle(w.GetParent(control))
     if not parent:
-        raise MethodError("Contrôle sans parent.")
+        raise MethodError("Control without a parent.")
     ident = w.GetDlgCtrlID(control) & 0xFFFF
     post(parent, w.WM_COMMAND, (code << 16) | ident, control)
 
@@ -111,7 +111,7 @@ def _send_notify(control: int, code: int) -> None:
     répond pas en 2 s : rien d'autre, la relecture décide."""
     parent = w.handle(w.GetParent(control))
     if not parent:
-        raise MethodError("Contrôle sans parent.")
+        raise MethodError("Control without a parent.")
     ident = w.GetDlgCtrlID(control) & 0xFFFF
     w.send_message(parent, w.WM_COMMAND, (code << 16) | ident, control, timeout_ms=2000)
 
@@ -133,14 +133,14 @@ def _radio_group(control: int) -> list[int]:
 def win32_button_click(control: int) -> str:
     """Bouton Win32/WinForms : notifie le parent comme un vrai clic (BN_CLICKED), coche gérée pour les cases auto."""
     if not _is_class(control, BUTTON_CLASSES):
-        raise MethodError("Pas un bouton Win32.")
+        raise MethodError("Not a Win32 button.")
     if not w.IsWindowEnabled(control):
-        raise MethodError("Bouton désactivé.")
+        raise MethodError("Button disabled.")
     kind = w.style(control) & BS_TYPEMASK
     if kind in (BS_AUTOCHECKBOX, BS_AUTO3STATE):
         state = w.send_message(control, w.BM_GETCHECK)
         if state is None:
-            raise MethodError("Bouton figé.")
+            raise MethodError("Button not responding.")
         nxt = (state + 1) % (3 if kind == BS_AUTO3STATE else 2)
         w.send_message(control, w.BM_SETCHECK, nxt)
     elif kind == BS_AUTORADIOBUTTON:
@@ -155,14 +155,14 @@ def win32_tab_select(control: int, index: int) -> str:
     """Onglet Win32/WinForms : TCM_SETCURFOCUS change l'onglet choisi ET notifie le parent (TCN_SELCHANGING/CHANGE),
     comme un clic, sans souris. (UIA Legacy DoDefaultAction y ferait un VRAI clic : curseur de l'utilisateur déplacé.)"""
     if not _is_class(control, TAB_CLASSES):
-        raise MethodError("Pas un contrôle d'onglets Win32.")
+        raise MethodError("Not a Win32 tab control.")
     count = w.send_message(control, TCM_GETITEMCOUNT)
     if count is None or not 0 <= index < count:
-        raise MethodError("Onglet introuvable dans le contrôle.")
+        raise MethodError("Tab not found in the control.")
     w.send_message(control, TCM_SETCURFOCUS, index)
     if w.send_message(control, TCM_GETCURSEL) != index:
-        raise MethodError("L'onglet n'a pas été choisi (relu).")
-    return "relu ✓"
+        raise MethodError("The tab was not selected (read back).")
+    return "read back ✓"
 
 
 def _item_texts(control: int, count_msg: int, len_msg: int, text_msg: int) -> list[str]:
@@ -190,18 +190,18 @@ def match_option(items: list[str], wanted: str) -> tuple[int, bool]:
     if len(exact) == 1:
         return exact[0], False
     if exact:
-        raise AmbiguousOption(f"« {wanted} » apparaît {len(exact)} fois dans la liste : impossible de savoir laquelle.")
+        raise AmbiguousOption(f'"{wanted}" appears {len(exact)} times in the list: cannot tell which one.')
     partial = [i for i, item in enumerate(items) if low and low in item.lower()]
     if len(partial) == 1:
         return partial[0], True
     if partial:
-        names = ", ".join(f"« {items[i]} »" for i in partial[:8])
-        raise AmbiguousOption(f"« {wanted} » est ambigu : {names}. Préciser le libellé exact.")
-    raise MethodError(f"Option « {wanted} » absente ({', '.join(items[:20])}).")
+        names = ", ".join(f'"{items[i]}"' for i in partial[:8])
+        raise AmbiguousOption(f'"{wanted}" is ambiguous: {names}. Give the exact label.')
+    raise MethodError(f'Option "{wanted}" not found ({", ".join(items[:20])}).')
 
 
 def _partial_note(items: list[str], index: int, partial: bool) -> str:
-    return f"correspondance partielle « {items[index]} »" if partial else ""
+    return f'partial match "{items[index]}"' if partial else ""
 
 
 LBS_MULTIPLESEL, LBS_EXTENDEDSEL = 0x0008, 0x0800
@@ -210,7 +210,7 @@ LBS_MULTIPLESEL, LBS_EXTENDEDSEL = 0x0008, 0x0800
 def win32_combo_select(control: int, option: str) -> str:
     """Option d'une liste déroulante Win32/WinForms par son libellé (lu par CB_GETLBTEXT), liste ouverte ou non."""
     if not _is_class(control, COMBO_CLASSES):
-        raise MethodError("Pas une liste déroulante Win32.")
+        raise MethodError("Not a Win32 combo box.")
     items = _item_texts(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT)
     index, partial = match_option(items, option)
     detail = _combo_commit(control, index, items[index])
@@ -219,31 +219,31 @@ def win32_combo_select(control: int, option: str) -> str:
 
 def win32_listbox_select(control: int, option: str) -> str:
     if not _is_class(control, LISTBOX_CLASSES):
-        raise MethodError("Pas une liste Win32.")
+        raise MethodError("Not a Win32 list box.")
     if w.style(control) & (LBS_MULTIPLESEL | LBS_EXTENDEDSEL):
-        raise MethodError("Liste à sélection multiple : LB_SETCURSEL ne s'y applique pas.")
+        raise MethodError("Multiple-selection list: LB_SETCURSEL does not apply.")
     items = _item_texts(control, LB_GETCOUNT, LB_GETTEXTLEN, LB_GETTEXT)
     index, partial = match_option(items, option)
     w.send_message(control, LB_SETCURSEL, index)
     if w.send_message(control, LB_GETCURSEL) != index:
-        raise MethodError("La liste n'a pas pris la sélection.")
+        raise MethodError("The list did not take the selection.")
     _notify_parent(control, LBN_SELCHANGE)
-    return " ; ".join(filter(None, ["relu ✓", _partial_note(items, index, partial)]))
+    return " ; ".join(filter(None, ["read back ✓", _partial_note(items, index, partial)]))
 
 
 def win32_edit_replace(control: int, text: str, append: bool = False) -> str:
     """Champ Edit/RichEdit : remplace (ou complète) le texte comme une saisie (EN_CHANGE, annulation possible)."""
     if not _is_class(control, EDIT_CLASSES):
-        raise MethodError("Pas un champ Edit Win32.")
+        raise MethodError("Not a Win32 Edit field.")
     if w.style(control) & w.ES_READONLY:
-        raise MethodError("Champ en lecture seule.")
+        raise MethodError("Read-only field.")
     if append:
         w.send_message(control, w.EM_SETSEL, 0x7FFFFFFF, 0x7FFFFFFF)
     else:
         w.send_message(control, w.EM_SETSEL, 0, -1)
     buf = ctypes.create_unicode_buffer(text.replace("\r\n", "\n").replace("\n", "\r\n"))
     if w.send_message(control, w.EM_REPLACESEL, 1, ctypes.addressof(buf), timeout_ms=2000) is None:
-        raise MethodError("Le champ ne répond pas.")
+        raise MethodError("The field is not responding.")
     return "em_replacesel"
 
 
@@ -291,14 +291,14 @@ def win32_menu_items(top: int) -> list[tuple[str, int]]:
 def win32_menu_command(top: int, path: str) -> str:
     items = win32_menu_items(top)
     if not items:
-        raise MethodError("Pas de barre de menus Win32.")
+        raise MethodError("No Win32 menu bar.")
     wanted = [p.strip().lower() for p in path.replace("/", ">").split(">")]
     for label, ident in items:
         parts = [p.strip().lower() for p in label.split(">")]
         if parts[-len(wanted) :] == wanted or (len(wanted) == 1 and parts[-1] == wanted[0]):
             post(top, w.WM_COMMAND, ident & 0xFFFF, 0)
             return "wm_command_menu"
-    raise MethodError(f"Commande de menu « {path} » introuvable.")
+    raise MethodError(f'Menu command "{path}" not found.')
 
 
 # --- Clavier par messages -----------------------------------------------------------------------------------
@@ -370,10 +370,10 @@ class fake_modifiers:
     def __enter__(self):
         fg_thread = w.window_thread(w.foreground()) if w.foreground() else 0
         if self.thread == fg_thread:
-            raise MethodError("Le thread cible est celui du premier plan : modificateurs simulés refusés.")
+            raise MethodError("The target thread is the foreground thread: simulated modifiers refused.")
         self.attached = bool(w.AttachThreadInput(self.own, self.thread, True))
         if not self.attached:
-            raise MethodError("AttachThreadInput refusé.")
+            raise MethodError("AttachThreadInput refused.")
         w.GetKeyboardState(ctypes.byref(self.saved))
         state = (ctypes.c_ubyte * 256)(*self.saved)
         for vk in self.vks:
@@ -452,15 +452,15 @@ class SimulatedActivation:
         self.windows = windows
         self.started = time.monotonic()
 
-    def _julien_in_target(self) -> bool:
+    def _user_in_target(self) -> bool:
         return w.root(w.foreground()) in self.windows and physical.available() and physical.since(self.started)
 
     def check(self, consequence: str) -> None:
-        if self._julien_in_target():
-            raise foreground.UserInterrupted(f"L'utilisateur est passé dans la fenêtre et y tape : {consequence}.")
+        if self._user_in_target():
+            raise foreground.UserInterrupted(f"The user switched to the window and is typing in it: {consequence}.")
 
     def checkpoint(self) -> None:
-        self.check("frappe arrêtée ; ses touches ont pu arriver dans la cible : vérifier la cible (look)")
+        self.check("typing stopped; the user's keystrokes may have reached the target: check the target (look)")
 
 
 @contextlib.contextmanager
@@ -472,20 +472,20 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
     pause de l'utilisateur (son droit de premier plan de lancement peut être utilisé, voir plus haut)."""
     windows = windows or {top}
     if not w.IsWindow(top) or not w.class_name(top).startswith(CHROMIUM_TOP_CLASS):
-        raise MethodError("pas une fenêtre Chromium de premier niveau : activation simulée inapplicable")
+        raise MethodError("not a top-level Chromium window: simulated activation not applicable")
     if w.root(w.foreground()) in windows:
-        raise MethodError("la fenêtre est au premier plan : activation simulée inutile")
+        raise MethodError("the window is in the foreground: simulated activation not needed")
     pid = w.window_pid(top)
     with contextlib.ExitStack() as stack:
         if pid not in _PRIMED:
-            stack.enter_context(foreground.agent_token("activation simulée (première fois)"))
+            stack.enter_context(foreground.agent_token("simulated activation (first time)"))
             if not foreground.wait_typing_pause():
                 raise foreground.BusyUser(
-                    "L'utilisateur tape, bouge la souris ou tient un bouton en ce moment : première frappe sans activation "
-                    "reportée (l'application peut encore prendre le premier plan une fois)."
+                    "The user is typing, moving the mouse or holding a button right now: first typing without activation "
+                    "postponed (the application can still take the foreground once)."
                 )
         if w.send_message(top, WM_NCACTIVATE, 1, 0) is None or w.send_message(top, WM_ACTIVATE, WA_ACTIVE, 0) is None:
-            raise MethodError("la fenêtre ne répond pas aux messages d'activation")
+            raise MethodError("the window does not respond to activation messages")
         _PRIMED.add(pid)
         try:
             yield SimulatedActivation(top, windows)
@@ -618,30 +618,32 @@ class Typed:
 
     def state(self) -> str:
         """Ce que contient le champ, d'après les relectures (pour un arrêt ou une interruption)."""
-        parts = [f"{self.confirmed}/{self.total} caractères relus dans le champ"]
+        parts = [f"{self.confirmed}/{self.total} characters read back in the field"]
         if self.sent > self.confirmed:
-            parts.append(f"{self.sent - self.confirmed} autres envoyés mais pas relus (ils peuvent encore apparaître)")
+            parts.append(f"{self.sent - self.confirmed} more sent but not read back (they may still appear)")
         if self.clear:
-            parts.append("contenu d'origine effacé" if self.erased else "contenu d'origine intact")
-        parts.append("aucun caractère renvoyé")
+            parts.append("original content erased" if self.erased else "original content intact")
+        parts.append("no character resent")
         return ", ".join(parts)
 
     def detail(self) -> str:
         if self.stopped:
-            return f"frappe arrêtée ({self.state()}) : {self.stopped}"
+            return f"typing stopped ({self.state()}): {self.stopped}"
         if self.simulated:
-            return "frappes WM_CHAR sans activation (activation simulée par messages, premier plan de l'utilisateur intact)"
+            return (
+                "WM_CHAR keystrokes without activation (activation simulated by messages, the user's foreground intact)"
+            )
         if self.slices <= 1:
-            return f"frappes WM_CHAR, activation brève {self.active_ms} ms"
+            return f"WM_CHAR keystrokes, brief activation {self.active_ms} ms"
         return (
-            f"frappes WM_CHAR en {self.slices} activations brèves (la plus longue {self.longest_ms} ms, {self.active_ms} "
-            "ms au total, premier plan rendu à l'utilisateur entre chacune) ; texte long : launch avec devtools=true l'écrit "
-            "sans aucune activation"
+            f"WM_CHAR keystrokes in {self.slices} brief activations (longest {self.longest_ms} ms, {self.active_ms} "
+            "ms in total, foreground given back to the user between each); long text: launch with devtools=true types it "
+            "without any activation"
         )
 
 
 def _seconds(value: float) -> str:
-    return f"{value:g} s".replace(".", ",")
+    return f"{value:g} s"
 
 
 class _Stop(Exception):  # noqa: N818 - signal interne : arrêt de la frappe, avec sa cause
@@ -710,15 +712,15 @@ class _SliceTyping:
         try:
             value = self.read()
         except Unreadable as error:
-            raise _Stop(f"la valeur du champ ne se relit plus ({error})") from None
+            raise _Stop(f"the field value can no longer be read back ({error})") from None
         finally:
             self.read_s = time.monotonic() - begin
         k = self.prefix(value)
         if k is None:
-            raise _Stop("le champ contient autre chose qu'un début du texte (autre saisie ?)")
+            raise _Stop("the field contains something other than the start of the text (other input?)")
         k = min(k, self.sent)  # un paragraphe vide n'est pas une Entrée tapée
         if self.k >= 0 and k < self.k:
-            raise _Stop(f"le champ a perdu du texte déjà relu ({k} caractères au lieu de {self.k})")
+            raise _Stop(f"the field lost text already read back ({k} characters, expected {self.k})")
         if self.before_enter is not None and value != self.before_enter:
             self.before_enter = None  # l'Entrée a fait son effet
         self.k, self.value = max(self.k, k) if k >= 0 else k, value
@@ -754,9 +756,9 @@ class _SliceTyping:
                 return
             if now - progress_at >= WAIT_IDLE_S or now - start >= WAIT_MAX_S:
                 if self.k < 0:
-                    raise _Stop("Suppr n'a pas effacé le contenu d'origine (sélection perdue ?)")
+                    raise _Stop("Delete did not erase the original content (selection lost?)")
                 waited = _seconds(round(now - start, 1))
-                raise _Stop(f"ce qui a été envoyé n'est pas relu dans le champ après {waited} : suite non envoyée")
+                raise _Stop(f"what was sent is not read back in the field after {waited}: rest not sent")
             time.sleep(WAIT_POLL_S)
 
     # --- Tranches ---------------------------------------------------------------------------------------------------
@@ -771,7 +773,7 @@ class _SliceTyping:
             except (foreground.BusyUser, MethodError) as error:
                 if not self.touched:
                     raise
-                return self._finish(f"suite non envoyée ({error})")
+                return self._finish(f"rest not sent ({error})")
             except foreground.UserInterrupted as error:
                 self._sync_out()
                 raise foreground.UserInterrupted(f"{str(error).rstrip('.')} ; {self.out.state()}.") from None
@@ -780,9 +782,9 @@ class _SliceTyping:
             starved = 0 if posted else starved + 1
             if starved >= STARVED_SLICES:
                 limit = _seconds(round(self.slice_s - self.reserve - self.min_post, 3))
-                cause = f"la fenêtre met plus de {limit} à recevoir le clavier : tranches trop courtes pour envoyer"
+                cause = f"the window takes more than {limit} to receive the keyboard: slices too short to send"
                 if not self.touched:
-                    raise MethodError(f"{cause} ; rien n'a été tapé")
+                    raise MethodError(f"{cause}; nothing was typed")
                 return self._finish(cause)
 
     def _slice(self) -> bool:
@@ -793,7 +795,7 @@ class _SliceTyping:
             started = time.monotonic()
             self.out.slices += 1
             target = self.prepare(self.out.slices == 1 or self.k < 0)
-            activation.check("rien de plus n'a été tapé" if self.touched else "rien n'a été tapé, l'action est annulée")
+            activation.check("nothing more was typed" if self.touched else "nothing was typed, the action is cancelled")
             deadline = started + self.slice_s - self.reserve  # préparation comprise ; restitution dans la tranche
             if self.k < 0:  # contenu d'origine sélectionné : effacé et relu vide avant tout caractère
                 post_key(target, VK_DELETE)
@@ -852,7 +854,7 @@ class _SliceTyping:
 
     def _finish(self, cause: str = "") -> Typed:
         if cause and not self.touched:
-            raise MethodError(f"{cause} ; rien n'a été tapé")
+            raise MethodError(f"{cause}; nothing was typed")
         self._sync_out()
         self.out.stopped = cause
         return self.out
@@ -909,17 +911,17 @@ def _checked_rank(control: int, count_msg: int, len_msg: int, text_msg: int, ind
     """Le rang désigne-t-il bien l'élément vu (même libellé) ? Sinon refus, avant toute modification."""
     count = w.send_message(control, count_msg)
     if count is None or count > 0x7FFF or not 0 <= index < count:
-        raise MethodError("Rang hors de la liste : refaire look.")
+        raise MethodError("Index outside the list: call look again.")
     label = _item_text(control, len_msg, text_msg, index)
     if label is None or " ".join(label.split()) != " ".join(name.split()):
-        raise MethodError(f"l'élément n° {index + 1} de la liste n'est pas « {name} » : refaire look.")
+        raise MethodError(f'item no. {index + 1} of the list is not "{name}": call look again.')
 
 
 def win32_combo_select_index(control: int, index: int, name: str) -> str:
     """Option n° index d'une liste déroulante Win32/WinForms (homonymes distingués par leur rang), contrôlée par son
     libellé avant toute modification, puis choisie comme par l'utilisateur (_combo_commit)."""
     if not _is_class(control, COMBO_CLASSES):
-        raise MethodError("Pas une liste déroulante Win32.")
+        raise MethodError("Not a Win32 combo box.")
     _checked_rank(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT, index, name)
     return _combo_commit(control, index, name)
 
@@ -946,19 +948,19 @@ def _combo_commit(control: int, index: int, name: str) -> str:
         w.send_message(control, CB_SHOWDROPDOWN, 0, timeout_ms=2000)
     w.send_message(control, CB_SETCURSEL, index)
     if w.send_message(control, CB_GETCURSEL) != index:
-        raise MethodError("La liste déroulante n'a pas pris la sélection.")
+        raise MethodError("The combo box did not take the selection.")
     _send_notify(control, CBN_SELCHANGE)
     _send_notify(control, CBN_SELENDOK)
     current = w.send_message(control, CB_GETCURSEL)
     label = _item_text(control, CB_GETLBTEXTLEN, CB_GETLBTEXT, current) if current is not None else None
     if current != index or not label:
-        shown = f"« {label} »" if label else "vide"
-        raise ReadBackFailed(f"l'application a gardé une valeur {shown} au lieu de « {name} » (relu)")
+        shown = f'"{label}"' if label else "empty"
+        raise ReadBackFailed(f'the application kept the value {shown}, not "{name}" (read back)')
     if " ".join(label.split()) != " ".join(name.split()):
-        raise ReadBackFailed(f"l'application affiche « {label} » au lieu de « {name} » (relu)")
+        raise ReadBackFailed(f'the application shows "{label}", not "{name}" (read back)')
     if combo_dropped(control):
-        raise ReadBackFailed(f"« {name} » choisi mais la liste est restée ouverte (relu)")
-    return "relu ✓"
+        raise ReadBackFailed(f'"{name}" chosen but the list stayed open (read back)')
+    return "read back ✓"
 
 
 def win32_combo_show(control: int, open_: bool) -> str:
@@ -966,22 +968,22 @@ def win32_combo_show(control: int, open_: bool) -> str:
     CB_GETDROPPEDSTATE : ni souris, ni clavier, ni premier plan (la liste s'affiche au-dessus, fenêtre inactive).
     Fermer ainsi n'est jamais un choix : c'est l'annulation de Windows (Échap), la sélection d'avant reste."""
     if not _is_class(control, COMBO_CLASSES):
-        raise MethodError("Pas une liste déroulante Win32.")
+        raise MethodError("Not a Win32 combo box.")
     if w.style(control) & CBS_TYPEMASK == CBS_SIMPLE:
-        raise MethodError("liste toujours affichée (CBS_SIMPLE) : rien à déplier")
+        raise MethodError("list always shown (CBS_SIMPLE): nothing to expand")
     if open_ and not w.IsWindowEnabled(control):
-        raise MethodError("liste déroulante désactivée")
+        raise MethodError("combo box disabled")
     w.send_message(control, CB_SHOWDROPDOWN, int(open_), timeout_ms=2000)
     deadline = time.monotonic() + 0.6
     while True:
         state = combo_dropped(control)
         if state is open_:
-            return "relu ✓"
+            return "read back ✓"
         if time.monotonic() >= deadline:
             break
         time.sleep(0.03)
-    now = "illisible" if state is None else "ouverte" if state else "fermée"
-    raise ReadBackFailed(f"liste toujours {now} (CB_GETDROPPEDSTATE)")
+    now = "unreadable" if state is None else "open" if state else "closed"
+    raise ReadBackFailed(f"list still {now} (CB_GETDROPPEDSTATE)")
 
 
 def _is_selected(control: int, index: int) -> bool:
@@ -994,7 +996,7 @@ def win32_listbox_select_index(control: int, index: int, name: str) -> str:
     comme un clic : LB_SETCURSEL ; liste à sélection multiple : LB_SETSEL (bascule en sélection multiple simple, cet
     élément seul en sélection étendue). Puis LBN_SELCHANGE au parent."""
     if not _is_class(control, LISTBOX_CLASSES):
-        raise MethodError("Pas une liste Win32.")
+        raise MethodError("Not a Win32 list box.")
     _checked_rank(control, LB_GETCOUNT, LB_GETTEXTLEN, LB_GETTEXT, index, name)
     style = w.style(control)
     if style & LBS_MULTIPLESEL:
@@ -1010,7 +1012,7 @@ def win32_listbox_select_index(control: int, index: int, name: str) -> str:
     else:
         w.send_message(control, LB_SETCURSEL, index)
         if w.send_message(control, LB_GETCURSEL) != index:
-            raise MethodError("La liste n'a pas pris la sélection.")
+            raise MethodError("The list did not take the selection.")
         done = True
     _notify_parent(control, LBN_SELCHANGE)
-    return "relu ✓" if done else "sélection posée, non relue"
+    return "read back ✓" if done else "selection set, not read back"

@@ -54,12 +54,31 @@ class PolicyError(RuntimeError):
     pass
 
 
+# Raisons de blocage dur de garde-fous.json (politique commune, en français) : rendues en anglais au modèle ; une
+# raison inconnue (nouvelle catégorie) reste telle quelle.
+HARD_BLOCK_REASONS = {
+    "invite UAC, écran de verrouillage ou ouverture de session (bureau sécurisé)": (
+        "UAC prompt, lock screen or sign-in screen (secure desktop)"
+    ),
+    "fenêtre d'identifiants Windows": "Windows credential window",
+    "gestionnaire de mots de passe": "password manager",
+}
+
+
+def english_reason(reason: str) -> str:
+    """Raison de garde_fous.hard_block_reason en anglais (suffixe « (processus) » gardé)."""
+    for french, english in HARD_BLOCK_REASONS.items():
+        if reason.startswith(french):
+            return english + reason[len(french) :]
+    return reason
+
+
 def hard_block(process: str, cls: str) -> str:
     """Raison du blocage dur de cette fenêtre (ni lue ni pilotée), « » si libre. Politique illisible : PolicyError."""
     try:
-        return garde_fous.hard_block_reason(AGENT, process, cls)
+        return english_reason(garde_fous.hard_block_reason(AGENT, process, cls))
     except garde_fous.GardeFousError as error:
-        raise PolicyError(f"{error} : rien n'a été fait (échec fermé)") from error
+        raise PolicyError(f"safety policy unreadable ({error}): nothing was done (fail closed)") from error
 
 
 def act_refusal(process: str, cls: str, title: str = "") -> str | None:
@@ -132,25 +151,23 @@ def switch_refusal(args: str, chromium: bool = True, browser: bool = True, devto
     """Raison de refuser ces arguments, lus comme Chromium les lit ; None si permis."""
     tail_matters = chromium or devtools  # l'outil ajoute alors ses propres commutateurs APRÈS ceux du modèle
     if tail_matters and "single-argument" in args.lower():
-        return "--single-argument fait du reste de la ligne un seul argument (commutateurs de l'outil neutralisés)"
+        return "--single-argument turns the rest of the line into one argument (the tool's switches neutralized)"
     for token in split_args(args):
         if tail_matters and token == "--":
-            return (
-                "« -- » met fin aux commutateurs : ceux que l'outil ajoute (profil neuf, sans compte) seraient ignorés"
-            )
+            return '"--" ends the switches: those the tool adds (fresh profile, no account) would be ignored'
         key = switch_key(token)
         if key in CHROMIUM_DENY_SWITCHES:
-            return f"le commutateur {key} ouvre un canal de contrôle sur les sessions du navigateur (devtools=true)"
+            return f"the {key} switch opens a control channel on the browser's sessions (devtools=true)"
         if key in PROFILE_SWITCHES and (browser or devtools):
             return (
-                f"le commutateur {key} choisirait un profil du navigateur (celui de l'utilisateur ?) : jamais fourni par le "
-                "modèle ; devtools=true ouvre un profil neuf"
+                f"the {key} switch would pick a browser profile (the user's?): never given by the model; "
+                "devtools=true opens a fresh profile"
             )
     return None
 
 
 def _refuse(reason: str) -> PolicyError:
-    return PolicyError(f"Lancement refusé : {reason}.")
+    return PolicyError(f"Launch refused: {reason}.")
 
 
 def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
@@ -165,8 +182,8 @@ def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
         browser = is_browser_exe(str(candidate))
         if devtools and browser and name not in BROWSER_EXES:
             raise _refuse(
-                f"devtools=true seulement sur l'exécutable principal du navigateur (msedge.exe, chrome.exe…), jamais "
-                f"sur {name}, qui ouvrirait le profil de l'utilisateur"
+                f"devtools=true only on the browser's main executable (msedge.exe, chrome.exe…), never "
+                f"on {name}, which would open the user's profile"
             )
         reason = switch_refusal(
             args, chromium=browser or is_chromium_exe(str(candidate)), browser=browser, devtools=devtools
@@ -181,8 +198,8 @@ def check_launch_app_id(app_id: str, name: str, args: str = "", devtools: bool =
     vérifiables)."""
     if devtools:
         raise PolicyError(
-            f"Lancement refusé : devtools=true pas pour « {name} » (application du menu Démarrer ou empaquetée) : "
-            "passer le chemin complet de l'exécutable Chromium ou Electron."
+            f'Launch refused: devtools=true not for "{name}" (Start menu or packaged app): '
+            "give the full path of the Chromium or Electron executable."
         )
     reason = switch_refusal(args)
     if reason:

@@ -43,9 +43,9 @@ class UiaActions(ExecutorBase):
         fw = framework_of(e, view)
         role = e.role
         p = e.props
-        what = f"clic sur {e.describe()}"
+        what = f"click on {e.describe()}"
         if p.get("enabled") is False:
-            raise ActionError(f"{e.describe()} est désactivé.")
+            raise ActionError(f"{e.describe()} is disabled.")
         self._confirm_click(e, button)
         chain: list[tuple[str, Callable[[], Any]]] = []
         hwnd, cls = self._element_hwnd_class(e)
@@ -54,28 +54,28 @@ class UiaActions(ExecutorBase):
         page = self._page_if_free()
 
         if button == "right":
-            chain.append(("menu contextuel UIA", lambda: self.auto.show_context_menu(e.node.element)))
+            chain.append(("UIA context menu", lambda: self.auto.show_context_menu(e.node.element)))
             if page is not None:
                 chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e), "right")))
             if fw not in NO_MOUSE_MESSAGES:
                 chain.append(
-                    ("clic droit par messages", self._watched(lambda: self._post_click(*self._point_of(e), "right")))
+                    ("right-click by messages", self._watched(lambda: self._post_click(*self._point_of(e), "right")))
                 )
             return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e), "right"))
         if count >= 2:
             if p.get("has_invoke") and role in ITEM_ROLES and not msaa:
-                chain.append(("UIA Invoke (ouvrir)", lambda: self.auto.invoke(e.node.element)))
+                chain.append(("UIA Invoke (open)", lambda: self.auto.invoke(e.node.element)))
             if page is not None:
                 chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e), "left", 2)))
             if fw not in NO_MOUSE_MESSAGES:
                 chain.append(
                     (
-                        "double-clic par messages",
+                        "double-click by messages",
                         self._watched(lambda: self._post_click(*self._point_of(e), "left", 2)),
                     )
                 )
             return self._try_or_foreground(
-                chain, what.replace("clic", "double-clic"), lambda: realinput.click(*self._point_of(e), "left", 2)
+                chain, what.replace("click", "double-click", 1), lambda: realinput.click(*self._point_of(e), "left", 2)
             )
 
         if fw == "Chromium":
@@ -123,7 +123,7 @@ class UiaActions(ExecutorBase):
         ):
             chain.append(("UIA Select", lambda: self.auto.select(e.node.element)))
         if role in ("Edit", "Document"):
-            chain.append(("focus UIA", lambda: self._quiet_focus(e)))
+            chain.append(("UIA focus", lambda: self._quiet_focus(e)))
         if p.get("has_legacy") and fw not in ("Win32", "WinForms"):
             # Win32/WinForms : l'action par défaut MSAA d'oleacc fait souvent un VRAI clic (SendInput) sur les onglets,
             # en-têtes et barres d'outils : jamais sans foreground=true.
@@ -131,7 +131,7 @@ class UiaActions(ExecutorBase):
         if page is not None:
             chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e))))
         if fw not in NO_MOUSE_MESSAGES:
-            chain.append(("clic par messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
+            chain.append(("click by messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
         # Option d'une liste déroulante ouverte (WPF, UWP…) : la liste reste ouverte après UIA Select ; refermée, puis
         # le choix relu sur la liste déroulante.
         combo_parent = (
@@ -142,11 +142,11 @@ class UiaActions(ExecutorBase):
             closed = self._collapse_if_open(combo_parent)
             if self._selection_confirmed(combo_parent, e):
                 outcome.verified = True
-                outcome.line += " — relu ✓" + (", liste refermée" if closed else "")
+                outcome.line += " — read back ✓" + (", list closed" if closed else "")
             else:
                 outcome.ok = False
                 outcome.line += (
-                    f" — ÉCHEC À LA RELECTURE : {combo_parent.describe()} n'affiche pas « {snapshot.clip(e.name, 40)} »"
+                    f' — READ-BACK FAILED: {combo_parent.describe()} does not show "{snapshot.clip(e.name, 40)}"'
                 )
         return outcome
 
@@ -166,18 +166,18 @@ class UiaActions(ExecutorBase):
         if spec is None or spec == "":
             self._confirm_text(None, text)
             return self._write_focused(text, replace)
-        element = self.resolve_element(spec, TEXT_ROLES, "champ de saisie")
+        element = self.resolve_element(spec, TEXT_ROLES, "text field")
         self._confirm_text(element, text)
         return self.write_element(element, text, replace)
 
     def write_element(self, e: snapshot.Element, text: str, replace: bool) -> Outcome:
-        verb = "texte remplacé" if replace else "texte saisi"
+        verb = "text replaced" if replace else "text typed"
         p = e.props
         self._refuse_secret(p, e.describe())
         if p.get("readonly"):
-            raise ActionError(f"{e.describe()} est en lecture seule : rien n'a été écrit.")
+            raise ActionError(f"{e.describe()} is read-only: nothing was written.")
         if p.get("enabled") is False:
-            raise ActionError(f"{e.describe()} est désactivé.")
+            raise ActionError(f"{e.describe()} is disabled.")
         fw = framework_of(e, self.view)
         hwnd, cls = self._element_hwnd_class(e)
         before = self._read_value(e) or ""
@@ -192,10 +192,10 @@ class UiaActions(ExecutorBase):
         keystrokes = page is None
         # Chromium sans DevTools : frappes en activation SIMULÉE d'abord (premier plan de Julien jamais pris), puis en
         # activations brèves si l'application ne s'y prête pas (rien n'a alors été tapé).
-        simulated = ("frappes sans activation", lambda: self._keystrokes(e, text, replace, simulated=True))
+        simulated = ("keystrokes without activation", lambda: self._keystrokes(e, text, replace, simulated=True))
         if multiline_chromium and keystrokes:
             chain.append(simulated)
-            chain.append(("frappes", lambda: self._keystrokes(e, text, replace)))
+            chain.append(("keystrokes", lambda: self._keystrokes(e, text, replace)))
         if p.get("has_value") and not multiline_chromium:
 
             def set_value() -> None:
@@ -215,17 +215,17 @@ class UiaActions(ExecutorBase):
         if fw not in NO_KEYBOARD_MESSAGES and not multiline_chromium and keystrokes:
             if fw == "Chromium":
                 chain.append(simulated)
-            chain.append(("frappes", lambda: self._keystrokes(e, text, replace)))
+            chain.append(("keystrokes", lambda: self._keystrokes(e, text, replace)))
         outcome = self._try_or_foreground(
-            chain, f"{verb} dans {e.describe()}", lambda: self._real_write(e, text, replace)
+            chain, f"{verb} in {e.describe()}", lambda: self._real_write(e, text, replace)
         )
         verified = self._verify_text(e, before, text, replace, timeout_s=1.5 if fw == "Chromium" else 1.2)
         if verified is False:
             outcome.ok = False
-            outcome.line += f" — ÉCHEC À LA RELECTURE : valeur actuelle de {len(self._read_value(e) or '')} caractères"
+            outcome.line += f" — READ-BACK FAILED: current value is {len(self._read_value(e) or '')} characters long"
         elif verified:
             outcome.verified = True
-            outcome.line += " — relu ✓"
+            outcome.line += " — read back ✓"
         return outcome
 
     def _focused_target_element(self) -> snapshot.Element | None:
@@ -250,7 +250,7 @@ class UiaActions(ExecutorBase):
     def _write_focused(self, text: str, replace: bool) -> Outcome:
         """Saisie sans cible : seulement dans le champ qui a le focus DANS la cible, relu ; sinon refus."""
         page = self._get_page()
-        verb = "texte remplacé" if replace else "texte saisi"
+        verb = "text replaced" if replace else "text typed"
         if page is not None:
 
             def via_cdp() -> str:
@@ -260,11 +260,11 @@ class UiaActions(ExecutorBase):
                 page.insert_text(text)
                 return ""
 
-            return self._try([("DevTools insertText", via_cdp)], f"{verb} dans l'élément qui a le focus")
+            return self._try([("DevTools insertText", via_cdp)], f"{verb} in the focused element")
         element = self._focused_target_element()
         if element is None:
             raise ActionError(
-                f"{verb} : aucun champ de la fenêtre n'a le focus (ou il est inconnu) : préciser target (nom ou [N])."
+                f"{verb}: no field of the window has the focus (or it is unknown): specify target (name or [N])."
             )
         return self.write_element(element, text, replace)
 
@@ -272,11 +272,11 @@ class UiaActions(ExecutorBase):
     def press(self, spec: str, target: Any = None) -> Outcome:
         combos = keys.parse_sequence(spec)
         if not combos:
-            raise ActionError("Aucune touche.")
+            raise ActionError("No key.")
         printable = any(c.char and c.char.isprintable() and not c.modifiers for c in combos)
         element = None
         if target not in (None, ""):
-            element = self.resolve_element(target, TEXT_ROLES | LEAF_ROLES, "élément")
+            element = self.resolve_element(target, TEXT_ROLES | LEAF_ROLES, "element")
         self._confirm_keys(combos, spec, element)  # avant toute touche : ce qu'elles déclencheraient
         page = self._get_page()
         fw = self.view.framework
@@ -294,7 +294,7 @@ class UiaActions(ExecutorBase):
                 else:
                     char = None
                 page.key(key, code, combo.key, combo.cdp_modifiers, text=char)
-            return Outcome(True, f"touches « {spec} » (DevTools)", "DevTools")
+            return Outcome(True, f'keys "{spec}" (DevTools)', "DevTools")
         focused = element or self._focused_target_element()
         if focused is not None and printable:
             self._refuse_secret(focused.props, focused.describe())
@@ -304,7 +304,7 @@ class UiaActions(ExecutorBase):
             for combo in combos:
                 realinput.press(combo)
 
-        what = f"touches « {spec} »"
+        what = f'keys "{spec}"'
         simulated: list[tuple[str, Callable[[], Any]]] = []
         if fw == "Chromium":
             # Activation simulée d'abord : touches et raccourcis (état clavier simulé) lus par Chromium sans que le
@@ -317,14 +317,14 @@ class UiaActions(ExecutorBase):
                     def prepare_simulated() -> None:
                         if element is not None:
                             self._take_focus(element)
-                        sim.check("rien n'a été envoyé, l'action est annulée")
+                        sim.check("nothing was sent, the action is cancelled")
 
                     detail = self._watched(
                         lambda: self._post_combos(combos, fw, sim_sent, simulated=True), prepare_simulated
                     )()
-                return f"activation simulée, {', '.join(sorted(set(sim_sent)))} ; {detail}"
+                return f"simulated activation, {', '.join(sorted(set(sim_sent)))}; {detail}"
 
-            simulated.append(("messages sans activation", run_simulated))
+            simulated.append(("messages without activation", run_simulated))
             if shortcut:
                 try:
                     return self._try(simulated, what)
@@ -334,7 +334,7 @@ class UiaActions(ExecutorBase):
                     pass  # l'application ne s'y prête pas : refus (ou vrai clavier autorisé) ci-dessous
         # Raccourcis (Ctrl/Alt/Win) : WPF/UWP les ignorent par messages, Chromium lit l'état réel du clavier.
         if (shortcut and (fw in UIA_ONLY or fw in ("Chromium", "Tk"))) or fw in NO_KEYBOARD_MESSAGES:
-            hint = " (ou relancer l'application par launch avec devtools=true)" if fw == "Chromium" else ""
+            hint = " (or relaunch the application with launch and devtools=true)" if fw == "Chromium" else ""
             try:
                 return self._foreground_or_fail(what, real)
             except NeedsForeground as error:
@@ -356,23 +356,23 @@ class UiaActions(ExecutorBase):
 
                     def checked() -> None:
                         prepare()
-                        activation.check("rien n'a été envoyé, l'action est annulée")
+                        activation.check("nothing was sent, the action is cancelled")
 
                     detail = self._watched(lambda: self._post_combos(combos, fw, sent), checked)()
             else:
                 detail = self._watched(lambda: self._post_combos(combos, fw, sent))()
-            return f"{', '.join(sorted(set(sent)))} ; {detail}"
+            return f"{', '.join(sorted(set(sent)))}; {detail}"
 
         return self._try_or_foreground([*simulated, ("messages", run)], what, real)
 
     # --- Choix, cases, dépliage ---------------------------------------------------------------------------------
     def select(self, spec: Any, option: str | None) -> Outcome:
-        e = self.resolve_element(spec, CHOICE_ROLES, "liste ou option")
+        e = self.resolve_element(spec, CHOICE_ROLES, "list or option")
         if not option:
             return self.click_element(e)
         fw = framework_of(e, self.view)
         hwnd, cls = self._element_hwnd_class(e)
-        what = f"« {option} » choisi dans {e.describe()}"
+        what = f'"{option}" selected in {e.describe()}'
         if hwnd and methods._is_class(hwnd, methods.COMBO_CLASSES):
             return self._try([("CB_SETCURSEL", lambda: methods.win32_combo_select(hwnd, option))], what)
         if hwnd and methods._is_class(hwnd, methods.LISTBOX_CLASSES):
@@ -401,12 +401,12 @@ class UiaActions(ExecutorBase):
                     outcome = self._try([("UIA Value", lambda: self.auto.set_value(e.node.element, option))], what)
                     if self._value_is(e, option):
                         outcome.verified = True
-                        outcome.line += " — relu ✓"
+                        outcome.line += " — read back ✓"
                     else:
                         outcome.ok = False
-                        outcome.line += " — ÉCHEC À LA RELECTURE"
+                        outcome.line += " — READ-BACK FAILED"
                     return outcome
-                raise ActionError(f"Option « {option} » introuvable dans {e.describe()}.")
+                raise ActionError(f'Option "{option}" not found in {e.describe()}.')
             outcome = self.click_element(item, close_list=False)  # repli et relecture faits ici
             keep_open = e.role != "ComboBox"  # arbre ou liste dépliés pour atteindre l'option : laissés tels quels
         except worker.Cancelled:
@@ -419,10 +419,10 @@ class UiaActions(ExecutorBase):
                 self._collapse_if_open(e)
         if self._selection_confirmed(e, item):
             outcome.verified = True
-            outcome.line += " — relu ✓"
+            outcome.line += " — read back ✓"
         else:
             outcome.ok = False
-            outcome.line += f" — ÉCHEC À LA RELECTURE : {e.describe()} n'affiche pas « {snapshot.clip(item.name, 40)} »"
+            outcome.line += f' — READ-BACK FAILED: {e.describe()} does not show "{snapshot.clip(item.name, 40)}"'
         return outcome
 
     def _collapse_if_open(self, e: snapshot.Element) -> bool:
@@ -505,16 +505,16 @@ class UiaActions(ExecutorBase):
             return None
         element, partial, name = next((f for f in found if not f[1]), found[0])
         if partial:
-            self.notes.append(f"correspondance partielle : « {name} »")
+            self.notes.append(f'partial match: "{name}"')
         return element
 
     def set_checked(self, spec: Any, state: bool | None) -> Outcome:
-        e = self.resolve_element(spec, CHECK_ROLES, "case à cocher")  # resolve relit déjà l'état en direct
+        e = self.resolve_element(spec, CHECK_ROLES, "checkbox")  # resolve relit déjà l'état en direct
         if e.role == "RadioButton":
             if state is False:
-                raise ActionError(f"{e.describe()} : un bouton radio ne se décoche pas, choisir une autre option.")
+                raise ActionError(f"{e.describe()}: a radio button cannot be unchecked; select another option.")
             if e.props.get("selected") or e.props.get("toggle") == 1:
-                return Outcome(True, f"{e.describe()} déjà choisi (relu)", "aucune", verified=True)
+                return Outcome(True, f"{e.describe()} already selected (read back)", "none", verified=True)
             outcome = self.click_element(e)
             deadline = time.monotonic() + 0.6
             while time.monotonic() < deadline:
@@ -522,19 +522,22 @@ class UiaActions(ExecutorBase):
                     live = self._refresh(e.node.element)
                     if live.get("selected") or live.get("toggle") == 1:
                         outcome.verified = True
-                        outcome.line += " — choisi ✓"
+                        outcome.line += " — selected ✓"
                         return outcome
                 time.sleep(0.05)
             outcome.ok = False
-            outcome.line += " — ÉCHEC À LA RELECTURE"
+            outcome.line += " — READ-BACK FAILED"
             return outcome
         if not e.props.get("has_toggle"):
-            raise ActionError(f"{e.describe()} n'est pas une case à cocher (pas de motif Toggle) : utiliser click.")
+            raise ActionError(f"{e.describe()} is not a checkbox (no Toggle pattern): use click.")
         before = e.props.get("toggle")
         wanted = (1 if before != 1 else 0) if state is None else (1 if state else 0)
         if before == wanted:
             return Outcome(
-                True, f"{e.describe()} déjà {'coché' if wanted else 'décoché'} (relu)", "aucune", verified=True
+                True,
+                f"{e.describe()} already {'checked' if wanted else 'unchecked'} (read back)",
+                "none",
+                verified=True,
             )
         timeout = 1.2 if framework_of(e, self.view) == "Chromium" else 0.6
         outcome = None
@@ -554,33 +557,33 @@ class UiaActions(ExecutorBase):
         assert outcome is not None
         if after == wanted:
             outcome.verified = True
-            outcome.line += f" — {'coché' if wanted else 'décoché'} ✓"
+            outcome.line += f" — {'checked' if wanted else 'unchecked'} ✓"
         else:
             outcome.ok = False
-            names: dict[int | None, str] = {0: "décoché", 1: "coché", 2: "mixte"}
-            state_name = names.get(after, "inconnu")
-            outcome.line += f" — ÉCHEC À LA RELECTURE : état {state_name}"
+            names: dict[int | None, str] = {0: "unchecked", 1: "checked", 2: "mixed"}
+            state_name = names.get(after, "unknown")
+            outcome.line += f" — READ-BACK FAILED: state {state_name}"
         return outcome
 
     def expand(self, spec: Any, open_: bool) -> Outcome:
-        e = self.resolve_element(spec, EXPAND_ROLES, "élément dépliable")
-        word = "déplié" if open_ else "replié"
+        e = self.resolve_element(spec, EXPAND_ROLES, "expandable element")
+        word = "expanded" if open_ else "collapsed"
         combo = self._win32_combo_of(e)
         if combo:
             # Liste déroulante Win32/WinForms (WinForms n'y publie pas ExpandCollapse) : CB_SHOWDROPDOWN, relu.
             if methods.combo_dropped(combo) is open_:
-                return Outcome(True, f"{e.describe()} déjà {word} (relu)", "aucune", verified=True)
+                return Outcome(True, f"{e.describe()} already {word} (read back)", "none", verified=True)
             return self._try(
                 [("CB_SHOWDROPDOWN", lambda: methods.win32_combo_show(combo, open_))], f"{e.describe()} {word}"
             )
         if not e.props.get("has_expand"):
             # Jamais de repli sur Invoke : ce serait exécuter la commande de l'élément (bouton, menu feuille).
-            raise ActionError(f"{e.describe()} n'est pas dépliable (pas de motif ExpandCollapse) : utiliser click.")
+            raise ActionError(f"{e.describe()} is not expandable (no ExpandCollapse pattern): use click.")
         state = e.props.get("expand")  # relu en direct par resolve
         if state == 3:
-            raise ActionError(f"{e.describe()} n'a rien à déplier (élément feuille).")
+            raise ActionError(f"{e.describe()} has nothing to expand (leaf element).")
         if state in (0, 1, 2) and (state != 0) == open_:
-            return Outcome(True, f"{e.describe()} déjà {word} (relu)", "aucune", verified=True)
+            return Outcome(True, f"{e.describe()} already {word} (read back)", "none", verified=True)
         outcome = self._try(
             [("UIA ExpandCollapse", lambda: (self.auto.expand if open_ else self.auto.collapse)(e.node.element))],
             f"{e.describe()} {word}",
@@ -592,35 +595,35 @@ class UiaActions(ExecutorBase):
                 state = self._refresh(e.node.element).get("expand")
             if state in (0, 1, 2) and (state != 0) == open_:
                 outcome.verified = True
-                outcome.line += " — relu ✓"
+                outcome.line += " — read back ✓"
                 return outcome
             time.sleep(0.05)
         if state is None:
-            outcome.line += " — état non relu (vérifier sur l'image)"
+            outcome.line += " — state not read back (check the image)"
         else:
             outcome.ok = False
             outcome.line += (
-                f" — ÉCHEC À LA RELECTURE : {'feuille' if state == 3 else 'replié' if state == 0 else 'déplié'}"
+                f" — READ-BACK FAILED: {'leaf' if state == 3 else 'collapsed' if state == 0 else 'expanded'}"
             )
         return outcome
 
     def focus(self, spec: Any) -> Outcome:
-        e = self.resolve_element(spec, TEXT_ROLES | LEAF_ROLES, "élément")
+        e = self.resolve_element(spec, TEXT_ROLES | LEAF_ROLES, "element")
         chain: list[tuple[str, Callable[[], Any]]] = []
         if framework_of(e, self.view) == "Chromium":
-            chain.append(("focus sans activation", lambda: self._sim_focus(e)))
-        chain.append(("focus UIA", lambda: self._quiet_focus(e)))
-        return self._try(chain, f"focus sur {e.describe()}")
+            chain.append(("focus without activation", lambda: self._sim_focus(e)))
+        chain.append(("UIA focus", lambda: self._quiet_focus(e)))
+        return self._try(chain, f"focus on {e.describe()}")
 
     # --- Menus --------------------------------------------------------------------------------------------------
     def menu(self, path: str) -> Outcome:
         parts = [p.strip() for p in path.replace("/", ">").split(">") if p.strip()]
         if not parts:
-            raise ActionError("Chemin de menu vide.")
+            raise ActionError("Empty menu path.")
         if methods.win32_menu_items(self.hwnd):
             try:
                 return self._try(
-                    [("WM_COMMAND menu", lambda: methods.win32_menu_command(self.hwnd, path))], f"menu « {path} »"
+                    [("WM_COMMAND menu", lambda: methods.win32_menu_command(self.hwnd, path))], f'menu "{path}"'
                 )
             except ActionError:
                 pass
@@ -654,11 +657,11 @@ class UiaActions(ExecutorBase):
                             ]
                         )  # fmt: skip
                     if len(exact) > 1:
-                        raise ActionError(f"Menu « {name} » ambigu ({', '.join(e.describe() for e in exact[:5])}).")
+                        raise ActionError(f'Menu "{name}" ambiguous ({", ".join(e.describe() for e in exact[:5])}).')
                     item = self._shown_id(exact[0]) if exact else None
                     if item is None:
                         if time.monotonic() > deadline:
-                            raise ActionError(f"Menu « {name} » introuvable (chemin « {path} »).")
+                            raise ActionError(f'Menu "{name}" not found (path "{path}").')
                         time.sleep(0.15)
                 if last:
                     clicked = True
@@ -674,7 +677,7 @@ class UiaActions(ExecutorBase):
                         chain.append(
                             ("UIA Legacy", lambda item=item: self.auto.legacy_default_action(item.node.element))
                         )
-                    self._try(chain, f"menu « {name} » ouvert")
+                    self._try(chain, f'menu "{name}" opened')
                     opened.append(item)
                     time.sleep(0.2)
         except worker.Cancelled:
@@ -683,7 +686,7 @@ class UiaActions(ExecutorBase):
             self._close_menus(opened, clicked)
             raise
         assert outcome is not None
-        outcome.line = f"menu « {path} » : {outcome.line}"
+        outcome.line = f'menu "{path}": {outcome.line}'
         return outcome
 
     def _menu_role(self, e: snapshot.Element, roles: set[str]) -> bool:

@@ -34,7 +34,7 @@ def check_cancelled() -> None:
     (premier plan rendu sur-le-champ, puis foreground.UserInterrupted)."""
     token: threading.Event | None = getattr(_LOCAL, "cancel", None)
     if token is not None and token.is_set():
-        raise Cancelled("Opération annulée : l'appel avait dépassé son délai et a été abandonné.")
+        raise Cancelled("Operation cancelled: the call had exceeded its timeout and was abandoned.")
     if stop.remaining_s() > 0:
         raise Stopped(stop.message())
     foreground.check_activation()
@@ -71,7 +71,7 @@ class Worker:
                 continue
             try:
                 if cancel.is_set():
-                    raise Cancelled("Opération annulée : l'appel avait dépassé son délai et a été abandonné.")
+                    raise Cancelled("Operation cancelled: the call had exceeded its timeout and was abandoned.")
                 future.set_result(fn(automation))
             except BaseException as error:  # noqa: BLE001 - transmis à l'appelant
                 future.set_exception(error)
@@ -103,5 +103,5 @@ class Worker:
             except queue.Empty:
                 break
             if job is not None and job[1].set_running_or_notify_cancel():
-                job[1].set_exception(Cancelled("Annulé : le thread bureau précédent était bloqué."))
+                job[1].set_exception(Cancelled("Cancelled: the previous desktop thread was blocked."))
         old.put(None)

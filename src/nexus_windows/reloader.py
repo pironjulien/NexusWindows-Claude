@@ -35,7 +35,14 @@ from . import codeprint, log
 
 ENV = "NEXUS_WINDOWS_SUPERVISOR"  # pid du superviseur, dans l'environnement de l'enfant
 ENV_CODE = "NEXUS_WINDOWS_SUPERVISOR_CODE"  # empreinte du code du superviseur à son lancement
-STALE_HEADS = ("serveur nexus-windows dépassé", "Attention : serveur nexus-windows dépassé")
+# Début d'une réponse « serveur dépassé » (freshness.STALE, préfixé de « Warning: » par server.py pour une lecture).
+# Les formes françaises restent reconnues : un enfant lancé sur un code d'avant la traduction peut encore répondre.
+STALE_HEADS = (
+    "nexus-windows server out of date",
+    "Warning: nexus-windows server out of date",
+    "serveur nexus-windows dépassé",
+    "Attention : serveur nexus-windows dépassé",
+)
 SETTLE_S = 0.4  # disque relu jusqu'à deux empreintes identiques à SETTLE_S d'écart (installation en cours)
 SETTLE_MAX_S = 10.0
 START_TIMEOUT_S = 60.0
@@ -124,7 +131,7 @@ class Supervisor:
     def to_child(self, message: Message) -> None:
         child = self.child
         if child is None or child.stdin is None:
-            raise BrokenPipeError("serveur arrêté")
+            raise BrokenPipeError("server stopped")
         with self.in_lock:
             child.stdin.write(_encode(message))
             child.stdin.flush()
@@ -222,9 +229,11 @@ class Supervisor:
             lost, self.inflight = self.inflight, {}
             self.cond.notify_all()
         tail = " | ".join(list(self.stderr_tail)[-3:])
-        log.event("reloader-enfant-arrete", {"appels_perdus": len(lost), "stderr": tail[:300]})
+        log.event("reloader-child-stopped", {"lost_calls": len(lost), "stderr": tail[:300]})
         for request_id, (request, _) in lost.items():
-            text = "nexus-windows s'est arrêté pendant l'appel : issue INCONNUE. Relire l'état (look) avant de refaire."
+            text = (
+                "nexus-windows stopped during the call: UNKNOWN outcome. Read the state again (look) before redoing it."
+            )
             if request.get("method") == "tools/call":
                 self.to_client(_tool_error(request_id, text))
             else:
@@ -245,13 +254,13 @@ class Supervisor:
                     break
                 except queue.Empty:
                     if not self.alive() or time.monotonic() > deadline:
-                        raise StartError(f"pas de réponse à {method}") from None
+                        raise StartError(f"no answer to {method}") from None
         except OSError as error:
-            raise StartError(f"liaison coupée ({error})") from error
+            raise StartError(f"link broken ({error})") from error
         finally:
             self.waiters.pop(request_id, None)
         if "error" in reply:
-            raise StartError(f"{method} refusé : {reply['error']}")
+            raise StartError(f"{method} refused: {reply['error']}")
         return reply.get("result") or {}
 
     def _settled_print(self) -> str:
@@ -274,13 +283,11 @@ class Supervisor:
         self._settled_print()
         self.stderr_tail.clear()
         self.spawn()
-        notes = [f"nexus-windows rechargé sur son nouveau code ({before} → {self.child_version}), sans reconnexion"]
+        notes = [f"nexus-windows reloaded on its new code ({before} → {self.child_version}), without reconnecting"]
         if self.init_request is not None:
             init = self._internal("initialize", self.init_request.get("params", {}))
             self.child_version = str(init.get("serverInfo", {}).get("version", self.child_version))
-            notes[0] = (
-                f"nexus-windows rechargé sur son nouveau code ({before} → {self.child_version}), sans reconnexion"
-            )
+            notes[0] = f"nexus-windows reloaded on its new code ({before} → {self.child_version}), without reconnecting"
             if self.initialized is not None:
                 self.to_child(self.initialized)
             if self.client_tools is not None:
@@ -288,28 +295,28 @@ class Supervisor:
                 if tools != self.client_tools:
                     known = self.client_tools
                     groups = {
-                        "nouveaux": sorted(set(tools) - set(known)),
-                        "modifiés": sorted(n for n in tools if n in known and tools[n] != known[n]),
-                        "retirés": sorted(set(known) - set(tools)),
+                        "new": sorted(set(tools) - set(known)),
+                        "changed": sorted(n for n in tools if n in known and tools[n] != known[n]),
+                        "removed": sorted(set(known) - set(tools)),
                     }
-                    detail = ", ".join(f"{label} : {', '.join(names)}" for label, names in groups.items() if names)
+                    detail = ", ".join(f"{label}: {', '.join(names)}" for label, names in groups.items() if names)
                     notes.append(
-                        f"outils changés ({detail}) : client prévenu (list_changed) ; s'ils n'apparaissent pas, "
-                        "ils viendront à la prochaine reconnexion (/mcp), les autres outils marchent déjà"
+                        f"tools changed ({detail}): client notified (list_changed); if they do not appear, "
+                        "they will come at the next reconnection (/mcp), the other tools already work"
                     )
                     self.client_tools = tools
                     self.to_client({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
         self.reloads += 1
         log.event(
-            "reloader-recharge",
+            "reloader-reload",
             {
-                "raison": reason,
-                "avant": before,
-                "apres": self.child_version,
+                "reason": reason,
+                "before": before,
+                "after": self.child_version,
                 "ms": int((time.monotonic() - started) * 1000),
             },
         )
-        return " ; ".join(notes) + ". Numéros [N] et pages d'avant oubliés : refaire look avant d'agir."
+        return "; ".join(notes) + ". Earlier [N] numbers and pages forgotten: look again before acting."
 
     def _ensure_current(self, *, check_code: bool) -> str:
         """Note de rechargement (« » si rien à faire). Le code n'est comparé qu'avant un appel d'outil."""
@@ -322,9 +329,9 @@ class Supervisor:
         if not idle:
             # Appel sans réponse depuis BUSY_WAIT_S : serveur figé. Ses appels reçoivent « issue INCONNUE » et le
             # rechargement repart sur un serveur neuf, plutôt que de geler tous les appels suivants.
-            log.event("reloader-fige", {"en_cours": len(self.inflight)})
+            log.event("reloader-frozen", {"in_flight": len(self.inflight)})
             self._child_died()
-        reason = "arrêté" if not self.alive() else ("refus « dépassé »" if self.force_reload else "code modifié")
+        reason = "stopped" if not self.alive() else ('"out of date" refusal' if self.force_reload else "code changed")
         self.force_reload = False
         return self.reload(reason)
 
@@ -342,12 +349,12 @@ class Supervisor:
             note = self._ensure_current(check_code=method == "tools/call") if method != "initialize" else ""
         except (StartError, OSError) as error:
             self.stop_child()
-            tail = "\n".join(self.stderr_tail) or "(rien sur stderr)"
-            log.event("reloader-echec", {"erreur": str(error)[:300], "stderr": tail[-600:]})
+            tail = "\n".join(self.stderr_tail) or "(nothing on stderr)"
+            log.event("reloader-failure", {"error": str(error)[:300], "stderr": tail[-600:]})
             text = (
-                f"nexus-windows n'a pas pu redémarrer sur son nouveau code ({error}). Rien n'a été fait. Code sur "
-                f"disque cassé ou installation en cours : relancer l'appel dans un instant ; si ça persiste, "
-                f"install.ps1. Fin de la sortie d'erreur :\n{tail[-1500:]}"
+                f"nexus-windows could not restart on its new code ({error}). Nothing was done. Code on disk "
+                f"broken or installation in progress: retry the call in a moment; if it persists, "
+                f"install.ps1. End of the error output:\n{tail[-1500:]}"
             )
             if request_id is not None:
                 error_reply = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32603, "message": text}}
@@ -374,14 +381,14 @@ class Supervisor:
                 if retries < RETRIES:
                     self._requeue(message, retries + 1)
                 else:
-                    self.to_client(_tool_error(request_id, "nexus-windows injoignable : relancer l'appel."))
+                    self.to_client(_tool_error(request_id, "nexus-windows unreachable: retry the call."))
 
     def dispatch(self) -> None:
         while (item := self.inbox.get()) is not None:
             try:
                 self.handle(*item)
             except Exception as error:  # le superviseur ne tombe jamais : il tient la liaison du client
-                log.event("reloader-erreur", {"erreur": f"{type(error).__name__}: {error}"[:300]})
+                log.event("reloader-error", {"error": f"{type(error).__name__}: {error}"[:300]})
 
     def from_client(self, raw: bytes) -> None:
         try:

@@ -29,20 +29,20 @@ def _guard(x: int | None = None, y: int | None = None) -> None:
     de l'emprunt, la cible doit être devant, et le point viser une de ses fenêtres. Sinon (L'utilisateur a repris la main,
     une autre fenêtre s'est intercalée) on s'arrête au lieu d'écrire chez lui."""
     if not _ALLOWED:
-        raise ForegroundError("Entrée réelle hors d'un emprunt autorisé : refusée.")
+        raise ForegroundError("Real input outside an allowed borrow: refused.")
     if stop.remaining_s() > 0:
         raise ForegroundError(stop.message())
     if _SINCE is not None and foreground.user_input_since(*_SINCE):
         raise foreground.UserInterrupted(
-            "L'utilisateur a utilisé le clavier ou la souris pendant la vraie souris/clavier : arrêt, rien d'autre envoyé ; "
-            "ce qui précède a pu arriver dans la cible : vérifier la cible (look)"
+            "The user used the keyboard or mouse during the real mouse/keyboard input: stopped, nothing else sent; "
+            "what came before may have reached the target: check the target (look)"
         )
     if w.root(w.foreground()) not in _ALLOWED:
         raise ForegroundError(
-            "La cible n'est plus au premier plan (L'utilisateur a repris la main ?) : arrêt, rien d'autre envoyé."
+            "The target is no longer in the foreground (the user took over?): stopped, nothing else sent."
         )
     if x is not None and y is not None and w.window_at(x, y) not in _ALLOWED:
-        raise ForegroundError(f"Le point ({x}, {y}) ne vise pas la fenêtre cible (recouverte ?) : arrêt.")
+        raise ForegroundError(f"The point ({x}, {y}) does not hit the target window (covered?): stopped.")
     if _TOKEN is not None:
         foreground.renew(_TOKEN)
 
@@ -51,7 +51,7 @@ def _send(*inputs: w.INPUT) -> None:
     foreground.mark_own_input()
     array = (w.INPUT * len(inputs))(*inputs)
     if w.SendInput(len(inputs), array, ctypes.sizeof(w.INPUT)) != len(inputs):
-        raise ForegroundError("Windows a refusé l'entrée simulée (écran verrouillé, UAC ou bureau sécurisé).")
+        raise ForegroundError("Windows refused the simulated input (locked screen, UAC or secure desktop).")
 
 
 def _key(vk: int, up: bool = False, scan: int = 0, unicode: bool = False) -> w.INPUT:
@@ -99,9 +99,9 @@ def put_in_front(hwnd: int) -> bool:
     arrêt d'urgence contrôlé juste avant ; la cible passe devant sous suspension de la garde, et les surveillances en
     cours (traîne d'un appel précédent comprise) adoptent ce premier plan voulu au lieu de le rendre. Jeton commun aux
     agents tenu le temps de la mise au premier plan."""
-    with foreground.agent_token("fenêtre mise devant"):
+    with foreground.agent_token("window put in front"):
         if not foreground.wait_typing_pause():
-            raise foreground.BusyUser("L'utilisateur utilise la souris ou le clavier : mise au premier plan reportée.")
+            raise foreground.BusyUser("The user is using the mouse or keyboard: bringing to the foreground postponed.")
         worker.check_cancelled()
         with foreground.suspended():
             if not bring_to_front(hwnd):
@@ -114,9 +114,9 @@ def _holder() -> str:
     """Qui tient le premier plan, pour un refus compréhensible."""
     fg = w.foreground()
     return foreground.system_foreground() or (
-        f"premier plan tenu par « {w.window_text(fg) or w.class_name(fg)} » ({w.process_name(w.window_pid(fg))})"
+        f'foreground held by "{w.window_text(fg) or w.class_name(fg)}" ({w.process_name(w.window_pid(fg))})'
         if fg
-        else "aucune fenêtre au premier plan"
+        else "no window in the foreground"
     )
 
 
@@ -140,8 +140,8 @@ class Hold:
         if foreground.user_input_since(self.started, self.started_tick):
             self.user_took_over = True
             raise foreground.UserInterrupted(
-                "L'utilisateur a utilisé le clavier ou la souris pendant le lot au premier plan : lot arrêté, premier plan "
-                "laissé à l'utilisateur"
+                "The user used the keyboard or mouse during the foreground batch: batch stopped, foreground "
+                "left to the user"
             )
         if w.root(w.foreground()) not in self.windows:
             worker.check_cancelled()
@@ -169,7 +169,7 @@ def held(hwnd: int, windows: set[int] | None = None):
     les surveillances du premier plan l'adoptent au lieu de le « rendre ». À la sortie (fin, erreur, arrêt
     d'urgence), premier plan rendu à la fenêtre de l'utilisateur (sauf s'il a repris la main lui-même) et curseur remis si
     nous l'avons déplacé et qu'il n'a pas bougé depuis. Jeton commun aux agents tenu pendant tout le lot."""
-    with foreground.agent_token("lot au premier plan"), _held(hwnd, windows) as hold:
+    with foreground.agent_token("foreground batch"), _held(hwnd, windows) as hold:
         yield hold
 
 
@@ -178,7 +178,7 @@ def _held(hwnd: int, windows: set[int] | None):
     global _HOLD, _LAST_MOVE
     if not foreground.wait_typing_pause():
         raise foreground.BusyUser(
-            "L'utilisateur utilise la souris ou le clavier : lot au premier plan reporté, rien n'a été fait."
+            "The user is using the mouse or keyboard: foreground batch postponed, nothing was done."
         )
     worker.check_cancelled()
     previous = w.foreground()
@@ -188,7 +188,7 @@ def _held(hwnd: int, windows: set[int] | None):
     _LAST_MOVE = None
     with foreground.suspended():
         if not bring_to_front(hwnd):
-            raise ForegroundError(f"Windows refuse de mettre la fenêtre devant ({_holder()}) : rien n'a été fait.")
+            raise ForegroundError(f"Windows refuses to bring the window to the front ({_holder()}): nothing was done.")
         foreground.adopt_foreground()
     _HOLD = hold
     try:
@@ -212,7 +212,7 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
     suspendue lot par lot. Le curseur n'est remis en place que si nous l'avons déplacé et que l'utilisateur ne l'a pas
     bougé depuis. Jeton commun aux agents tenu pendant tout l'emprunt.
     """
-    with foreground.agent_token("vraie souris ou vrai clavier"), _borrowed(hwnd, windows):
+    with foreground.agent_token("real mouse or keyboard"), _borrowed(hwnd, windows):
         yield
 
 
@@ -220,9 +220,7 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
 def _borrowed(hwnd: int, windows: set[int] | None):
     global _LAST_MOVE, _ALLOWED, _TOKEN, _SINCE
     if not foreground.wait_typing_pause():
-        raise foreground.BusyUser(
-            "L'utilisateur utilise la souris ou le clavier : emprunt reporté, rien n'a été envoyé."
-        )
+        raise foreground.BusyUser("The user is using the mouse or keyboard: borrow postponed, nothing was sent.")
     worker.check_cancelled()  # arrêt d'urgence demandé pendant l'attente : rien n'est mis devant
     previous = w.foreground()
     cursor = w.cursor_pos()
@@ -236,7 +234,7 @@ def _borrowed(hwnd: int, windows: set[int] | None):
         try:
             if not bring_to_front(hwnd):
                 raise ForegroundError(
-                    f"Windows refuse de mettre la fenêtre devant ({_holder()}) : rien n'a été envoyé."
+                    f"Windows refuses to bring the window to the front ({_holder()}): nothing was sent."
                 )
             _ALLOWED = set(allowed)
             yield

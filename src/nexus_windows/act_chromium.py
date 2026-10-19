@@ -40,11 +40,11 @@ class ChromiumActions(ExecutorBase):
         role = e.role
         if role in ("TabItem", "RadioButton") and p.get("selected"):
             # Rien à faire : un clic de plus ne changerait rien et ne pourrait pas être relu (faux « sans effet »).
-            return Outcome(True, f"{what} (déjà sélectionné — relu ✓)", "aucune", [], True)
+            return Outcome(True, f"{what} (already selected — read back ✓)", "none", [], True)
         chain: list[tuple[str, Callable[[], Any]]] = []
         if role in ("Edit", "Document"):
-            chain.append(("focus sans activation", lambda: self._sim_focus(e)))
-            chain.append(("focus UIA", lambda: self._quiet_focus(e)))
+            chain.append(("focus without activation", lambda: self._sim_focus(e)))
+            chain.append(("UIA focus", lambda: self._quiet_focus(e)))
         elif role == "CheckBox" and p.get("has_toggle"):
             chain.append(("UIA Toggle", self._effect(e, lambda: self.auto.toggle(e.node.element))))
         else:
@@ -70,7 +70,7 @@ class ChromiumActions(ExecutorBase):
                 chain.append(("UIA Invoke", self._effect(e, lambda: self.auto.invoke(e.node.element))))
             elif p.get("has_legacy"):
                 chain.append(
-                    ("UIA action par défaut", self._effect(e, lambda: self.auto.legacy_default_action(e.node.element)))
+                    ("UIA default action", self._effect(e, lambda: self.auto.legacy_default_action(e.node.element)))
                 )
             if expandable and not expand_first:
                 chain.append(expand_step)
@@ -80,7 +80,7 @@ class ChromiumActions(ExecutorBase):
                 if child is not None:
                     chain.append(
                         (
-                            f"UIA Invoke sur {child.control_type} enfant",
+                            f"UIA Invoke on child {child.control_type}",
                             self._effect(e, lambda: self.auto.invoke(child.element)),
                         )
                     )
@@ -88,7 +88,7 @@ class ChromiumActions(ExecutorBase):
                 chain.append(("UIA Select", self._effect(e, lambda: self.auto.select(e.node.element))))
         if page is not None:
             chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e))))
-        chain.append(("clic par messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
+        chain.append(("click by messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
         return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e)))
 
     @staticmethod
@@ -111,7 +111,7 @@ class ChromiumActions(ExecutorBase):
         try:
             own = self._signature_own(e)
         except uia.UIAError, comtypes.COMError:
-            own = ("disparu",)
+            own = ("gone",)
         windows = tuple(
             sorted(
                 (h, w.window_text(h))
@@ -155,7 +155,7 @@ class ChromiumActions(ExecutorBase):
                 if change:
                     return self._own_state_change(e, before, change)
                 if time.monotonic() >= deadline:
-                    raise NoEffect(f"aucun effet constaté en {settle_s:.1f} s")
+                    raise NoEffect(f"no effect observed within {settle_s:.1f} s")
 
         return run
 
@@ -165,7 +165,9 @@ class ChromiumActions(ExecutorBase):
         sélectionné). Élément sélectionnable, cochable ou dépliable : son état est relu encore un instant pour le
         prouver (✓). Rien n'est rejoué : l'action a déjà eu un effet."""
         p = e.props
-        if change.startswith("relu ✓") or not any(p.get(k) for k in ("has_selection_item", "has_toggle", "has_expand")):
+        if change.startswith("read back ✓") or not any(
+            p.get(k) for k in ("has_selection_item", "has_toggle", "has_expand")
+        ):
             return change
         deadline = time.monotonic() + wait_s
         while time.monotonic() < deadline:
@@ -176,7 +178,7 @@ class ChromiumActions(ExecutorBase):
             except uia.UIAError, comtypes.COMError:
                 break
             proved = self._describe_change(before, (own, before[1], before[2]))
-            if proved.startswith("relu ✓"):
+            if proved.startswith("read back ✓"):
                 return proved
         return change
 
@@ -184,23 +186,23 @@ class ChromiumActions(ExecutorBase):
         own0, win0, img0 = before
         own1, win1, img1 = after
         if own1 != own0:
-            if own1 == ("disparu",):
-                return "effet constaté : l'élément a disparu (interface changée)"
+            if own1 == ("gone",):
+                return "effect observed: the element disappeared (interface changed)"
             selected, toggle, expand = own1[0], own1[1], own1[2]
             if selected and not own0[0]:
-                return "relu ✓ sélectionné"
+                return "read back ✓ selected"
             if toggle is not None and toggle != own0[1]:
-                return "relu ✓ " + {0: "décoché", 1: "coché"}.get(toggle, "coche changée")
+                return "read back ✓ " + {0: "unchecked", 1: "checked"}.get(toggle, "check state changed")
             if expand is not None and expand != own0[2]:
-                return "relu ✓ " + ("ouvert" if expand == 1 else "fermé")
-            return "effet constaté : état de l'élément changé"
+                return "read back ✓ " + ("expanded" if expand == 1 else "collapsed")
+            return "effect observed: element state changed"
         if win1 != win0:
             new = [title for h, title in win1 if (h, title) not in win0 and title]
-            return "effet constaté : " + (
-                f"fenêtre « {snapshot.clip(new[0], 40)} »" if new else "menu ou fenêtre ouverts/fermés"
+            return "effect observed: " + (
+                f'window "{snapshot.clip(new[0], 40)}"' if new else "menu or window opened/closed"
             )
         if self._images_differ(img0, img1):
-            return "effet constaté : changement visible"
+            return "effect observed: visible change"
         return ""
 
     # --- DevTools -----------------------------------------------------------------------------------------------
@@ -211,7 +213,7 @@ class ChromiumActions(ExecutorBase):
         try:
             return self._get_page()
         except cdp.PageBusy as error:
-            self.notes.append(f"DevTools ignoré : {_short(error)}")
+            self.notes.append(f"DevTools skipped: {_short(error)}")
             return None
 
     def _cdp_click(self, page: cdp.Page, x: int, y: int, button: str = "left", count: int = 1) -> str:
@@ -252,7 +254,7 @@ class ChromiumActions(ExecutorBase):
         if not editable:
             script = f"(() => {{ const el = document.elementFromPoint({cx}, {cy}); if (!el) return false; el.focus(); return true; }})()"
             if not page.evaluate(script):
-                raise cdp.CDPError("aucun élément sous le point")
+                raise cdp.CDPError("no element under the point")
             return
         script = (
             f"(() => {{ const hit = document.elementFromPoint({cx}, {cy}); if (!hit) return 'none';"
@@ -263,9 +265,9 @@ class ChromiumActions(ExecutorBase):
         )
         state = page.evaluate(script)
         if state == "none":
-            raise cdp.CDPError("aucun élément sous le point")
+            raise cdp.CDPError("no element under the point")
         if state != "ok":
-            raise cdp.CDPError("aucun champ de saisie ne prend le focus sous le point")
+            raise cdp.CDPError("no input field takes the focus under the point")
 
     def _visible_point(self, e: snapshot.Element, refresh: bool = False) -> tuple[int, int] | None:
         """Centre de la partie de l'élément visible dans la page (None : hors de la zone visible)."""
@@ -281,7 +283,7 @@ class ChromiumActions(ExecutorBase):
     def _cdp_focus_field(self, page: cdp.Page, e: snapshot.Element) -> None:
         """Focus DOM du champ par sa partie visible ; hors de la zone visible (ou rien de focalisable au point), il est
         ramené à l'écran (UIA ScrollIntoView) puis le focus est réessayé. Échec : refus avec la cause."""
-        cause = "hors de la zone visible de la page"
+        cause = "outside the visible area of the page"
         for attempt in range(2):
             point = self._visible_point(e, refresh=attempt > 0)
             if point is not None:
@@ -295,14 +297,14 @@ class ChromiumActions(ExecutorBase):
             try:
                 self.auto.scroll_into_view(e.node.element)
             except EXPECTED as error:
-                raise cdp.CDPError(f"{cause} ; ScrollIntoView impossible : {_short(error)}") from None
+                raise cdp.CDPError(f"{cause}; ScrollIntoView impossible: {_short(error)}") from None
             self._settle(lambda: self._visible_point(e, refresh=True) is not None)  # position publiée avec retard
-        raise cdp.CDPError(f"{cause}, même après ScrollIntoView")
+        raise cdp.CDPError(f"{cause}, even after ScrollIntoView")
 
     @staticmethod
     def _cdp_refuse_secret(page: cdp.Page) -> None:
         if page.evaluate("(() => { const a = document.activeElement; return !!a && a.type === 'password'; })()"):
-            raise ActionError("Le champ qui a le focus est un mot de passe : je n'y écris pas (règle de sécurité).")
+            raise ActionError("The focused field is a password field: I do not write in it (security rule).")
 
     # --- Activation simulée : clavier sans activation réelle (methods.simulated_activation) ----------------------
     def _sim_top(self, e: snapshot.Element | None = None) -> int:
@@ -322,21 +324,21 @@ class ChromiumActions(ExecutorBase):
         try:
             self.auto.take_focus(e.node.element)
         except EXPECTED as error:
-            raise methods.MethodError(f"focus sans activation impossible ({_short(error)})") from None
+            raise methods.MethodError(f"focus without activation impossible ({_short(error)})") from None
         deadline = time.monotonic() + timeout_s
         while True:
             with contextlib.suppress(*EXPECTED):
                 if self._refresh(e.node.element).get("focused"):  # publication déclenchée (fenêtre occultée)
                     return
             if time.monotonic() >= deadline:
-                raise methods.MethodError("focus sans activation non relu sur l'élément : rien n'a été tapé")
+                raise methods.MethodError("focus without activation not read back on the element: nothing was typed")
             time.sleep(0.02)
 
     def _sim_focus(self, e: snapshot.Element) -> str:
         started = time.perf_counter()
         with self._sim_activation(e):
             self._take_focus(e)
-        return f"relu ✓ focus, sans activation (activation simulée) {round((time.perf_counter() - started) * 1000)} ms"
+        return f"read back ✓ focus, without activation (simulated activation) {round((time.perf_counter() - started) * 1000)} ms"
 
     # --- Texte --------------------------------------------------------------------------------------------------
     def _is_multiline_chromium(self, e: snapshot.Element) -> bool:
@@ -404,33 +406,33 @@ class ChromiumActions(ExecutorBase):
                 self.auto.set_focus(e.node.element)
                 self._ensure_active()
                 time.sleep(0.03)
-                activation.check("rien n'a été tapé, l'action est annulée")
+                activation.check("nothing was typed, the action is cancelled")
                 methods.post_chars(methods.keyboard_target(self.hwnd, self.windows), option)
                 self._settle(lambda: snapshot.norm(self._read_value(e) or "").lower() == option.strip().lower())
-            return f"activation brève {round((time.perf_counter() - started) * 1000)} ms"
+            return f"brief activation {round((time.perf_counter() - started) * 1000)} ms"
 
         def typing_simulated() -> str:
             """Même frappe, sans activation : focus accSelect relu, activation simulée (premier plan intact)."""
             started = time.perf_counter()
             with self._sim_activation(e) as sim:
                 self._take_focus(e)
-                sim.check("rien n'a été tapé, l'action est annulée")
+                sim.check("nothing was typed, the action is cancelled")
                 methods.post_chars(self._sim_top(e), option, check=sim.checkpoint)
                 self._settle(lambda: snapshot.norm(self._read_value(e) or "").lower() == option.strip().lower())
-            return f"sans activation (activation simulée) {round((time.perf_counter() - started) * 1000)} ms"
+            return f"without activation (simulated activation) {round((time.perf_counter() - started) * 1000)} ms"
 
         if page is None:  # DevTools disponible : jamais de frappes (activation brève, que devtools=true évite)
-            chain.append(("frappes sans activation", typing_simulated))
-            chain.append(("frappes", typing))
-        what = f"« {option} » choisi dans {e.describe()}"
+            chain.append(("keystrokes without activation", typing_simulated))
+            chain.append(("keystrokes", typing))
+        what = f'"{option}" chosen in {e.describe()}'
         outcome = self._try(chain, what)
         if self._value_is(e, option):
             outcome.verified = True
-            outcome.line += " — relu ✓"
+            outcome.line += " — read back ✓"
             return outcome
         outcome.ok = False
         outcome.line += (
-            " — ÉCHEC À LA RELECTURE : relancer avec foreground=true (accord de l'utilisateur) ou lancer l'application avec "
+            " — READ-BACK FAILED: run again with foreground=true (the user's consent) or launch the application with "
             "devtools=true"
         )
         return outcome
@@ -448,4 +450,4 @@ class ChromiumActions(ExecutorBase):
             " el.dispatchEvent(new Event('change', {bubbles: true})); return true; })()"
         )
         if not page.evaluate(script):
-            raise cdp.CDPError("option introuvable (ou en double) dans le <select>")
+            raise cdp.CDPError("option not found (or duplicated) in the <select>")

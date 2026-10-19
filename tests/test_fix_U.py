@@ -80,7 +80,7 @@ def test_react_tab_uses_default_action_not_select_and_reads_selection():
     tab, _icon = react_tab()
     auto = ReactAuto(tab, {"legacy"})
     outcome = chromium_executor(make_view(tab), auto).click("Stockage")
-    assert outcome.ok and outcome.verified and "relu ✓ sélectionné" in outcome.line
+    assert outcome.ok and outcome.verified and "read back ✓ selected" in outcome.line
     assert [c[0] for c in auto.calls] == ["legacy"]  # jamais Select d'abord
 
 
@@ -88,9 +88,9 @@ def test_no_effect_moves_to_the_clickable_child():
     tab, icon = react_tab()
     auto = ReactAuto(tab, {"invoke"})
     outcome = chromium_executor(make_view(tab), auto).click("Stockage")
-    assert outcome.ok and outcome.verified and "enfant" in outcome.line
+    assert outcome.ok and outcome.verified and "child" in outcome.line
     assert [c[0] for c in auto.calls] == ["legacy", "invoke"] and auto.calls[1][1] is icon.element
-    assert "aucun effet constaté" in " ".join(outcome.attempts)
+    assert "no effect observed" in " ".join(outcome.attempts)
 
 
 def test_invoke_and_default_action_are_never_both_played():
@@ -119,8 +119,8 @@ def test_change_description():
     opened = (base[0], ((1, "Steam"), (2, "Paramètres Steam")), None)
     assert "Paramètres Steam" in ex._describe_change(base, opened)
     expanded = ((None, None, 1, "x", None, True), base[1], None)
-    assert ex._describe_change(base, expanded) == "relu ✓ ouvert"
-    assert "disparu" in ex._describe_change(base, (("disparu",), base[1], None))
+    assert ex._describe_change(base, expanded) == "read back ✓ expanded"
+    assert "disappeared" in ex._describe_change(base, (("gone",), base[1], None))
 
 
 # --- 3. foreground=true : repli vers la vraie souris quand les messages sont ignorés -----------------------------
@@ -152,7 +152,7 @@ def test_late_effect_is_not_replayed_with_real_mouse(monkeypatch):
     ex._watched = _ignored(still=False)
     monkeypatch.setattr(realinput, "click", lambda *a, **k: pytest.fail("vraie souris après un effet tardif"))
     outcome = ex.click("Steam")
-    assert outcome.ok and "tardif" in outcome.line
+    assert outcome.ok and "delayed" in outcome.line
 
 
 def test_ignored_messages_without_permission_stay_unconfirmed():
@@ -226,7 +226,7 @@ def test_hold_gives_back_on_error(desk):
 # --- Steam : politique, lancement, DevTools --------------------------------------------------------------------
 @pytest.mark.parametrize("args", ["-cef-enable-debugging", "--devtools-port=9", "/cef-enable-debugging"])
 def test_model_can_never_open_steam_devtools_itself(args):
-    assert "ouvre un canal" in (policy.switch_refusal(args, chromium=False, browser=False) or "")
+    assert "opens a control channel" in (policy.switch_refusal(args, chromium=False, browser=False) or "")
 
 
 def test_view_switches_are_allowed():
@@ -271,7 +271,7 @@ def test_restart_is_refused_before_closing_steam_when_port_is_taken(monkeypatch)
 
 
 def test_restart_only_for_steam():
-    with pytest.raises(launch.LaunchError, match="seulement pour Steam"):
+    with pytest.raises(launch.LaunchError, match="Steam only"):
         launch.launch(r"C:\Windows\notepad.exe", restart=True)
 
 
@@ -306,7 +306,7 @@ def test_nested_same_name_tab_is_one_target():
 def test_unnamed_combobox_is_found_by_its_value():
     combo = chrome("ComboBox", "", value="Disque local (C:) 357 Go libres", has_expand=True)
     picked, note = snapshot.pick(make_view(combo), "Disque local")
-    assert picked.node is combo and "partielle" in note
+    assert picked.node is combo and "partial match" in note
 
 
 # --- Page DevTools par document (Steam : cadre et magasin dans une même fenêtre) --------------------------------

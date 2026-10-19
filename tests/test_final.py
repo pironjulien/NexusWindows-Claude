@@ -90,4 +90,4 @@ def test_steal_during_wait_content_is_given_back_at_once(monkeypatch):
     result = launch.launch("Calculatrice", auto=as_auto(object()))
     assert gave and gave[-1] == JULIEN and result.returned
     assert steal["back"] - steal["at"] < 0.2  # rendu pendant l'attente, pas à la fin du lancement
-    assert any("rendu aussitôt" in n for n in result.notes)
+    assert any("given back to the user at once" in n for n in result.notes)

@@ -74,7 +74,7 @@ def test_server_resumes_store_app_before_look(calc, monkeypatch):
     monkeypatch.setattr(server.launcher, "wait_content", lambda auto, hwnd, limit_s=3.0: waited.append(limit_s))
     notes: list[str] = []
     server._resume_store_app(None, 1, notes)  # type: ignore[arg-type]
-    assert calc.resumed == [CALC] and waited and "reprise sans premier plan" in notes[0]
+    assert calc.resumed == [CALC] and waited and "resumed without foreground" in notes[0]
 
 
 def test_server_ignores_desktop_frameworks(monkeypatch):

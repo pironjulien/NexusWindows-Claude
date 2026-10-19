@@ -23,7 +23,7 @@ def test_check_verified_after_set():
     report, failed, symbols = run(
         ex, server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien"))
     )
-    assert not failed and symbols == ["✓"] and "vérifié" in report[0]
+    assert not failed and symbols == ["✓"] and "verified" in report[0]
 
 
 def test_check_already_true_sends_nothing():
@@ -33,7 +33,7 @@ def test_check_already_true_sends_nothing():
         executor(make_view(field), auto),
         server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien")),
     )
-    assert not failed and symbols == ["="] and auto.calls == [] and "déjà vrai" in report[0]
+    assert not failed and symbols == ["="] and auto.calls == [] and "already true" in report[0]
 
 
 def test_check_not_met_stops_the_batch():
@@ -47,7 +47,7 @@ def test_check_not_met_stops_the_batch():
         ),
         server.Step(do="click", target="Lancer"),
     )
-    assert failed and symbols == ["✗"] and "NON ATTEINT" in report[0] and "non exécutées" in report[-1]
+    assert failed and symbols == ["✗"] and "NOT REACHED" in report[0] and "not run" in report[-1]
 
 
 def test_check_unreadable_state_is_unknown_not_success():
@@ -58,7 +58,7 @@ def test_check_unreadable_state_is_unknown_not_success():
         ex,
         server.Step(do="click", target="Lancer", timeout=0.2, check=server.Check(target="Text:Statut", checked=True)),
     )
-    assert not failed and symbols == ["~"] and "issue inconnue" in report[0]
+    assert not failed and symbols == ["~"] and "unknown outcome" in report[0]
 
 
 def test_check_exists_false_waits_for_disappearance():
@@ -89,7 +89,7 @@ def test_absence_in_an_empty_reading_is_unknown():
     button = node("Button", "Fermer", has_invoke=True)
     view = make_view(button)  # node_count 0 : lecture vide, rien n'y est prouvé absent
     verdict = postcond.evaluate(executor(view, FakeAuto()), {"target": "Confirmer", "exists": False})
-    assert verdict.state is None and "lecture incomplète" in verdict.detail
+    assert verdict.state is None and "read is incomplete" in verdict.detail
 
 
 def test_compare_fields():
@@ -103,7 +103,7 @@ def test_compare_fields():
 
 
 def test_tally():
-    assert server._tally(["✓", "✓", "=", "~"]) == "Bilan : 2 vérifiées, 1 déjà faites, 1 issue inconnue."
+    assert server._tally(["✓", "✓", "=", "~"]) == "Summary: 2 verified, 1 already done, 1 unknown outcome."
     assert server._tally([]) == ""
 
 
@@ -133,9 +133,9 @@ def test_remember_get_expand_and_forget():
         routines.expand(entry, {})
     assert not routines.changed(entry, FP) and routines.changed(entry, FP | {"mtime": 2})
     routines.record_run("test.exe", "saisir nom", False)
-    assert "(à revoir)" in routines.summary("test.exe")
+    assert "(needs review)" in routines.summary("test.exe")
     assert routines.forget("test.exe", "saisir nom") and routines.names("test.exe") == []
-    with pytest.raises(routines.RoutineError, match="aucune enregistrée"):
+    with pytest.raises(routines.RoutineError, match="none saved"):
         routines.get("test.exe", "saisir nom")
 
 
@@ -147,14 +147,14 @@ def test_bad_name_refused():
 def test_server_remember_only_fully_proven_batches():
     steps = [server.Step(do="click", target="OK", expect="Fait")]
     refused = server._remember("test.exe", FP, "T", "r", steps, ["~"], False)
-    assert "NON enregistrée" in refused and routines.names("test.exe") == []
-    assert "NON enregistrée" in server._remember("test.exe", FP, "T", "r", steps, ["✗"], True)
+    assert "NOT saved" in refused and routines.names("test.exe") == []
+    assert "NOT saved" in server._remember("test.exe", FP, "T", "r", steps, ["✗"], True)
     by_number = [server.Step(do="click", target="#2")]
-    assert "numéro" in server._remember("test.exe", FP, "T", "r", by_number, ["✓"], False)
-    assert "enregistrée pour test.exe" in server._remember("test.exe", FP, "T", "r", steps, ["✓"], False)
+    assert "by number" in server._remember("test.exe", FP, "T", "r", by_number, ["✓"], False)
+    assert "saved for test.exe" in server._remember("test.exe", FP, "T", "r", steps, ["✓"], False)
     saved = json.loads((routines.ROOT / "test.exe.json").read_text(encoding="utf-8"))
     assert saved["routines"]["r"]["steps"] == [{"do": "click", "target": "OK", "expect": "Fait"}]
-    assert "oubliée" in server._remember("test.exe", FP, "T", "r", [], [], False)
+    assert "forgotten" in server._remember("test.exe", FP, "T", "r", [], [], False)
 
 
 def test_server_routine_steps_and_notes():
@@ -163,7 +163,7 @@ def test_server_routine_steps_and_notes():
     steps, template = server._routine_steps("test.exe", FP | {"size": 99}, "r", {"x": "abc"}, notes)
     assert template[0].text == "{{x}}"
     assert steps[0].text == "abc" and steps[0].do == "set"
-    assert any("mise à jour" in n for n in notes)
+    assert any("updated since the routine" in n for n in notes)
 
 
 def test_template_steps_run_with_params_and_refuse_missing_values():

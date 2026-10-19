@@ -47,27 +47,27 @@ class PointerActions(ExecutorBase):
             try:
                 self.auto.scroll_into_view(e.node.element)
             except EXPECTED as error:
-                cause = f" ; ScrollIntoView impossible : {_short(error)}"
+                cause = f"; ScrollIntoView failed: {_short(error)}"
             try:
                 e.node.props.update(self._refresh(e.node.element))
             except EXPECTED as error:
-                cause += f" ; relecture impossible : {_short(error)}"
+                cause += f"; read-back failed: {_short(error)}"
             if e.rect is None or e.props.get("offscreen"):
                 raise ActionError(
-                    f"{e.describe()} est hors de la zone visible, même après ScrollIntoView{cause} : rien n'a été "
-                    "envoyé. Faire défiler (scroll) jusqu'à lui, puis relire (look)."
+                    f"{e.describe()} is outside the visible area, even after ScrollIntoView{cause}: nothing was "
+                    "sent. Scroll to it, then read again (look)."
                 )
         rect = e.rect
         if rect is None:
-            raise ActionError(f"{e.describe()} n'a pas de position à l'écran.")
+            raise ActionError(f"{e.describe()} has no position on screen.")
         window = e.window if e.window in self.windows else self.hwnd
         if not w.IsWindow(window):  # fenêtre disparue : rien pour découper, l'envoi échouera de lui-même
             return rect.center
         visible = rect.intersect(w.frame_rect(window))
         if visible is None:
             raise ActionError(
-                f"{e.describe()} est en dehors de sa fenêtre (défilé hors vue ?) : rien n'a été envoyé. Faire défiler "
-                "(scroll) jusqu'à lui, puis relire (look)."
+                f"{e.describe()} is outside its window (scrolled out of view?): nothing was sent. Scroll "
+                "to it, then read again (look)."
             )
         return visible.center
 
@@ -147,17 +147,17 @@ class PointerActions(ExecutorBase):
                 and element.rect.width * element.rect.height < window_area / 4
             ):
                 outcome = self.click_element(element, button, count)
-                outcome.line += f" au point {image_xy}"
+                outcome.line += f" at point {image_xy}"
                 return outcome
         chain: list[tuple[str, Callable[[], Any]]] = []
         page = self._page_if_free()
         if page is not None:
             chain.append(("DevTools", lambda: self._cdp_click(page, x, y, button, count)))
         if view.framework not in NO_MOUSE_MESSAGES:
-            chain.append(("clic par messages", self._watched(lambda: self._post_click(x, y, button, count))))
-        label = {"left": "clic", "right": "clic droit", "middle": "clic milieu"}[button]
+            chain.append(("click by messages", self._watched(lambda: self._post_click(x, y, button, count))))
+        label = {"left": "click", "right": "right click", "middle": "middle click"}[button]
         return self._try_or_foreground(
-            chain, f"{label} au point {image_xy}", lambda: realinput.click(x, y, button, count)
+            chain, f"{label} at point {image_xy}", lambda: realinput.click(x, y, button, count)
         )
 
     def _real_write(self, e: snapshot.Element, text: str, replace: bool) -> None:
@@ -215,7 +215,7 @@ class PointerActions(ExecutorBase):
         aliases = {"bas": "down", "haut": "up", "gauche": "left", "droite": "right"}
         direction = aliases.get(direction, direction)
         if direction not in ("up", "down", "left", "right", "into_view"):
-            raise ActionError("direction : up, down, left, right ou into_view.")
+            raise ActionError("direction: up, down, left, right or into_view.")
         amount = max(1, min(int(amount or 3), 50))
         view = self._rebuild() if self.acted else self.view
         element = None
@@ -228,10 +228,10 @@ class PointerActions(ExecutorBase):
                 element = target
         if direction == "into_view":
             if element is None:
-                raise ActionError("into_view demande un élément.")
+                raise ActionError("into_view requires an element.")
             return self._try(
                 [("UIA ScrollIntoView", lambda: self.auto.scroll_into_view(element.node.element))],
-                f"{element.describe()} amené à l'écran",
+                f"{element.describe()} brought into view",
             )
         container = None
         if element is not None:
@@ -251,7 +251,7 @@ class PointerActions(ExecutorBase):
                 container = self._main_scroll_container(view)
                 if container is not None and container.rect is not None:
                     point = container.rect.center
-        where = f" de {snapshot.Element(0, container, 0, self.hwnd).describe()}" if container is not None else ""
+        where = f" of {snapshot.Element(0, container, 0, self.hwnd).describe()}" if container is not None else ""
         chain: list[tuple[str, Callable[[], Any]]] = []
         vertical = direction in ("up", "down")
         scroll_uia: Callable[[], str] | None = None
@@ -263,7 +263,7 @@ class PointerActions(ExecutorBase):
                 before = self.auto.scroll_percent(container.element)
                 axis = 1 if vertical else 0
                 if before is not None and before[axis] < 0:
-                    raise methods.MethodError("ce conteneur ne défile pas dans cette direction")
+                    raise methods.MethodError("this container does not scroll in this direction")
                 for _ in range(amount):
                     worker.check_cancelled()
                     h = back if direction == "left" else step if direction == "right" else 2
@@ -278,16 +278,16 @@ class PointerActions(ExecutorBase):
                         break
                     time.sleep(0.05)
                 if after is None or after[axis] < 0:
-                    return "position non relue"
+                    return "position not read back"
                 if after != before:
-                    return f"relu ✓ position {after[axis]:.0f} %"
+                    return f"read back ✓ position {after[axis]:.0f} %"
                 at_end = after[axis] >= 99.9 if direction in ("down", "right") else after[axis] <= 0.1
                 if at_end:
-                    return f"relu ✓ déjà en butée ({after[axis]:.0f} %)"
+                    return f"read back ✓ already at the end ({after[axis]:.0f} %)"
                 # Défilement transmis sans effet relu : aucune autre technique par-dessus (double défilement possible).
                 raise Unconfirmed(
-                    f"défilement {direction} : UIA Scroll transmis, position inchangée ({after[axis]:.0f} %) en 1 s : "
-                    "vérifier sur l'image avant de recommencer."
+                    f"scroll {direction}: UIA Scroll sent, position unchanged ({after[axis]:.0f} %) after 1 s: "
+                    "check the image before trying again."
                 )
 
             scroll_uia = _scroll_uia
@@ -305,19 +305,19 @@ class PointerActions(ExecutorBase):
                 cx, cy = self._css_point(page, *aim)
                 page.wheel(cx, cy, -delta if not horizontal else 0, -delta if horizontal else 0)
 
-            chain.append(("DevTools molette", scroll_cdp))
+            chain.append(("DevTools wheel", scroll_cdp))
         if scroll_uia is not None:
             chain.append(("UIA Scroll", scroll_uia))
         process = w.process_name(w.window_pid(self.hwnd)).lower()
         if view.framework not in NO_MOUSE_MESSAGES and process not in BROWSERS_WITHOUT_MESSAGE_WHEEL:
             chain.append(
                 (
-                    "molette par messages",
+                    "wheel by messages",
                     self._watched(lambda: methods.post_wheel(self._window_under(*aim), *aim, delta, horizontal)),
                 )
             )
         return self._try_or_foreground(
-            chain, f"défilement {direction} ×{amount}{where}", lambda: realinput.wheel(*aim, delta, horizontal)
+            chain, f"scroll {direction} ×{amount}{where}", lambda: realinput.wheel(*aim, delta, horizontal)
         )
 
     # --- Glisser et survol : DevTools si disponible, sinon vraie souris -------------------------------------------
@@ -332,13 +332,13 @@ class PointerActions(ExecutorBase):
         if page is not None:
             a, b = self._css_point(page, x1, y1), self._css_point(page, x2, y2)
             page.drag(*a, *b)
-            return Outcome(True, "glisser-déposer (DevTools)", "DevTools")
-        return self._foreground_or_fail("glisser-déposer", lambda: realinput.drag(x1, y1, x2, y2))
+            return Outcome(True, "drag and drop (DevTools)", "DevTools")
+        return self._foreground_or_fail("drag and drop", lambda: realinput.drag(x1, y1, x2, y2))
 
     def hover(self, spec: Any) -> Outcome:
         x, y = self._point(spec)
         page = self._get_page()
         if page is not None:
             page.hover(*self._css_point(page, x, y))
-            return Outcome(True, "survol (DevTools)", "DevTools")
-        return self._foreground_or_fail("survol", lambda: realinput.move(x, y))
+            return Outcome(True, "hover (DevTools)", "DevTools")
+        return self._foreground_or_fail("hover", lambda: realinput.move(x, y))

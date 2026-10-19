@@ -22,11 +22,11 @@ class WaitActions(ExecutorBase):
     def _unreadable(view: snapshot.View) -> str:
         """Pourquoi un texte absent de cette vue n'y est pas prouvé absent (vide : la vue est complète)."""
         if view.node_count <= 1 or not view.elements:
-            return "arbre UI Automation vide"
+            return "UI Automation tree empty"
         if view.truncated:
-            return f"arbre UI Automation tronqué ({view.node_count} nœuds lus)"
+            return f"UI Automation tree truncated ({view.node_count} nodes read)"
         if view.web_missing:
-            return "contenu web non publié par Chromium"
+            return "web content not exposed by Chromium"
         return ""
 
     def present(self, text: str) -> bool | None:
@@ -51,7 +51,7 @@ class WaitActions(ExecutorBase):
             while time.monotonic() < deadline:
                 worker.check_cancelled()
                 time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
-            return Outcome(True, f"attente {timeout_s:.1f} s", "sleep")
+            return Outcome(True, f"waited {timeout_s:.1f} s", "sleep")
         start = time.monotonic()
         while True:
             worker.check_cancelled()
@@ -61,12 +61,10 @@ class WaitActions(ExecutorBase):
             if found is not None and found != gone:
                 elapsed = time.monotonic() - start
                 return Outcome(
-                    True, f"« {text} » {'disparu' if gone else 'présent'} après {elapsed:.1f} s", "wait", verified=True
+                    True, f'"{text}" {"gone" if gone else "present"} after {elapsed:.1f} s', "wait", verified=True
                 )
             if time.monotonic() - start > timeout_s:
                 if found is None:
-                    raise ActionError(
-                        f"« {text} » : lecture de la fenêtre incomplète ({self.unreadable}) : vérifier sur l'image."
-                    )
-                raise ActionError(f"« {text} » toujours {'présent' if gone else 'absent'} après {timeout_s:.0f} s.")
+                    raise ActionError(f'"{text}": incomplete window read ({self.unreadable}): check the image.')
+                raise ActionError(f'"{text}" still {"present" if gone else "absent"} after {timeout_s:.0f} s.')
             time.sleep(0.25)

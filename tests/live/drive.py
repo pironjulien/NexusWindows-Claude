@@ -369,7 +369,7 @@ async def drive(kind: str) -> list[tuple[str, bool, str]]:
                     ok = ok and any(wanted(e) for e in seen)
                     report += f"   ⇒ {[e[:60] for e in seen[-3:]]}"
                 if label in READ_BACK:
-                    ok = ok and "relu ✓" in report
+                    ok = ok and "read back ✓" in report
                 if label in LONG_TEXT:  # chaque tranche d'activation brève : premier plan de Julien rendu à 0,5 s
                     ok = ok and holds.longest_ms <= methods.SLICE_S * 1000
                     report += f"   [{holds.summary()}]"
@@ -446,7 +446,7 @@ async def drive_calc() -> list[tuple[str, bool, str]]:
             # launch rend la main dès la fenêtre ; l'arbre UIA de la Calculatrice arrive ensuite, par étapes.
             names = ("Un", "Deux", "Plus", "Trois", "Zéro", "Est égal à")
             ready = await wait_stable(client, names)
-            print("   " + next((line for line in ready.splitlines() if "éléments sur" in line), "")[:100])
+            print("   " + next((line for line in ready.splitlines() if "elements from" in line), "")[:100])
             steps = [{"do": "click", "target": n} for n in names[:-1]]
             steps.append({"do": "click", "target": "Est égal à", "expect": "42"})
             result = await client.call_tool("act", {"steps": steps, "then": "elements"})
@@ -511,7 +511,7 @@ async def drive_devtools(kind: str) -> list[tuple[str, bool, str]]:
                     ok = ok and any(expect(e) for e in seen)
                     report += f"   ⇒ {seen[-3:]}"
                 if label == "set Notes 2 lignes":
-                    ok = ok and "relu ✓" in report
+                    ok = ok and "read back ✓" in report
                 stolen = w.foreground() != fg
                 ok = ok and not stolen
                 rows.append((label, ok, report))

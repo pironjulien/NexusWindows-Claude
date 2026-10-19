@@ -120,10 +120,10 @@ class Win32Actions(ExecutorBase):
             holder = foreground.system_foreground()
             if holder:
                 raise methods.MethodError(
-                    f"Windows refuse d'activer la fenêtre : le premier plan est tenu par {holder} (aucune fenêtre n'a "
-                    "le focus). Remède : application lancée par launch avec devtools=true, ou foreground=true"
+                    f"Windows refuses to activate the window: the foreground is held by {holder} (no window has "
+                    "the focus). Remedy: app started by launch with devtools=true, or foreground=true"
                 )
-            raise methods.MethodError("la fenêtre n'a pas pu être activée pour recevoir les frappes")
+            raise methods.MethodError("the window could not be activated to receive keystrokes")
 
     def _keystrokes(self, e: snapshot.Element, text: str, replace: bool, simulated: bool = False) -> str:
         """Focus UIA puis caractères WM_CHAR vers la fenêtre de la cible qui a le clavier, par tranches d'activation
@@ -140,9 +140,7 @@ class Win32Actions(ExecutorBase):
         started = time.perf_counter()
         before = self._read_value(e)
         if before is None:
-            raise methods.MethodError(
-                "valeur du champ illisible : la frappe ne pourrait pas être relue, rien n'a été tapé"
-            )
+            raise methods.MethodError("field value unreadable: typing could not be read back, nothing was typed")
         top = self._sim_top(e) if simulated else self.hwnd
 
         def prepare(first: bool) -> int:
@@ -154,7 +152,7 @@ class Win32Actions(ExecutorBase):
                     try:
                         (self.auto.select_all_text if replace else self.auto.caret_to_end)(e.node.element)
                     except EXPECTED:
-                        raise methods.MethodError("sélection du texte existant impossible") from None
+                        raise methods.MethodError("could not select the existing text") from None
                     time.sleep(0.03)
                 return top
             foreground.mark_own_input()
@@ -168,7 +166,7 @@ class Win32Actions(ExecutorBase):
                         self.auto.select_all_text(e.node.element)
                     except EXPECTED:
                         if chromium:
-                            raise methods.MethodError("sélection du texte existant impossible") from None
+                            raise methods.MethodError("could not select the existing text") from None
                         methods.post_combo(methods.keyboard_target(self.hwnd, self.windows), [0x41], [0x11])
                 else:
                     with contextlib.suppress(*EXPECTED):
@@ -179,19 +177,19 @@ class Win32Actions(ExecutorBase):
         original = methods.norm_text(before)
         if not text:  # vider : sélection puis Suppr, dans une seule activation brève d'au plus methods.SLICE_S
             if not original:
-                return "champ déjà vide, aucune activation"
+                return "field already empty, no activation"
             activate = self._sim_activation(e) if simulated else foreground.brief_activation(self.hwnd, self.windows)
             with activate as activation:
                 begun = time.monotonic()
                 target = prepare(True)
-                activation.check("rien n'a été effacé, l'action est annulée")
+                activation.check("nothing was erased, the action is cancelled")
                 methods.post_key(target, methods.VK_DELETE)
                 # Relu jusqu'à l'échéance de la tranche seulement : au-delà, la relecture finale (_verify_text) suit,
                 # premier plan rendu.
                 remaining = begun + methods.SLICE_S - methods.GIVE_BACK_S - time.monotonic()
                 self._settle(lambda: self._text_done(self._read_value(e), before, text, replace), max_s=remaining)
-            how = "sans activation (activation simulée)" if simulated else "activation brève"
-            return f"Suppr, {how} {round((time.perf_counter() - started) * 1000)} ms"
+            how = "no activation (simulated activation)" if simulated else "brief activation"
+            return f"Delete, {how} {round((time.perf_counter() - started) * 1000)} ms"
 
         # Remplacement d'un contenu : effacé (Suppr) et relu vide avant tout caractère, sans quoi un texte qui commence
         # comme lui serait indiscernable de « rien n'a encore été traité ».
@@ -203,7 +201,7 @@ class Win32Actions(ExecutorBase):
             except EXPECTED as error:
                 raise methods.Unreadable(_short(error)) from None
             if value is None:
-                raise methods.Unreadable("valeur du champ illisible")
+                raise methods.Unreadable("field value unreadable")
             return methods.norm_text(value)
 
         def prefix(value: str) -> int | None:
@@ -232,9 +230,7 @@ class Win32Actions(ExecutorBase):
                 self.hwnd, self.windows, text, prepare, read, prefix, enter_as_key=chromium, clear=not cleared[0]
             )
         if not typed.complete:
-            raise Unconfirmed(
-                f"texte partiellement tapé : {typed.detail()}. Vérifier la cible (look) avant de compléter"
-            )
+            raise Unconfirmed(f"text partially typed: {typed.detail()}. Check the target (look) before completing it")
         return typed.detail()
 
     def _post_combos(self, combos: list[keys.Combo], fw: str, sent: list[str], simulated: bool = False) -> None:
@@ -245,7 +241,7 @@ class Win32Actions(ExecutorBase):
             if combo.modifiers and (fw != "Chromium" or simulated):
                 hold = methods.SIM_MODIFIERS_HOLD_S if simulated else 0.15
                 methods.post_combo(target_hwnd, [combo.key], list(combo.modifiers), hold_s=hold)
-                sent.append("état clavier simulé")
+                sent.append("simulated keyboard state")
             elif combo.modifiers:  # Maj seule en Chromium (les raccourcis Ctrl/Alt ont été refusés plus haut)
                 for vk in combo.modifiers:
                     methods.post(target_hwnd, w.WM_KEYDOWN, vk, methods._key_lparam(vk, False))

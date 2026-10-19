@@ -234,13 +234,13 @@ def test_watch_starts_when_foreground_is_null(monkeypatch):
 
 def test_brief_activation_refuses_null_or_system_foreground(monkeypatch):
     desk = Desk(monkeypatch, fg=0)
-    with pytest.raises(foreground.BusyUser, match="aucune fenêtre"):
+    with pytest.raises(foreground.BusyUser, match="held by no window"):
         with foreground.brief_activation(TARGET, {TARGET}):
             pytest.fail("activation sans fenêtre à qui rendre le premier plan")
     desk.fg = OTHER
     desk.cloaked = {OTHER}
     monkeypatch.setattr(foreground.w, "window_text", lambda h: "Recherche")
-    with pytest.raises(foreground.BusyUser, match="premier plan est tenu par fenêtre système masquée"):
+    with pytest.raises(foreground.BusyUser, match="foreground is held by hidden system window"):
         with foreground.brief_activation(TARGET, {TARGET}):
             pytest.fail("activation avec une fenêtre système masquée au premier plan")
 
@@ -252,7 +252,7 @@ def test_held_mouse_button_is_not_a_pause(monkeypatch):
     assert not foreground.wait_typing_pause(max_wait_s=0.05)
     real = foreground.wait_typing_pause
     monkeypatch.setattr(foreground, "wait_typing_pause", lambda: real(max_wait_s=0.05))
-    with pytest.raises(foreground.BusyUser, match="tient un bouton"):
+    with pytest.raises(foreground.BusyUser, match="holding a button"):
         with foreground.brief_activation(TARGET, {TARGET}):
             pytest.fail("activation pendant un glisser de Julien")
 
@@ -278,7 +278,7 @@ def test_physical_input_stops_post_chars_at_once(monkeypatch):
     posts: list[tuple] = []
     monkeypatch.setattr(methods, "post", lambda *a: posts.append(a))
     _interrupt_after(monkeypatch, posts, 3)
-    with pytest.raises(foreground.UserInterrupted, match="premier plan rendu"):
+    with pytest.raises(foreground.UserInterrupted, match="foreground given back"):
         with foreground.brief_activation(TARGET, {TARGET}):
             desk.fg = TARGET  # la cible s'active
             methods.post_chars(TARGET, "abcdefghij")
@@ -293,7 +293,7 @@ def test_checkpoints_interrupt_waits_during_activation(monkeypatch):
     _interrupt_after(monkeypatch, posts, 0)
     worker.check_cancelled()  # hors activation : rien
     reached: list[str] = []
-    with pytest.raises(foreground.UserInterrupted, match="frappe arrêtée et premier plan rendu"):
+    with pytest.raises(foreground.UserInterrupted, match="typing stopped and foreground given back"):
         with foreground.brief_activation(TARGET, {TARGET}):
             desk.fg = TARGET
             worker.check_cancelled()  # comme chaque tour de _settle
@@ -391,7 +391,7 @@ def test_long_text_is_typed_in_short_slices(monkeypatch):
     assert app.pauses == typed.slices  # pause de Julien attendue avant chaque tranche
     assert desk.gave_back == [JULIEN] * typed.slices  # premier plan rendu après chaque tranche
     assert all(end - start <= 0.1 + 0.05 for start, end in app.slices)  # activation bornée (marge d'ordonnanceur)
-    assert "activations brèves" in typed.detail() and "devtools=true" in typed.detail()
+    assert "brief activations" in typed.detail() and "devtools=true" in typed.detail()
 
 
 def test_short_text_is_one_slice(monkeypatch):
@@ -399,7 +399,7 @@ def test_short_text_is_one_slice(monkeypatch):
     app = App(monkeypatch, desk)
     typed = methods.type_in_slices(TARGET, {TARGET}, "Julien Piron", app.prepare, *as_reader(app.progress))
     assert typed.complete and typed.slices == 1 and app.typed == "Julien Piron"
-    assert typed.detail().startswith("frappes WM_CHAR, activation brève")
+    assert typed.detail().startswith("WM_CHAR keystrokes, brief activation")
 
 
 def test_enter_is_synchronised_by_read_back(monkeypatch):
@@ -421,8 +421,8 @@ def test_unread_slice_stops_without_exception(monkeypatch):
     typed = methods.type_in_slices(TARGET, {TARGET}, "x" * 400, app.prepare, *as_reader(lambda: 0), slice_s=0.1)
     # Rien n'est jamais renvoyé : ce qui n'est pas relu est attendu hors activation, puis l'arrêt le dit.
     assert not typed.complete and typed.confirmed == 0 and typed.slices == 1 and typed.sent > 0
-    assert "pas relu" in typed.detail() and "suite non envoyée" in typed.detail()
-    assert "aucun caractère renvoyé" in typed.detail()
+    assert "not read back" in typed.detail() and "rest not sent" in typed.detail()
+    assert "no character resent" in typed.detail()
 
 
 def test_busy_julien_between_slices_stops_but_first_slice_raises(monkeypatch):
@@ -440,7 +440,7 @@ def test_busy_julien_between_slices_stops_but_first_slice_raises(monkeypatch):
         return app.prepare(first)
 
     typed = methods.type_in_slices(TARGET, {TARGET}, "y" * 400, prepare, *as_reader(app.progress), slice_s=0.1)
-    assert not typed.complete and typed.confirmed > 0 and "suite non envoyée" in typed.stopped
+    assert not typed.complete and typed.confirmed > 0 and "rest not sent" in typed.stopped
 
 
 def test_physical_input_during_slices_raises_with_progress(monkeypatch):
@@ -448,7 +448,7 @@ def test_physical_input_during_slices_raises_with_progress(monkeypatch):
     app = App(monkeypatch, desk)
     monkeypatch.setattr(foreground.physical, "available", lambda: True)
     monkeypatch.setattr(foreground.physical, "since", lambda moment: len(app.typed) >= 5)
-    with pytest.raises(foreground.UserInterrupted, match="0/50 caractères relus.*5 autres envoyés"):
+    with pytest.raises(foreground.UserInterrupted, match="0/50 characters read back.*5 more sent"):
         methods.type_in_slices(TARGET, {TARGET}, "z" * 50, app.prepare, *as_reader(app.progress))
     assert app.typed == "z" * 5 and desk.gave_back == [JULIEN]
 
@@ -554,7 +554,7 @@ def test_hotkey_failure_is_logged_once_then_relay(monkeypatch):
     monkeypatch.setattr(stop, "_failure", 0)
     stop._loop()
     assert [e["hotkey"] for e in events] == [False, True]  # échec journalisé UNE fois, puis le relais
-    assert stop.owns_hotkey() and stop.hotkey_note() == "" and stop.status() == "détenu par ce serveur"
+    assert stop.owns_hotkey() and stop.hotkey_note() == "" and stop.status() == "held by this server"
     beat = json.loads(stop.OWNER_FILE.read_text(encoding="utf-8"))
     assert beat["pid"] > 0 and time.time() - beat["ts"] < 5
 
@@ -565,12 +565,12 @@ def test_hotkey_note_without_live_owner(monkeypatch):
     monkeypatch.setattr(stop, "_failure", 1409)
     assert stop.hotkey_note() == ""  # pas encore essayé : rien à affirmer
     stop._tried.set()
-    assert "NON GARANTI" in stop.hotkey_note() and "1409" in stop.hotkey_note()
+    assert "NOT GUARANTEED" in stop.hotkey_note() and "1409" in stop.hotkey_note()
     stop.OWNER_FILE.write_text(json.dumps({"pid": 4242, "version": "x", "ts": time.time()}), encoding="utf-8")
     assert stop.hotkey_note() == "" and "4242" in stop.status()  # un autre serveur vivant le détient
     stale = time.time() - stop.OWNER_STALE_S - 1
     stop.OWNER_FILE.write_text(json.dumps({"pid": 4242, "version": "x", "ts": stale}), encoding="utf-8")
-    assert "NON GARANTI" in stop.hotkey_note()
+    assert "NOT GUARANTEED" in stop.hotkey_note()
 
 
 def test_stop_press_survives_write_error(monkeypatch):
@@ -617,9 +617,11 @@ def test_supervisor_status_in_logs(monkeypatch):
     monkeypatch.setattr(freshness, "SUPERVISED", True)
     monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR", "42")
     monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR_CODE", freshness.supervisor_fingerprint())
-    assert freshness.supervisor_status().startswith("actif (superviseur pid 42) : le serveur reprend tout seul")
+    assert freshness.supervisor_status().startswith(
+        "active (supervisor pid 42): the server reloads its new code by itself"
+    )
     monkeypatch.setenv("NEXUS_WINDOWS_SUPERVISOR_CODE", "ancien")
-    assert "prochaine reconnexion" in freshness.supervisor_status()
+    assert "next reconnection" in freshness.supervisor_status()
 
 
 def test_loaded_fingerprint_matches_disk():
@@ -634,13 +636,13 @@ def test_stale_server_refuses_actions_and_warns_reads(monkeypatch):
     wk = worker.Worker()
     monkeypatch.setattr(server, "WORKER", wk)
     try:
-        with pytest.raises(ToolError, match="serveur nexus-windows dépassé : reconnecter \\(/mcp\\)"):
+        with pytest.raises(ToolError, match="nexus-windows server out of date: reconnect \\(/mcp\\)"):
             asyncio.run(server._run(lambda auto: ran.append("act") or "fait"))
         assert ran == []  # refusé avant tout effet
         text = asyncio.run(server._run(lambda auto: "liste", reads_only=True))
-        assert text.startswith(f"Attention : {stale}.") and text.endswith("liste")
+        assert text.startswith(f"Warning: {stale}.") and text.endswith("liste")
         look = asyncio.run(server._run(lambda auto: ["en-tête\néléments", "image"], reads_only=True))
-        assert look[0].startswith("Attention : serveur nexus-windows dépassé") and look[1] == "image"
+        assert look[0].startswith("Warning: nexus-windows server out of date") and look[1] == "image"
     finally:
         wk.abandon()
 
@@ -663,12 +665,12 @@ def test_logs_show_server_state(tmp_path, monkeypatch):
     monkeypatch.setattr(freshness, "stale_reason", lambda: "")
     out = asyncio.run(server.logs(5))
     lines = out.splitlines()
-    assert "à jour" in lines[0] and lines[1].startswith("Rechargement automatique : ")
-    assert lines[2].startswith("Arrêt d'urgence") and lines[3].startswith("Entrées de l'utilisateur")
-    assert lines[-1] == "Journal vide."
+    assert "up to date" in lines[0] and lines[1].startswith("Automatic reload: ")
+    assert lines[2].startswith("Emergency stop") and lines[3].startswith("User input")
+    assert lines[-1] == "Log empty."
     monkeypatch.setattr(physical, "_ok", True)
     monkeypatch.setattr(physical, "counts", {"physical": 3, "injected": 9})
-    assert "3 entrées physiques" in physical.summary() and "9 injectées" in physical.summary()
+    assert "3 physical inputs" in physical.summary() and "9 injected" in physical.summary()
 
 
 # --- Banc de test : Julien absent exigé, premier plan rendu -------------------------------------------------------

@@ -84,7 +84,7 @@ class Session:
     dead_ports: dict[int, float] = field(default_factory=dict)  # port → instant du dernier échec
     profiles: dict[int, Path] = field(default_factory=dict)  # pid → profil jetable d'un navigateur DevTools
     identities: dict[int, int] = field(default_factory=dict)  # pid → heure de création relevée à l'enregistrement
-    # pid → port DevTools ouvert sur la session réelle de Julien (Steam), avec son accord : jamais fermé par l'outil.
+    # pid → port DevTools ouvert sur la session réelle de l'utilisateur (Steam), avec son accord : jamais fermé par l'outil.
     own_sessions: set[int] = field(default_factory=set)
 
     # --- Fenêtres -----------------------------------------------------------------------------------------------
@@ -92,11 +92,11 @@ class Session:
         if spec is None or spec == "":
             if self.target and w.IsWindow(self.target):
                 return self.target
-            raise WindowError("Aucune fenêtre courante : appeler windows, ou passer window (titre, processus ou hwnd).")
+            raise WindowError("No current window: call windows, or pass window (title, process or hwnd).")
         if isinstance(spec, int) or (isinstance(spec, str) and spec.strip().isdigit()):
             hwnd = int(spec)
             if not w.IsWindow(hwnd):
-                raise WindowError(f"La fenêtre {hwnd} n'existe plus : appeler windows.")
+                raise WindowError(f"Window {hwnd} no longer exists: call windows.")
             self.target = hwnd
             return hwnd
         text = str(spec).strip().lower()
@@ -108,8 +108,8 @@ class Session:
             if group:
                 self.target = group[0].hwnd  # le plus haut dans l'empilement
                 return self.target
-        names = ", ".join(f"« {snapshot.clip(c.title, 40)} »" for c in candidates[:12])
-        raise WindowError(f"Aucune fenêtre ne correspond à « {spec} ». Fenêtres : {names}.")
+        names = ", ".join(f'"{snapshot.clip(c.title, 40)}"' for c in candidates[:12])
+        raise WindowError(f'No window matches "{spec}". Windows: {names}.')
 
     # --- Instantanés --------------------------------------------------------------------------------------------
     def view(self, auto: uia.Automation, hwnd: int, rebuild: bool = False, detail: str | None = None) -> snapshot.View:
@@ -200,12 +200,12 @@ class Session:
         pid = w.window_pid(hwnd)
         port, profile = self.devtools.get(pid), self.profiles.get(pid)
         if (not port and profile is None) or (pid in self.own_sessions and profile is None):
-            return  # session de Julien ouverte avec son accord (Steam) : jamais fermée par l'outil
+            return  # session de l'utilisateur ouverte avec son accord (Steam) : jamais fermée par l'outil
         handle = _open(pid)
         try:
             if not handle or _started_at(handle) != self.identities.get(pid):
                 self.drop_process(pid)  # navigateur terminé : ce pid est (ou sera) celui d'un autre programme
-                log.event("devtools-oublie", {"pid": pid, "raison": "processus terminé ou pid réattribué"})
+                log.event("devtools-forgotten", {"pid": pid, "reason": "process ended or pid reassigned"})
                 return
             reason = launch.account_found(port or 0, profile)
             if not reason:
@@ -215,14 +215,14 @@ class Session:
         finally:
             _close(handle)
         removed = launch.remove_profile(profile) if profile is not None else False
-        log.event("devtools-compte", {"pid": pid, "port": port, "raison": reason, "profil_supprime": removed})
+        log.event("devtools-account", {"pid": pid, "port": port, "reason": reason, "profile_removed": removed})
         self.drop_process(pid)
         for other in {k[0] if isinstance(k, tuple) else k for k in self.pages}:  # clé (hwnd, titre) : son hwnd
             if other == hwnd or not w.IsWindow(other):
                 self.forget(other)
         raise launch.AccountError(
-            f"Compte détecté dans le navigateur DevTools ({reason}) : fermé aussitôt, rien n'a été fait (jamais le "
-            f"compte de l'utilisateur derrière un port DevTools){launch._profile_fate(profile, removed)}."
+            f"Account detected in the DevTools browser ({reason}): closed at once, nothing was done (never the "
+            f"user's account behind a DevTools port){launch._profile_fate(profile, removed)}."
         )
 
     def page(self, hwnd: int, title: str | None = None) -> cdp.Page | None:

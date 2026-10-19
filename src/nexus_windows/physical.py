@@ -155,7 +155,7 @@ def listening_s() -> float:
 def summary() -> str:
     """Diagnostic pour l'outil logs : nombres d'événements vus depuis le démarrage, jamais leur contenu."""
     if not _ok:
-        return "Raw Input indisponible (repli : GetLastInputInfo, entrées injectées comprises)"
+        return "Raw Input unavailable (fallback: GetLastInputInfo, injected input included)"
     idle = idle_s()
-    last = "aucune encore" if idle == float("inf") else f"dernière il y a {idle:.0f} s"
-    return f"Raw Input actif : {counts['physical']} entrées physiques ({last}), {counts['injected']} injectées écartées"
+    last = "none yet" if idle == float("inf") else f"last {idle:.0f} s ago"
+    return f"Raw Input active: {counts['physical']} physical inputs ({last}), {counts['injected']} injected ignored"

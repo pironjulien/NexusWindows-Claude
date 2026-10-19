@@ -35,6 +35,33 @@ class ConfirmationRequired(ActionError):
     """Geste irréversible ou chez un tiers demandé sans confirm=true : rien n'a été fait."""
 
 
+# Libellés du champ « quoi » des contextes de garde-fous.json (politique commune, en français) : rendus en anglais
+# dans les messages au modèle ; un libellé inconnu reste tel quel.
+CONTEXT_WHAT = {
+    "paiement ou virement": "payment or transfer",
+    "formatage": "formatting",
+    "réinitialisation de l'appareil": "device reset",
+}
+
+
+def english_word(word: str) -> str:
+    """Mot à confirmer rendu par garde_fous.confirm_word, partie fixe en anglais (« (fenêtre de X) »)."""
+    head, sep, rest = word.partition(" (fenêtre de ")
+    if not sep:
+        return word
+    what = rest[:-1] if rest.endswith(")") else rest
+    return f"{head} ({CONTEXT_WHAT.get(what, what)} window)"
+
+
+def refusal(what: str, label: object, word: str) -> str:
+    """Refus sans confirm=true (mêmes conditions que garde_fous.refusal, texte anglais et neutre)."""
+    return (
+        f'{what} on "{str(label).strip()[:60]}": irreversible or affects a third party ("{english_word(word)}"), '
+        "nothing was done. The user's explicit order for THIS action → send the step again with confirm=true; the "
+        "agent's own initiative → ask the user first."
+    )
+
+
 def combo_kind(combo: keys.Combo) -> str:
     """Ce qu'une combinaison peut déclencher : « submit », « send » (Ctrl+Entrée), « press » (Espace), « alt+x », « »."""
     mods = set(combo.modifiers)
@@ -118,27 +145,27 @@ def key_triggers(view: snapshot.View, field: uia.Node | None, kind: str) -> list
     out: list[tuple[str, str]] = []
     non_action = garde_fous.non_action_roles()
     if kind in ("submit", "send", "press") and field is not None and field.control_type not in non_action:
-        out.append((label_of(field), "élément visé"))
+        out.append((label_of(field), "targeted element"))
     nodes = _all_nodes(view)
     if kind.startswith("alt+"):
         letter = garde_fous.plain(kind)
         for node in nodes:
             if _live_trigger(node) and garde_fous.plain(node.props.get("access_key")) == letter:
-                out.append((label_of(node), f"raccourci {node.props.get('access_key')}"))
+                out.append((label_of(node), f"shortcut {node.props.get('access_key')}"))
         return out
     for node in nodes:
         if node.props.get("focused") and _live_trigger(node):
-            out.append((label_of(node), "élément qui a le focus"))
+            out.append((label_of(node), "focused element"))
     if kind == "press":
         return out
     if kind == "send":
-        return out + [(label_of(node), "bouton d'action de la fenêtre") for node in nodes if _live_trigger(node)]
+        return out + [(label_of(node), "action button of the window") for node in nodes if _live_trigger(node)]
     for node in nodes:
         if node.control_type in ("Button", "SplitButton") and _live_trigger(node):
             if int(node.props.get("legacy_state") or 0) & STATE_SYSTEM_DEFAULT:
-                out.append((label_of(node), "bouton par défaut de la fenêtre"))
+                out.append((label_of(node), "default button of the window"))
     if field is not None:
-        out += [(label_of(node), "bouton d'action voisin du champ") for node in _neighbors(field)]
+        out += [(label_of(node), "action button next to the field") for node in _neighbors(field)]
     return out
 
 
@@ -182,9 +209,9 @@ class ConfirmActions(ExecutorBase):
                 word = garde_fous.confirm_word(label, title)
                 if word:
                     detail = f"{what} ({source})" if source else what
-                    raise ConfirmationRequired(garde_fous.refusal(detail, label, word))
+                    raise ConfirmationRequired(refusal(detail, label, word))
         except garde_fous.GardeFousError as error:
-            raise ActionError(f"{error} : rien n'a été fait (échec fermé)") from error
+            raise ActionError(f"safety policy unreadable ({error}): nothing was done (fail closed)") from error
 
     def _confirm_click(self, e: snapshot.Element, button: str = "left") -> None:
         """Clic gauche (simple ou double) sur un élément : refus sans confirm si ce qu'il déclenche est à confirmer."""
@@ -192,7 +219,7 @@ class ConfirmActions(ExecutorBase):
             return
         trigger = trigger_of(e.node)
         if trigger is not None:
-            self._refuse_if("clic", [(label_of(trigger), "")])
+            self._refuse_if("click", [(label_of(trigger), "")])
 
     def _confirm_point(self, x: int, y: int, button: str = "left") -> None:
         """Clic en coordonnées : même contrôle que le clic sur l'élément sous le point (arbre UIA, puis DOM)."""
@@ -203,7 +230,7 @@ class ConfirmActions(ExecutorBase):
         if hit is not None:
             trigger = trigger_of(hit[0])
             if trigger is not None:
-                self._refuse_if("clic par coordonnées", [(label_of(trigger), "")])
+                self._refuse_if("click by coordinates", [(label_of(trigger), "")])
         page = self._get_page()
         if page is not None:
             try:
@@ -211,7 +238,7 @@ class ConfirmActions(ExecutorBase):
                 labels = page.evaluate(f"{_DOM_POINT_JS}({cx}, {cy})") or []
             except cdp.CDPError, TypeError, ValueError:
                 labels = []
-            self._refuse_if("clic par coordonnées", [(str(label), "page") for label in labels])
+            self._refuse_if("click by coordinates", [(str(label), "page") for label in labels])
 
     def _field_node(self, element: snapshot.Element | None) -> uia.Node | None:
         """Nœud du champ dans l'instantané (avec ses ancêtres), même s'il vient d'une lecture directe du focus."""
@@ -238,12 +265,12 @@ class ConfirmActions(ExecutorBase):
                 except cdp.CDPError, TypeError, ValueError:
                     found = []
                 labels += [(str(label), "page") for label in found]
-            self._refuse_if(f"{what} : déclencherait", labels)
+            self._refuse_if(f"{what}: would trigger", labels)
 
     def _confirm_keys(self, combos: list[keys.Combo], spec: str, element: snapshot.Element | None) -> None:
-        self._confirm_kinds([combo_kind(c) for c in combos], element, f"touche « {spec} »")
+        self._confirm_kinds([combo_kind(c) for c in combos], element, f'key "{spec}"')
 
     def _confirm_text(self, element: snapshot.Element | None, text: str) -> None:
         """Un saut de ligne tapé dans un champ vaut Entrée (envoi d'une messagerie, validation d'un formulaire)."""
         if "\n" in text or "\r" in text:
-            self._confirm_kinds(["submit"], element, "saut de ligne dans le texte")
+            self._confirm_kinds(["submit"], element, "line break in the text")

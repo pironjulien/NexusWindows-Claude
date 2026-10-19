@@ -48,9 +48,9 @@ def targets(port: int, timeout_s: float = 0.5) -> list[dict[str, Any]]:
     try:
         data = _get_json(port, "/json/list", timeout_s)
     except (OSError, ValueError) as error:  # ValueError : réponse illisible (JSON, encodage)
-        raise CDPError(f"DevTools injoignable sur le port {port} : {error}") from error
+        raise CDPError(f"DevTools unreachable on port {port}: {error}") from error
     if not isinstance(data, list):
-        raise CDPError(f"DevTools : réponse inattendue sur le port {port}.")
+        raise CDPError(f"DevTools: unexpected answer on port {port}.")
     return [t for t in data if isinstance(t, dict)]
 
 
@@ -99,9 +99,9 @@ def _title(target: dict[str, Any]) -> str:
 def pick_page(pages: list[dict[str, Any]], window_title: str | None) -> dict[str, Any]:
     if len(pages) == 1 or window_title is None:
         if not pages:
-            raise CDPError("Aucune page DevTools disponible.")
+            raise CDPError("No DevTools page available.")
         if len(pages) > 1:
-            raise AmbiguousPage("Plusieurs pages DevTools : onglet actif impossible à désigner.")
+            raise AmbiguousPage("Several DevTools pages: the active tab cannot be identified.")
         return pages[0]
     wanted = page_title_from_window(window_title).strip().lower()
     exact = [t for t in pages if _title(t) == wanted]
@@ -110,7 +110,7 @@ def pick_page(pages: list[dict[str, Any]], window_title: str | None) -> dict[str
     agree = [t for t in pages if titles_agree(window_title, _title(t))]
     if len(agree) == 1:
         return agree[0]
-    raise AmbiguousPage("Onglet actif introuvable sans ambiguïté parmi les pages DevTools.")
+    raise AmbiguousPage("Active tab not found unambiguously among the DevTools pages.")
 
 
 class Page:
@@ -142,7 +142,7 @@ class Page:
                 )
             )
         except (WebSocketException, OSError) as error:  # TimeoutError compris (poignée de main trop lente)
-            raise CDPError(f"Connexion DevTools impossible sur le port {port} : {error}") from error
+            raise CDPError(f"DevTools connection failed on port {port}: {error}") from error
 
     def close(self) -> None:
         try:
@@ -170,15 +170,15 @@ class Page:
                     break
         except TimeoutError as error:  # avant OSError, dont il hérite
             raise PageBusy(
-                f"{method} : la page ne répond pas en {limit:.1f} s (boîte JavaScript ouverte ou script long : viser "
-                "son bouton OK/Annuler, ou réessayer)"
+                f"{method}: the page did not answer within {limit:.1f} s (JavaScript dialog open or long script: target "
+                "its OK/Cancel button, or retry)"
             ) from error
         except (WebSocketException, OSError, ValueError) as error:  # ValueError : message illisible
             self.close()
-            raise PageGone(f"{method} : connexion DevTools perdue ({type(error).__name__} : {error})") from error
+            raise PageGone(f"{method}: DevTools connection lost ({type(error).__name__}: {error})") from error
         if "error" in message:
             error = message["error"]
-            raise CDPError(f"{method} : {error.get('message') if isinstance(error, dict) else error}")
+            raise CDPError(f"{method}: {error.get('message') if isinstance(error, dict) else error}")
         result = message.get("result", {})
         return result if isinstance(result, dict) else {}
 
@@ -188,7 +188,7 @@ class Page:
         )
         if "exceptionDetails" in result:
             details = result["exceptionDetails"]
-            raise CDPError(f"JavaScript : {details.get('text') if isinstance(details, dict) else details}")
+            raise CDPError(f"JavaScript: {details.get('text') if isinstance(details, dict) else details}")
         value = result.get("result", {})
         return value.get("value") if isinstance(value, dict) else None
 

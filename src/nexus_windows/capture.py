@@ -51,7 +51,7 @@ def _dib(width: int, height: int):
     hbitmap = w.CreateDIBSection(hdc, ctypes.byref(header), 0, ctypes.byref(bits), None, 0)
     if not hbitmap:
         w.DeleteDC(hdc)
-        raise CaptureError(f"CreateDIBSection {width}×{height} a échoué.")
+        raise CaptureError(f"CreateDIBSection {width}×{height} failed.")
     old = w.SelectObject(hdc, hbitmap)
     return hdc, hbitmap, old, bits
 
@@ -76,11 +76,11 @@ def capture_printwindow(hwnd: int) -> Shot:
     """
     start = time.perf_counter()
     if w.IsIconic(hwnd):
-        raise CaptureError("Fenêtre réduite : rien à dessiner.")
+        raise CaptureError("Window minimized: nothing to draw.")
     win = w.window_rect(hwnd)
     frame = w.frame_rect(hwnd)
     if win.empty:
-        raise CaptureError("Fenêtre de taille nulle.")
+        raise CaptureError("Window has zero size.")
     scale = w.window_dpi_scale(hwnd)
     width, height = win.width, win.height
     if scale != 1.0:
@@ -88,7 +88,7 @@ def capture_printwindow(hwnd: int) -> Shot:
     hdc, hbitmap, old, bits = _dib(width, height)
     try:
         if not w.PrintWindow(hwnd, hdc, w.PW_RENDERFULLCONTENT):
-            raise CaptureError("PrintWindow a échoué.")
+            raise CaptureError("PrintWindow failed.")
         image = _to_image(bits, width, height)
     finally:
         _free(hdc, hbitmap, old)
@@ -96,7 +96,7 @@ def capture_printwindow(hwnd: int) -> Shot:
         image = image.resize((win.width, win.height), Image.Resampling.LANCZOS)
     crop = frame.intersect(win) or win
     image = image.crop((crop.left - win.left, crop.top - win.top, crop.right - win.left, crop.bottom - win.top))
-    method = "printwindow" if scale == 1.0 else f"printwindow ×{scale:.2f} (application non adaptée au DPI)"
+    method = "printwindow" if scale == 1.0 else f"printwindow ×{scale:.2f} (application not DPI-aware)"
     return Shot(image, (crop.left, crop.top), method, (time.perf_counter() - start) * 1000)
 
 
@@ -175,7 +175,7 @@ def capture_wgc(hwnd: int, timeout_s: float = 2.0) -> Shot:
     """Windows.Graphics.Capture, faite dans le processus d'appoint wgc_helper (lancé à la demande, arrêté après une
     minute sans usage) : sa mémoire (pilote graphique, numpy, opencv : ~770 Mo) ne reste pas dans ce serveur."""
     if w.IsIconic(hwnd):
-        raise CaptureError("Fenêtre réduite : rien à capturer.")
+        raise CaptureError("Window minimized: nothing to capture.")
     start = time.perf_counter()
     request = json.dumps({"hwnd": hwnd, "timeout": timeout_s}).encode() + b"\n"
     with _HELPER_LOCK:
@@ -184,21 +184,21 @@ def capture_wgc(hwnd: int, timeout_s: float = 2.0) -> Shot:
         if not head:
             helper, head = _ask(request, timeout_s)
         if not head:
-            raise CaptureError("Windows.Graphics.Capture : processus d'appoint arrêté sans réponse.")
+            raise CaptureError("Windows.Graphics.Capture: helper process stopped without answering.")
         try:
             answer = json.loads(head)
         except ValueError:
             _drop(helper)
-            raise CaptureError("Windows.Graphics.Capture : réponse illisible du processus d'appoint.") from None
+            raise CaptureError("Windows.Graphics.Capture: unreadable answer from the helper process.") from None
         if not answer.get("ok"):
-            raise CaptureError(answer.get("error") or "Windows.Graphics.Capture : échec.")
+            raise CaptureError(answer.get("error") or "Windows.Graphics.Capture: failed.")
         size = answer["width"] * answer["height"] * 3
         stdout = helper.stdout
         assert stdout is not None
         raw = _bounded(helper, lambda: stdout.read(size), HELPER_READ_S)
         if len(raw) != size:
             _drop(helper)
-            raise CaptureError("Windows.Graphics.Capture : image tronquée.")
+            raise CaptureError("Windows.Graphics.Capture: truncated image.")
     image = Image.frombytes("RGB", (answer["width"], answer["height"]), raw)
     return Shot(image, (answer["left"], answer["top"]), "wgc", (time.perf_counter() - start) * 1000)
 
@@ -213,7 +213,7 @@ def capture_wgc_inline(hwnd: int, timeout_s: float = 2.0) -> Shot:
 
     start = time.perf_counter()
     if w.IsIconic(hwnd):
-        raise CaptureError("Fenêtre réduite : rien à capturer.")
+        raise CaptureError("Window minimized: nothing to capture.")
     result: dict = {}
     done = threading.Event()
     capture = WindowsCapture(cursor_capture=False, draw_border=False, window_hwnd=hwnd)
@@ -233,7 +233,7 @@ def capture_wgc_inline(hwnd: int, timeout_s: float = 2.0) -> Shot:
     control = capture.start_free_threaded()
     try:
         if not done.wait(timeout_s):
-            raise CaptureError("Windows.Graphics.Capture : aucune image reçue.")
+            raise CaptureError("Windows.Graphics.Capture: no image received.")
     finally:
         try:
             _end_wgc(control, done)
@@ -242,7 +242,7 @@ def capture_wgc_inline(hwnd: int, timeout_s: float = 2.0) -> Shot:
             # (≈ 1,7 Mo par capture mesurés). Le rompre libère l'image et les ressources natives.
             capture.capture = None
     if "image" not in result:
-        raise CaptureError("Windows.Graphics.Capture : capture fermée sans image.")
+        raise CaptureError("Windows.Graphics.Capture: capture closed without an image.")
     frame = w.frame_rect(hwnd)
     image = result["image"]
     if image.size != (frame.width, frame.height):  # WGC capture la zone visible DWM : recaler sur le cadre

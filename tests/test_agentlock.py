@@ -45,7 +45,7 @@ def test_other_holder_is_seen_and_described():
     with other_agent():
         holder = agentlock.other_holder()
         assert holder is not None and holder["owner"] == "NexusAGY"
-        assert agentlock.describe(holder).startswith("NexusAGY tient la souris et le premier plan depuis ")
+        assert agentlock.describe(holder).startswith("NexusAGY holds the mouse and the foreground for ")
         assert "(computer_act)" in agentlock.describe(holder)
     assert agentlock.other_holder() is None
 
@@ -53,7 +53,7 @@ def test_other_holder_is_seen_and_described():
 def test_busy_after_wait_and_nothing_left_open():
     checks = []
     with other_agent():
-        with pytest.raises(agentlock.Busy, match="NexusAGY tient la souris"):
+        with pytest.raises(agentlock.Busy, match="NexusAGY holds the mouse"):
             with agentlock.hold("test", wait_s=0.2, checkpoint=lambda: checks.append(1)):
                 pytest.fail("bloc exécuté sans le jeton")
     assert checks  # attente contrôlée (arrêt d'urgence, appel abandonné)
@@ -112,7 +112,7 @@ def test_another_thread_waits_like_another_agent():
     thread.start()
     try:
         assert inside.wait(5)
-        with pytest.raises(agentlock.Busy, match="NexusClaude tient la souris"):
+        with pytest.raises(agentlock.Busy, match="NexusClaude holds the mouse"):
             with agentlock.hold("appel suivant", wait_s=0.2):
                 pytest.fail("deux fils dans le jeton en même temps")
         with agentlock.hold("appel suivant", wait_s=5, checkpoint=leave.set):
@@ -169,7 +169,7 @@ def test_brief_activation_waits_for_the_token(monkeypatch):
     reached = []
     monkeypatch.setattr(foreground, "wait_typing_pause", lambda *a, **k: reached.append(1) or False)
     with other_agent():
-        with pytest.raises(foreground.BusyUser, match="NexusAGY tient la souris"):
+        with pytest.raises(foreground.BusyUser, match="NexusAGY holds the mouse"):
             with foreground.brief_activation(TARGET):
                 pytest.fail("activation sans le jeton")
     assert reached == []  # rien n'est tenté tant qu'un autre agent tient souris et premier plan

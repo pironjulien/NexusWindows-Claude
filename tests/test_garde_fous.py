@@ -116,7 +116,7 @@ def test_generic_ok_in_a_payment_window(monkeypatch):
     element = ex.resolve_element("OK", set(), "x")
     ex._confirm_click(element)  # fenêtre ordinaire : OK libre
     monkeypatch.setattr(ex, "_title", lambda: "Confirmer le paiement — Banque")
-    with pytest.raises(actions.ConfirmationRequired, match="paiement"):
+    with pytest.raises(actions.ConfirmationRequired, match="payment"):
         ex._confirm_click(element)
 
 
@@ -126,7 +126,7 @@ def test_click_by_coordinates_cannot_bypass(monkeypatch):
     icon.parent = send
     send.children.append(icon)
     ex = executor(make_view(send), FakeAuto())
-    with pytest.raises(actions.ConfirmationRequired, match="coordonnées"):
+    with pytest.raises(actions.ConfirmationRequired, match="coordinates"):
         ex._confirm_point(115, 110)  # sur l'icône du bouton
     ex._confirm_point(115, 110, button="right")
     ex.confirm = True
@@ -150,7 +150,7 @@ def test_enter_in_a_composer_refused_before_any_key(monkeypatch):
     sent: list = []
     monkeypatch.setattr(actions.realinput, "press", lambda combo: sent.append(combo))
     ex = executor(make_view(field, send), FakeAuto())
-    with pytest.raises(actions.ConfirmationRequired, match="voisin du champ"):
+    with pytest.raises(actions.ConfirmationRequired, match="next to the field"):
         ex.press("enter", "Message")
     assert sent == []
 
@@ -159,7 +159,7 @@ def test_newline_typed_in_a_composer_refused():
     field, send = _composer()
     auto = FakeAuto()
     ex = executor(make_view(field, send), auto)
-    with pytest.raises(actions.ConfirmationRequired, match="saut de ligne"):
+    with pytest.raises(actions.ConfirmationRequired, match="line break"):
         ex.write("Message", "Bonjour\n", replace=True)
     assert auto.calls == []
     ex._confirm_text(ex.resolve_element("Message", set(), "x"), "Bonjour sans saut")  # texte seul : libre
@@ -189,7 +189,7 @@ def test_enter_triggers_the_default_button():
     default.parent = window
     window.children.append(default)
     ex = executor(make_view(field, default), FakeAuto())
-    with pytest.raises(actions.ConfirmationRequired, match="bouton par défaut"):
+    with pytest.raises(actions.ConfirmationRequired, match="default button"):
         ex._confirm_keys(actions.keys.parse_sequence("enter"), "enter", ex.resolve_element("Nom", set(), "x"))
 
 
@@ -198,7 +198,7 @@ def test_space_on_focused_button_and_alt_shortcut():
     ex = executor(make_view(send), FakeAuto())
     with pytest.raises(actions.ConfirmationRequired):
         ex._confirm_keys(actions.keys.parse_sequence("space"), "space", None)
-    with pytest.raises(actions.ConfirmationRequired, match="raccourci"):
+    with pytest.raises(actions.ConfirmationRequired, match="shortcut"):
         ex._confirm_keys(actions.keys.parse_sequence("alt+e"), "alt+e", None)
     ex._confirm_keys(actions.keys.parse_sequence("alt+f"), "alt+f", None)  # autre raccourci : libre
 
@@ -227,7 +227,7 @@ def test_hard_block_also_refuses_reading(monkeypatch):
     monkeypatch.setattr(w, "process_name", lambda pid: "KeePassXC.exe")
     monkeypatch.setattr(w, "class_name", lambda hwnd: "Qt5QWindowIcon")
     monkeypatch.setattr(w, "window_text", lambda hwnd: "Coffre")
-    with pytest.raises(actions.ActionError, match="gestionnaire de mots de passe"):
+    with pytest.raises(actions.ActionError, match="password manager"):
         server._check_readable_window(HWND)
     monkeypatch.setattr(w, "process_name", lambda pid: "Antigravity.exe")
     server._check_readable_window(HWND)  # l'autre agent : lisible et pilotable

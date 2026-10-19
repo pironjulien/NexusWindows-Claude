@@ -37,7 +37,7 @@ def test_remember_writes_the_mirror_without_run_statistics():
 
 
 def test_plain_typed_text_never_reaches_the_mirror():
-    with pytest.raises(routines.RoutineError, match="texte tapé fixe"):  # jamais gardé, même au poste
+    with pytest.raises(routines.RoutineError, match="fixed typed text"):  # jamais gardé, même au poste
         routines.remember("app.exe", "secret", [{"do": "set", "target": "Nom", "text": "Julien Piron"}], {}, "Fiche")
     routines.remember(
         "app.exe", "verif", [{"do": "click", "target": "OK", "check": {"target": "Nom", "value": "x"}}], {}, "F"
@@ -95,7 +95,7 @@ def test_sync_imports_routines_of_another_pc_and_never_rewrites_identically():
         "autre.exe",
         {"schema": 1, "app": "autre.exe", "routines": {"r": _routine("2026-10-03T08:00:00")}},
     )
-    assert routines.sync() == ["autre.exe : r : version du 2026-10-03T08:00:00 reprise du miroir"]
+    assert routines.sync() == ["autre.exe: r: version of 2026-10-03T08:00:00 taken from the mirror"]
     path = _mirror() / "autre.exe.json"
     before = path.stat().st_mtime_ns
     assert routines.sync() == []

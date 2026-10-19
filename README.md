@@ -317,8 +317,7 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 - **Emergency stop**: Ctrl+Alt+Shift+Esc interrupts the running action at its next checkpoint (typing included) and
   refuses every new action for 2 minutes, across conversations and for the other agents (protocol above).
 - **Hard blocks** (shared policy, `src/nexus_windows/shared/garde-fous.json`, same file as NexusWindows for
-  Antigravity): the secure desktop (UAC, lock and sign-in screens), Windows credential prompts and password managers
-  are never read nor driven. A missing or unreadable policy refuses every action (fail closed).
+  Antigravity): the secure desktop (UAC, lock and sign-in screens) and password managers are never read nor driven. A missing or unreadable policy refuses every action (fail closed).
 - **Confirmation of irreversible gestures**: paying, buying, ordering, transferring money, sending, publishing,
   posting, deleting permanently, emptying the bin, formatting, uninstalling, resetting, cancelling a subscription,
   deleting an account or making a repository public need `confirm: true` on the step, which the model sets only on the
@@ -342,8 +341,8 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 
 ## Limits
 
-- Server instructions are in English. Tool descriptions, step reports, refusal messages and code comments are in
-  French; the API itself (tool names, parameters, step actions) is in English.
+- Code comments are in French. Everything an MCP client receives (instructions, tool descriptions, step reports,
+  refusal messages) is in English.
 - Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
   been checked.
 - Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
@@ -361,7 +360,7 @@ NexusWindows for Claude runs entirely on your PC. It has no account, no telemetr
 requests of its own (DevTools connections stay on `127.0.0.1`).
 
 - **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
-  only when a tool is called. Password managers, credential prompts and the secure desktop are never inspected
+  only when a tool is called. Password managers and the secure desktop are never inspected
   (`look`) nor driven (`act`); `windows` still lists their window titles, like the taskbar does.
 - **Where it goes**: tool results are returned to Claude Desktop or Claude Code, which send them to Anthropic under
   Anthropic's own privacy policy; this server sends nothing anywhere else.

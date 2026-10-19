@@ -288,7 +288,7 @@ def test_characters_lost_at_give_back_stop_honestly_without_duplicate(monkeypatc
     sim._advance()
     assert text.startswith(sim.dom), sim.dom[-60:]  # un début exact : ni doublon ni saut déplacé
     if not typed.complete:
-        assert "pas relu" in typed.stopped and "aucun caractère renvoyé" in typed.detail()
+        assert "not read back" in typed.stopped and "no character resent" in typed.detail()
         assert typed.sent > typed.confirmed == len(sim.dom)
     assert sim.longest_hold() <= methods.SLICE_S
 
@@ -326,7 +326,7 @@ def test_slow_prepare_never_stretches_a_slice(monkeypatch):
         time.sleep(0.4)
         return target
 
-    with pytest.raises(methods.MethodError, match="à recevoir le clavier.*rien n'a été tapé"):
+    with pytest.raises(methods.MethodError, match="to receive the keyboard.*nothing was typed"):
         methods.type_in_slices(TARGET, {TARGET}, "y" * 2000, slow, *_reader(sim, "y" * 2000))
     assert len(sim.holds) == methods.STARVED_SLICES and sim.longest_hold() <= methods.SLICE_S and sim.dom == ""
 
@@ -367,7 +367,7 @@ def test_unreadable_field_is_never_complete(monkeypatch):
     sim = Chromium(monkeypatch, desk)
     sim.unreadable_after = 0
     typed = methods.type_in_slices(TARGET, {TARGET}, "abc", sim.prepare, *_reader(sim, "abc"))
-    assert not typed.complete and typed.confirmed == 0 and "ne se relit plus" in typed.stopped
+    assert not typed.complete and typed.confirmed == 0 and "can no longer be read back" in typed.stopped
 
 
 def test_unreadable_field_with_newlines_does_not_stop_silently_at_first_enter(monkeypatch):
@@ -377,7 +377,7 @@ def test_unreadable_field_with_newlines_does_not_stop_silently_at_first_enter(mo
     sim.unreadable_after = 3
     text = "ligne1\nligne2\nligne3"
     typed = methods.type_in_slices(TARGET, {TARGET}, text, sim.prepare, *_reader(sim, text), enter_as_key=True)
-    assert not typed.complete and "ne se relit plus" in typed.detail()
+    assert not typed.complete and "can no longer be read back" in typed.detail()
 
 
 def test_foreign_content_stops_typing(monkeypatch):
@@ -393,7 +393,7 @@ def test_foreign_content_stops_typing(monkeypatch):
 
     sim._advance = julien_types
     typed = methods.type_in_slices(TARGET, {TARGET}, PROSE, sim.prepare, *_reader(sim, PROSE))
-    assert not typed.complete and "autre chose qu'un début du texte" in typed.stopped
+    assert not typed.complete and "something other than the start of the text" in typed.stopped
 
 
 def test_field_that_loses_confirmed_text_stops(monkeypatch):
@@ -409,7 +409,7 @@ def test_field_that_loses_confirmed_text_stops(monkeypatch):
 
     sim._advance = remount
     typed = methods.type_in_slices(TARGET, {TARGET}, PROSE, sim.prepare, *_reader(sim, PROSE))
-    assert not typed.complete and "perdu du texte déjà relu" in typed.stopped
+    assert not typed.complete and "lost text already read back" in typed.stopped
 
 
 # --- Exécuteur : éditeur riche, remplacement, Unconfirmed --------------------------------------------------------------
@@ -463,7 +463,7 @@ def test_rich_editor_append_is_read_back(monkeypatch, text):
     sim = Chromium(monkeypatch, desk, rich=True)
     ex = _chromium_executor(monkeypatch, sim, "Paragraphes")
     outcome = ex.write("Paragraphes", text, replace=False)
-    assert outcome.ok and outcome.verified and "relu ✓" in outcome.line, outcome.line
+    assert outcome.ok and outcome.verified and "read back ✓" in outcome.line, outcome.line
     _no_duplicate(sim.dom, text)
     assert sim.longest_hold() <= methods.SLICE_S
 
@@ -486,7 +486,7 @@ def test_replace_whose_delete_is_ignored_keeps_original(monkeypatch):
     desk = Desk(monkeypatch)
     sim = Chromium(monkeypatch, desk, value="CONTENU ORIGINAL DE JULIEN", deaf_delete=99)
     ex = _chromium_executor(monkeypatch, sim, "Notes")
-    with pytest.raises(actions.Unconfirmed, match="contenu d'origine intact"):
+    with pytest.raises(actions.Unconfirmed, match="original content intact"):
         ex.write("Notes", "Nouveau texte", replace=True)
     assert sim.dom == "CONTENU ORIGINAL DE JULIEN"
     assert not [item for kind, item in sim.log if kind == "post" and item != methods.VK_DELETE]  # aucun caractère
@@ -505,8 +505,8 @@ def test_partial_typing_fails_the_step_and_stops_the_batch(monkeypatch):
     sim.unreadable_after = 6  # l'élément est recréé pendant la frappe
     steps = [server.Step(do="type", target="Message", text=LONG6), server.Step(do="click", target="Envoyer")]
     report, failed = server._run_steps(ex, steps, HWND, as_call())
-    assert failed and report[0].startswith("1. ✗") and "partiellement tapé" in report[0], report
-    assert "(étapes 2 à 2 non exécutées)" in report[1] and auto_calls == []
+    assert failed and report[0].startswith("1. ✗") and "partially typed" in report[0], report
+    assert "(steps 2 to 2 not run)" in report[1] and auto_calls == []
 
 
 def test_unreadable_field_is_refused_before_typing(monkeypatch):
@@ -515,7 +515,7 @@ def test_unreadable_field_is_refused_before_typing(monkeypatch):
     ex = _chromium_executor(monkeypatch, sim, "Notes")
     field = ex.resolve_element("Notes", actions.TEXT_ROLES, "champ de saisie")
     sim.unreadable_after = sim.reads  # désormais, plus aucune relecture
-    with pytest.raises(actions.ActionError, match="illisible"):
+    with pytest.raises(actions.ActionError, match="unreadable"):
         ex.write_element(field, "abc", replace=False)
     assert not [kind for kind, _ in sim.log if kind == "post"] and sim.holds == []
 
@@ -525,7 +525,7 @@ def test_clearing_an_empty_field_needs_no_activation(monkeypatch):
     sim = Chromium(monkeypatch, desk)
     ex = _chromium_executor(monkeypatch, sim, "Notes")
     outcome = ex.write("Notes", "", replace=True)
-    assert outcome.ok and outcome.verified and sim.holds == [] and "déjà vide" in outcome.line
+    assert outcome.ok and outcome.verified and sim.holds == [] and "already empty" in outcome.line
 
 
 def test_clearing_stays_within_one_slice(monkeypatch):

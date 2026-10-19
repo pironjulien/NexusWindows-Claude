@@ -330,9 +330,9 @@ def system_foreground() -> str:
     Windows refuse alors toute activation programmatique (mesuré : attache de file, Alt simulé, focus UIA)."""
     fg = w.foreground()
     if not fg:
-        return "aucune fenêtre"
+        return "no window"
     if w.is_cloaked(fg) or not w.IsWindowVisible(fg):
-        return f"fenêtre système masquée « {w.window_text(fg) or w.class_name(fg)} »"
+        return f'hidden system window "{w.window_text(fg) or w.class_name(fg)}"'
     return ""
 
 
@@ -399,13 +399,13 @@ class Activation:
             self.give_back()
             took = round((time.monotonic() - self.started) * 1000)
             raise UserInterrupted(
-                f"L'utilisateur a utilisé le clavier ou la souris pendant l'activation brève ({took} ms) : {consequence}."
+                f"The user used the keyboard or mouse during the brief activation ({took} ms): {consequence}."
             )
 
     def checkpoint(self) -> None:
         """Contrôle en cours de frappe ou d'attente (à chaque caractère posté, à chaque tour d'attente)."""
         self.check(
-            "frappe arrêtée et premier plan rendu ; ses touches ont pu arriver dans la cible : vérifier la cible (look)"
+            "typing stopped and foreground given back; their keystrokes may have reached the target: check the target (look)"
         )
 
 
@@ -445,7 +445,7 @@ def brief_activation(target: int, windows: set[int] | None = None, user_front: i
     rendu en sortie et « rendu » serait faux : refus (BusyUser). Sans user_front (act), une cible au premier plan est
     celle que l'utilisateur a choisie (comme pour Watch) : l'activation est permise et n'a rien à rendre.
     """
-    with agent_token("activation brève"), _brief_activation(target, windows, user_front) as activation:
+    with agent_token("brief activation"), _brief_activation(target, windows, user_front) as activation:
         yield activation
 
 
@@ -453,23 +453,23 @@ def brief_activation(target: int, windows: set[int] | None = None, user_front: i
 def _brief_activation(target: int, windows: set[int] | None, user_front: int):
     if not wait_typing_pause():
         raise BusyUser(
-            "L'utilisateur tape, bouge la souris ou tient un bouton en ce moment : frappe reportée pour ne pas capter ses "
-            "touches."
+            "The user is typing, moving the mouse or holding a button right now: typing postponed so as not to capture "
+            "their keystrokes."
         )
     _checkpoint()  # arrêt d'urgence demandé pendant l'attente de la pause
     holder = system_foreground()
     front = w.foreground()
     if holder or not front:
         raise BusyUser(
-            f"Windows refuse d'activer la fenêtre : le premier plan est tenu par {holder or 'aucune fenêtre'}, à qui "
-            "il ne pourrait pas être rendu ensuite. Remède : application lancée par launch avec devtools=true, ou "
+            f"Windows refuses to activate the window: the foreground is held by {holder or 'no window'}, to which "
+            "it could not be given back afterwards. Remedy: app started by launch with devtools=true, or "
             "foreground=true"
         )
     windows = windows or target_windows(target)
     if user_front and front != user_front and belongs_to(front, windows, set()):  # par fenêtre seulement
         raise BusyUser(
-            "l'application tient déjà le premier plan pris à l'utilisateur : aucune activation brève (il n'y aurait personne "
-            "à qui le rendre ensuite)"
+            "the app already holds the foreground taken from the user: no brief activation (there would be no one "
+            "to give it back to afterwards)"
         )
     activation = Activation(time.monotonic(), front, windows, target_pids(target, list(windows)))
     previous = getattr(_CURRENT, "activation", None)
@@ -482,7 +482,7 @@ def _brief_activation(target: int, windows: set[int] | None, user_front: int):
                 activation.give_back()
     finally:
         _CURRENT.activation = previous
-    activation.check("ses frappes ont pu arriver dans la cible : vérifier la cible (look) et son propre texte")
+    activation.check("their keystrokes may have reached the target: check the target (look) and their own text")
 
 
 # --- Surveillance -----------------------------------------------------------------------------------------------
@@ -615,6 +615,6 @@ class Watch:
         if not self.stolen:
             return ""
         if self.failed:
-            return "L'application a pris le premier plan et Windows a refusé de le rendre à l'utilisateur."
-        times = "une fois" if self.stolen == 1 else f"{self.stolen} fois"
-        return f"L'application a pris le premier plan ({times}) : rendu aussitôt à l'utilisateur."
+            return "The app took the foreground and Windows refused to give it back to the user."
+        times = "once" if self.stolen == 1 else f"{self.stolen} times"
+        return f"The app took the foreground ({times}): given back to the user at once."

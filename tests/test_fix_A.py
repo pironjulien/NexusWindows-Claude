@@ -113,9 +113,9 @@ def test_msaa_list_item_without_parent_is_never_invoked(monkeypatch):
         actions.methods, "post_click", lambda top, x, y, button="left", count=1: posted.append((top, count))
     )
     outcome = ex.click_element(ex._shown_id(snapshot.Element(1, item, 0, HWND)))
-    assert outcome.ok and outcome.method == "clic par messages" and posted == [(HWND, 1)]
+    assert outcome.ok and outcome.method == "click by messages" and posted == [(HWND, 1)]
     outcome = ex.click_element(ex._shown_id(snapshot.Element(1, item, 0, HWND)), count=2)
-    assert outcome.method == "double-clic par messages" and posted[-1] == (HWND, 2)
+    assert outcome.method == "double-click by messages" and posted[-1] == (HWND, 2)
     assert auto.calls == []  # ni invoke ni legacy : aucune vraie souris
 
 
@@ -128,7 +128,7 @@ def test_msaa_item_in_open_dropdown_selects_owner_combo_by_rank(monkeypatch):
     monkeypatch.setattr(methods.w, "enum_children", lambda top: [COMBO] if top == HWND else [])
     monkeypatch.setattr(methods, "combo_list_of", lambda combo: DROP if combo == COMBO else 0)
     chosen: list[tuple] = []
-    monkeypatch.setattr(methods, "win32_combo_select_index", lambda c, i, n: chosen.append((c, i, n)) or "relu ✓")
+    monkeypatch.setattr(methods, "win32_combo_select_index", lambda c, i, n: chosen.append((c, i, n)) or "read back ✓")
     auto = FakeAuto()
     view = win32_view(*[snapshot.Element(i + 1, n, 0, DROP) for i, n in enumerate(items)], windows=[HWND, DROP])
     ex = executor(view, auto)
@@ -226,11 +226,11 @@ def fake_combo(monkeypatch):
 
 
 def test_combo_select_by_rank_checks_label_and_closes_the_list(fake_combo):
-    assert methods.win32_combo_select_index(COMBO, 2, "Bleu") == "relu ✓"
+    assert methods.win32_combo_select_index(COMBO, 2, "Bleu") == "read back ✓"
     assert fake_combo["sel"] == 2 and fake_combo["dropped"] == 0
     assert fake_combo["notified"] == [methods.CBN_SELCHANGE, methods.CBN_SELENDOK]
     fake_combo.update(sel=-1, dropped=1, notified=[])
-    with pytest.raises(methods.MethodError, match="refaire look"):
+    with pytest.raises(methods.MethodError, match="call look again"):
         methods.win32_combo_select_index(COMBO, 1, "Bleu")  # le rang ne désigne plus l'élément vu
     assert fake_combo["sel"] == -1 and fake_combo["dropped"] == 1 and fake_combo["notified"] == []
 
@@ -269,7 +269,7 @@ def test_listbox_select_by_rank_like_a_click(monkeypatch, style, selected_after)
     monkeypatch.setattr(methods.w, "class_name", lambda h: "ListBox")
     monkeypatch.setattr(methods.w, "style", lambda h: style)
     monkeypatch.setattr(methods, "_notify_parent", lambda control, code: state.update(notified=state["notified"] + 1))
-    assert methods.win32_listbox_select_index(6, 2, "Alpha") == "relu ✓"
+    assert methods.win32_listbox_select_index(6, 2, "Alpha") == "read back ✓"
     assert state["sel"] == selected_after and state["notified"] == 1
 
 
@@ -344,7 +344,7 @@ def popup_over_main(monkeypatch):
 def test_message_click_goes_to_the_popup_under_the_point(popup_over_main):
     ex, targets = popup_over_main
     outcome = ex.click_point(150, 150)
-    assert outcome.ok and outcome.method == "clic par messages"
+    assert outcome.ok and outcome.method == "click by messages"
     assert targets and set(targets) == {POPUP}  # la fenêtre principale, dessous, ne reçoit rien
 
 
@@ -352,7 +352,7 @@ def test_message_wheel_goes_to_the_popup_under_the_point(popup_over_main):
     ex, targets = popup_over_main
     ex.get_frame = lambda: snapshot.frame_for(w.Rect(0, 0, 400, 300), anchor=(0, 0), anchor_size=(400, 300))
     outcome = ex.scroll("150,150", "down", 1)
-    assert outcome.method == "molette par messages" and set(targets) == {POPUP}
+    assert outcome.method == "wheel by messages" and set(targets) == {POPUP}
 
 
 # --- 4. Un seul cadre de coordonnées --------------------------------------------------------------------------------
@@ -389,9 +389,9 @@ def test_list_only_uses_the_frame_of_the_last_image(shifted):
     session, before, after, supprimer = shifted
     session.mark_image(before)
     text = server.render(NO_AUTO, HWND, "elements")[0]
-    assert "dernière image (800×300" in text
-    listed = dict(re.findall(r"« (\w+) ».*?(@-?\d+,-?\d+|\(hors de l'image\))", text))
-    assert listed == {"Supprimer": "@180,30", "Exporter": "(hors de l'image)"}
+    assert "last image (800×300" in text
+    listed = dict(re.findall(r'"(\w+)".*?(@-?\d+,-?\d+|\(outside the image\))', text))
+    assert listed == {"Supprimer": "@180,30", "Exporter": "(outside the image)"}
     ex = executor(after, FakeAuto())
     ex.get_frame = lambda: session.frames.get(HWND)
     ex._windows, ex.acted = {HWND, POPUP}, False
@@ -419,7 +419,7 @@ def test_list_only_after_a_resize_omits_coordinates(shifted):
     session, before, after, _ = shifted
     session.frames[HWND] = snapshot.frame_for(w.Rect(100, 400, 600, 700), "normal", (100, 400), (500, 300))
     text = server.render(NO_AUTO, HWND, "elements")[0]
-    assert "omises" in text and "changé de taille" in text and "@" not in text.split("données à lire")[1]
+    assert "omitted" in text and "changed size" in text and "@" not in text.split("data to read")[1]
     out = server.render(
         NO_AUTO, HWND, "elements", region=[0, 0, 10, 10]
     )  # zoom dans une image périmée : image complète
@@ -557,7 +557,7 @@ def test_incomplete_view_is_never_proof_of_absence(flag):
     ex.hwnd = 0  # pas de titre de fenêtre
     assert ex.present("Valider") is True
     assert ex.present("Chargement") is None and ex.unreadable
-    with pytest.raises(actions.ActionError, match="incomplète"):
+    with pytest.raises(actions.ActionError, match="incomplete"):
         ex.wait("Chargement", gone=True, timeout_s=0.1)  # jamais « ✓ disparu »
 
 
@@ -576,7 +576,7 @@ def test_expect_after_an_incomplete_view_is_not_proof(monkeypatch):
     ex._pids = {7}
     steps = [server.Step(do="click", target="Lancer", expect="Terminé")]
     report, failed = server._run_steps(ex, steps, 0, as_call())
-    assert not failed and "non probant" in report[0] and report[0].split()[1] == "~"
+    assert not failed and "not proof" in report[0] and report[0].split()[1] == "~"
 
 
 def test_tree_reports_truncation_only_when_nodes_are_cut():
@@ -620,7 +620,7 @@ def test_build_view_flags_truncation_and_missing_web_content(monkeypatch):
 
     view = snapshot.build_view(as_auto(TreeAuto()), HWND)
     assert view.truncated and view.web_missing and view.roots[HWND].name == "T"
-    assert "tronqué" in server._header(view, [], view.frame, True)
+    assert "truncated" in server._header(view, [], view.frame, True)
 
 
 # --- 20. Liste ou menu ouverts : repliés sur tout chemin d'échec -------------------------------------------------------
@@ -635,7 +635,7 @@ def clock(monkeypatch):
 def test_select_missing_option_collapses_the_list(clock):
     combo = node("ComboBox", "Couleur", has_expand=True, expand=0)
     auto = FoldingAuto()
-    with pytest.raises(actions.ActionError, match="introuvable"):
+    with pytest.raises(actions.ActionError, match="not found"):
         executor(make_view(combo), auto).select("Couleur", "Inexistante")
     assert auto.calls == [("expand", combo.element), ("collapse", combo.element)]
 
@@ -666,7 +666,7 @@ def test_emergency_stop_during_select_does_nothing_more(clock, monkeypatch):
 def test_menu_with_missing_level_collapses_the_opened_one(clock):
     fichier = node("MenuItem", "Fichier", has_expand=True, expand=0)
     auto = FoldingAuto()
-    with pytest.raises(actions.ActionError, match="introuvable"):
+    with pytest.raises(actions.ActionError, match="not found"):
         executor(make_view(fichier), auto).menu("Fichier > Inexistant")
     assert auto.calls == [("expand", fichier.element), ("collapse", fichier.element)]
 
@@ -689,7 +689,7 @@ def test_scroll_without_target_uses_the_container_under_the_wheel_point(monkeypa
     ex = executor(make_view(side, content), auto)
     ex._windows, ex.acted = {HWND}, False
     outcome = ex.scroll(None, "down", 1)
-    assert outcome.ok and outcome.verified and "Document « Contenu »" in outcome.line
+    assert outcome.ok and outcome.verified and 'Document "Contenu"' in outcome.line
     assert auto.calls == [("scroll", content.element)]
 
 
@@ -701,7 +701,7 @@ def test_scroll_without_container_at_center_takes_the_largest(monkeypatch):
     ex = executor(make_view(small, large), auto)
     ex._windows, ex.acted = {HWND}, False
     outcome = ex.scroll(None, "down", 1)
-    assert "List « Messages »" in outcome.line and auto.calls == [("scroll", large.element)]
+    assert 'List "Messages"' in outcome.line and auto.calls == [("scroll", large.element)]
 
 
 # --- 26. Code mort retiré ; recherche par nom portée sur snapshot.pick -----------------------------------------------
@@ -726,7 +726,7 @@ def test_pick_role_prefix_and_partial():
     )
     assert snapshot.pick(view, "bouton:Enregistrer")[0].name == "Enregistrer"
     element, note = snapshot.pick(view, "sous")
-    assert element.name == "Enregistrer sous" and "partielle" in note
+    assert element.name == "Enregistrer sous" and "partial" in note
     with pytest.raises(snapshot.TargetError):
         snapshot.pick(view, "lien:Enregistrer")
 
@@ -778,7 +778,7 @@ def test_expand_accepts_a_button_with_expand_collapse(clock):
 def test_expand_refuses_a_plain_button_without_invoking_it(clock):
     button = node("Button", "Supprimer", has_invoke=True)
     auto = FakeAuto()
-    with pytest.raises(actions.ActionError, match="pas dépliable"):
+    with pytest.raises(actions.ActionError, match="not expandable"):
         executor(make_view(button), auto).expand("Supprimer", True)
     assert auto.calls == []
 

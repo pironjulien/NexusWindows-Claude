@@ -67,7 +67,7 @@ class RoutineError(ValueError):
 def app_of(hwnd: int) -> tuple[str, dict[str, Any]]:
     """(clé de l'application, empreinte de son exécutable) pour la fenêtre."""
     pid = foreground.app_pid(hwnd)
-    name = (w.process_name(pid) or "inconnu").lower()
+    name = (w.process_name(pid) or "unknown").lower()
     path = w.process_path(pid)
     fingerprint: dict[str, Any] = {"path": path}
     try:
@@ -125,9 +125,9 @@ def summary(app: str) -> str:
     for name in sorted(routines):
         entry = routines[name]
         params = sorted(set(PARAM.findall(json.dumps(entry.get("steps", []), ensure_ascii=False))))
-        flag = " (à revoir)" if entry.get("last_ok") is False else ""
+        flag = " (needs review)" if entry.get("last_ok") is False else ""
         parts.append(f"{name}{'(' + ', '.join(params) + ')' if params else ''}{flag}")
-    return f"Routines enregistrées pour {app} : {', '.join(parts)} — act(routine=…, params=…)."
+    return f"Saved routines for {app}: {', '.join(parts)} — act(routine=…, params=…)."
 
 
 TEXT_PARAM_FIELDS = ("value", "contains")  # champs de check où un {{x}} est permis (avec `text` de l'étape)
@@ -146,7 +146,7 @@ def _params_in(value: Any) -> bool:
 def misplaced(steps: list[dict[str, Any]]) -> str:
     """Premier {{x}} hors des champs de texte (`text`, `check.value`, `check.contains`), ou « » : rempli au rejeu, il
     changerait une cible, une touche ou un menu (« {{b}} » → « 120,340 » : clic par point)."""
-    allowed = "permis seulement dans text, check.value, check.contains"
+    allowed = "allowed only in text, check.value, check.contains"
     for index, step in enumerate(steps, 1):
         for key, value in step.items():
             if key == "text":
@@ -154,9 +154,9 @@ def misplaced(steps: list[dict[str, Any]]) -> str:
             if key == "check" and isinstance(value, dict):
                 for sub, inner in value.items():
                     if sub not in TEXT_PARAM_FIELDS and _params_in(inner):
-                        return f"étape {index} : {{{{x}}}} dans check.{sub} ({allowed})"
+                        return f"step {index}: {{{{x}}}} in check.{sub} ({allowed})"
             elif _params_in(value):
-                return f"étape {index} : {{{{x}}}} dans {key} ({allowed})"
+                return f"step {index}: {{{{x}}}} in {key} ({allowed})"
     return ""
 
 
@@ -167,7 +167,7 @@ def fixed_text(steps: list[dict[str, Any]]) -> str:
         text = step.get("text")
         if step.get("do") in TYPING and isinstance(text, str) and text.strip() and not _template_only(text):
             return (
-                f"étape {index} : texte tapé fixe (seuls des modèles {{{{x}}}} sont permis, valeur donnée au rejeu par "
+                f"step {index}: fixed typed text (only {{{{x}}}} templates are allowed, value given at replay through "
                 "params)"
             )
     return ""
@@ -181,19 +181,19 @@ def unreusable(steps: list[dict[str, Any]]) -> str:
             if value is None:
                 continue
             if isinstance(value, (int, list)) or snapshot.parse_point(value) is not None:
-                return f"étape {index} : cible {value!r} par numéro ou par point (seuls les noms visibles se rejouent)"
+                return f"step {index}: target {value!r} by number or by point (only visible names can be replayed)"
             if isinstance(value, str) and snapshot._ID.match(value):
-                return f"étape {index} : cible {value!r} par numéro [N] (seuls les noms visibles se rejouent)"
+                return f"step {index}: target {value!r} by number [N] (only visible names can be replayed)"
         check = step.get("check") or {}
         target = check.get("target")
         if isinstance(target, int) or (isinstance(target, str) and snapshot._ID.match(target)):
-            return f"étape {index} : check par numéro [N] (seuls les noms visibles se rejouent)"
+            return f"step {index}: check by number [N] (only visible names can be replayed)"
     return ""
 
 
 def remember(app: str, name: str, steps: list[dict[str, Any]], fingerprint: dict[str, Any], title: str) -> None:
     if not NAME.match(name):
-        raise RoutineError(f"Nom de routine « {name} » : lettres, chiffres, espaces, « . », « - », 60 caractères.")
+        raise RoutineError(f'Routine name "{name}": letters, digits, spaces, ".", "-", 60 characters.')
     reason = unreusable(steps) or misplaced(steps) or fixed_text(steps)
     if reason:
         raise RoutineError(reason)
@@ -229,8 +229,7 @@ def get(app: str, name: str) -> dict[str, Any]:
     if entry is None:
         known = names(app)
         raise RoutineError(
-            f"Aucune routine « {name} » pour {app}"
-            + (f" (connues : {', '.join(known)})." if known else " (aucune enregistrée).")
+            f'No routine "{name}" for {app}' + (f" (known: {', '.join(known)})." if known else " (none saved).")
         )
     return entry
 
@@ -260,12 +259,12 @@ def fill(steps: list[dict[str, Any]], params: dict[str, str] | None) -> list[dic
     expected = set(PARAM.findall(json.dumps(steps, ensure_ascii=False)))
     unknown = sorted(set(params) - expected)
     if unknown:
-        wanted = f"attendus : {', '.join(sorted(expected))}" if expected else "aucun paramètre attendu"
-        raise RoutineError(f"Paramètres inconnus : {', '.join(unknown)} ({wanted}).")
+        wanted = f"expected: {', '.join(sorted(expected))}" if expected else "no parameter expected"
+        raise RoutineError(f"Unknown parameters: {', '.join(unknown)} ({wanted}).")
     missing: set[str] = set()
     filled = _fill(steps, params, missing)
     if missing:
-        raise RoutineError(f"Paramètres manquants : {', '.join(sorted(missing))} (params={{…}}).")
+        raise RoutineError(f"Missing parameters: {', '.join(sorted(missing))} (params={{…}}).")
     return filled
 
 
@@ -276,11 +275,11 @@ def expand(entry: dict[str, Any], params: dict[str, str] | None) -> list[dict[st
     steps = entry.get("steps", [])
     reason = misplaced(steps)
     if reason:
-        raise RoutineError(f"Routine refusée : {reason}.")
+        raise RoutineError(f"Routine refused: {reason}.")
     filled = fill(steps, params)
     reason = unreusable(filled)
     if reason:
-        raise RoutineError(f"Routine refusée après remplissage des paramètres : {reason}.")
+        raise RoutineError(f"Routine refused after filling in the parameters: {reason}.")
     return filled
 
 
@@ -318,7 +317,7 @@ def plain_text(entry: dict[str, Any]) -> str:
         ]
         for field, value in fields:
             if isinstance(value, str) and value.strip() and not _template_only(value):
-                return f"étape {index}, {field}"  # texte fixe, même mêlé à un {{x}} (« IBAN FR76… {{nom}} »)
+                return f"step {index}, {field}"  # texte fixe, même mêlé à un {{x}} (« IBAN FR76… {{nom}} »)
     return ""
 
 
@@ -362,14 +361,14 @@ def _merge(local: dict[str, Any], mirror: dict[str, Any]) -> tuple[dict[str, Any
             }
             forgotten_local.pop(name, None)
             if not same:
-                changes.append(f"{name} : version du {stamp} reprise du miroir")
+                changes.append(f"{name}: version of {stamp} taken from the mirror")
         elif origin == "local-oubli":
             routines_local.pop(name, None)
             routines_mirror.pop(name, None)
             forgotten_mirror[name] = stamp
         else:  # miroir-oubli
             if routines_local.pop(name, None) is not None:
-                changes.append(f"{name} : oubliée sur un autre poste le {stamp}")
+                changes.append(f"{name}: forgotten on another computer on {stamp}")
             forgotten_local[name] = stamp
     app = local.get("app") or mirror.get("app")
     new_local = {"schema": SCHEMA, "app": app, "routines": routines_local, "forgotten": forgotten_local}
@@ -412,7 +411,7 @@ def sync() -> list[str]:
             apps.add(app if isinstance(app, str) and app else path.stem)
     changes: list[str] = []
     for app in sorted(apps):
-        changes += [f"{app} : {change}" for change in sync_app(app)]
+        changes += [f"{app}: {change}" for change in sync_app(app)]
     return changes
 
 
@@ -422,7 +421,7 @@ def _export_quietly(app: str) -> None:
     try:
         sync_app(app)
     except OSError as error:
-        log.event("routines-miroir", {"app": app, "erreur": str(error)[:200]})
+        log.event("routines-mirror", {"app": app, "error": str(error)[:200]})
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -431,14 +430,14 @@ def main(argv: list[str] | None = None) -> int:
 
     args = sys.argv[1:] if argv is None else argv
     if args[:1] != ["sync"]:
-        print("usage : python -m nexus_windows.routines sync")
+        print("usage: python -m nexus_windows.routines sync")
         return 2
     if MIRROR is None:
-        print("miroir des routines désactivé (NEXUS_ROUTINES_MIRROR vide, ou serveur de test isolé)")
+        print("routine mirror disabled (NEXUS_ROUTINES_MIRROR empty, or isolated test server)")
         return 0
     changes = sync()
-    print(f"routines synchronisées avec {MIRROR}")
-    for change in changes or ["rien de nouveau pour ce poste"]:
+    print(f"routines synchronized with {MIRROR}")
+    for change in changes or ["nothing new for this computer"]:
         print(f"  {change}")
     return 0
 

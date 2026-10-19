@@ -49,8 +49,8 @@ def test_open_path_reports_verified(monkeypatch, tmp_path):
     monkeypatch.setattr(launcher, "shell_open", lambda path: 1234)
     monkeypatch.setattr(launcher, "_opened_window", found)
     result = launcher.open_path(tmp_path, 5.0, user_front=0, before=set())
-    assert result.hwnd == 777 and result.via == "dossier"
-    assert any("ouverture vérifiée" in n for n in result.notes)
+    assert result.hwnd == 777 and result.via == "folder"
+    assert any("opening verified" in n for n in result.notes)
 
 
 def test_open_path_never_claims_unproven_success(monkeypatch, tmp_path):
@@ -59,7 +59,7 @@ def test_open_path_never_claims_unproven_success(monkeypatch, tmp_path):
     monkeypatch.setattr(launcher, "shell_open", lambda path: 0)
     monkeypatch.setattr(launcher, "_opened_window", lambda *a: 0)
     result = launcher.open_path(doc, 1.0, user_front=0, before=set())
-    assert result.hwnd == 0 and any("NON vérifiée" in n for n in result.notes)
+    assert result.hwnd == 0 and any("NOT verified" in n for n in result.notes)
 
 
 def test_close_refuses_an_explorer_window_with_several_tabs(monkeypatch):
@@ -76,12 +76,12 @@ def test_close_refuses_an_explorer_window_with_several_tabs(monkeypatch):
     monkeypatch.setattr(server.methods, "post", lambda *a: closed.append(a))
     monkeypatch.setattr(server.freshness, "stale_reason", lambda: "")
     text = asyncio.run(server.window(action="close", window=55))
-    assert "NON fermée" in text and "2 onglets" in text and closed == []
+    assert "NOT closed" in text and "2 tabs" in text and closed == []
 
 
 def test_launch_routes_paths_to_open(monkeypatch, tmp_path):
     seen: list[Path] = []
     monkeypatch.setattr(launcher, "open_path", lambda path, *a: seen.append(path) or "ouvert")
     assert launcher.launch(str(tmp_path)) == "ouvert" and seen == [tmp_path.resolve()]
-    with pytest.raises(launcher.LaunchError, match="ni args"):
+    with pytest.raises(launcher.LaunchError, match="no args"):
         launcher.launch(str(tmp_path), args="/x")

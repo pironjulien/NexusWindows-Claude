@@ -92,9 +92,9 @@ def start_apps(refresh: bool = False) -> list[dict]:
             )
             data = json.loads(out.stdout or "[]")
         except subprocess.TimeoutExpired:
-            _START_APPS_ERROR = f"Get-StartApps n'a pas répondu en {START_APPS_TIMEOUT_S:.0f} s"
+            _START_APPS_ERROR = f"Get-StartApps did not answer within {START_APPS_TIMEOUT_S:.0f} s"
         except (OSError, ValueError) as error:  # PowerShell introuvable, sortie illisible
-            _START_APPS_ERROR = f"Get-StartApps a échoué : {error}"
+            _START_APPS_ERROR = f"Get-StartApps failed: {error}"
         else:
             rows = data if isinstance(data, list) else [data]
             _START_APPS = [
@@ -105,7 +105,7 @@ def start_apps(refresh: bool = False) -> list[dict]:
             _START_APPS_AT = time.monotonic()
             _START_APPS_ERROR = ""
             return _START_APPS
-        log.event("menu-demarrer", {"erreur": _START_APPS_ERROR})
+        log.event("start-menu", {"error": _START_APPS_ERROR})
         return _START_APPS or []
 
 
@@ -113,7 +113,7 @@ def find_start_app(name: str) -> dict | None:
     low = name.strip().lower()
     apps = start_apps()
     if not apps and _START_APPS_ERROR:
-        raise LaunchError(f"Menu Démarrer illisible ({_START_APPS_ERROR}) : passer le chemin de l'exécutable.")
+        raise LaunchError(f"Start menu unreadable ({_START_APPS_ERROR}): pass the executable's path.")
     for app in apps:
         if app["Name"].lower() == low:
             return app
@@ -383,17 +383,17 @@ def profile_account(profile: Path) -> str | None:
             k for k, v in _dict(entry).items() if v and (k in ACCOUNT_KEYS or k.startswith(ACCOUNT_KEY_PREFIXES))
         )
         if keys:
-            return f"Local State, profil « {name} » : {', '.join(keys)}"
+            return f'Local State, profile "{name}": {", ".join(keys)}'
         if isinstance(name, str) and name not in names and not set(name) & set("/\\:") and name not in (".", ".."):
             names.append(name)
     for name in names:
         prefs = _json_file(profile / name / "Preferences")
         if prefs.get("account_info"):
-            return f"Preferences du profil « {name} » : account_info"
+            return f'Preferences of profile "{name}": account_info'
         services = _dict(_dict(prefs.get("google")).get("services"))
         keys = sorted(k for k in SERVICE_ACCOUNT_KEYS if services.get(k))
         if keys:
-            return f"Preferences du profil « {name} » : google.services.{', '.join(keys)}"
+            return f'Preferences of profile "{name}": google.services.{", ".join(keys)}'
     return None
 
 
@@ -409,7 +409,7 @@ def account_found(port: int, profile: Path | None) -> str | None:
             urls = []
         page = next((u for u in urls if u.startswith(SIGNIN_URLS)), None)
         if page:
-            return f"page {page.split('?')[0]} ouverte"
+            return f"page {page.split('?')[0]} open"
     return profile_account(profile) if profile is not None else None
 
 
@@ -461,7 +461,7 @@ def close_account_browser(proc: subprocess.Popen | None, pid: int, profile: Path
 def _profile_fate(profile: Path | None, removed: bool) -> str:
     if profile is None:
         return ""
-    return " ; profil jetable supprimé" if removed else " ; profil jetable NON supprimé (fichiers verrouillés : purge)"
+    return "; disposable profile removed" if removed else "; disposable profile NOT removed (locked files: purge)"
 
 
 def guard_account(
@@ -482,7 +482,7 @@ def guard_account(
                 if on_kill is not None:
                     on_kill(profile)
                 log.event(
-                    "devtools-compte", {"pid": proc.pid, "port": port, "raison": reason, "profil_supprime": removed}
+                    "devtools-account", {"pid": proc.pid, "port": port, "reason": reason, "profile_removed": removed}
                 )
                 return
 
@@ -649,7 +649,7 @@ def shell_open(path: Path) -> int:
     info.lpFile = str(path)
     info.nShow = w.SW_SHOWNOACTIVATE
     if not _shell32.ShellExecuteExW(ctypes.byref(info)):
-        raise LaunchError(f"Ouverture de « {path} » refusée par Windows (erreur {ctypes.get_last_error()}).")
+        raise LaunchError(f'Opening "{path}" refused by Windows (error {ctypes.get_last_error()}).')
     if not info.hProcess:
         return 0
     try:
@@ -730,7 +730,7 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
     qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), ou fenêtre dont le titre porte le
     nom du document. Faute de preuve, la note le dit (jamais « ouvert » supposé)."""
     folder = path.is_dir()
-    via = "dossier" if folder else "document"
+    via = "folder" if folder else "document"
     notes: list[str] = []
     pid = shell_open(path)
     start = time.monotonic()
@@ -763,17 +763,16 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
         tabs = len(explorer_tabs(hwnd)) if folder else 0
         shared = tabs > 1 if folder else hwnd in before
         where = (
-            (f"onglet d'une fenêtre à {tabs} onglets" if shared else "fenêtre à lui seul")
+            (f"tab of a window with {tabs} tabs" if shared else "window of its own")
             if folder
-            else ("fenêtre déjà ouverte" if shared else "nouvelle fenêtre")
+            else ("window already open" if shared else "new window")
         )
-        shown = f"dossier affiché « {path} »" if folder else f"titre « {snapshot.clip(w.window_text(hwnd), 80)} »"
-        notes.append(f"ouverture vérifiée ({where}, {shown})")
+        shown = f'folder shown "{path}"' if folder else f'title "{snapshot.clip(w.window_text(hwnd), 80)}"'
+        notes.append(f"opening verified ({where}, {shown})")
         if shared:
             notes.append(
-                "ouvert dans une fenêtre que l'utilisateur avait déjà (nouvel onglet ou document de la même instance) : ne "
-                "pas fermer cette fenêtre, elle porte aussi ses propres onglets ou documents (fermer seulement "
-                "l'onglet ouvert, ctrl+w)"
+                "opened in a window the user already had (new tab or document of the same instance): do not close "
+                "this window, it also holds the user's own tabs or documents (close only the opened tab, ctrl+w)"
             )
         fg = w.foreground()
         if fg and fg != user_front and user_front and w.IsWindow(user_front):
@@ -784,14 +783,14 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
             w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
     else:
         notes.append(
-            f"ouverture NON vérifiée : aucune fenêtre {'de l’Explorateur sur ce dossier' if folder else 'portant le nom du document'} "
-            f"en {max(1.0, wait_s):.0f} s (windows pour la chercher)"
+            f"opening NOT verified: no {'Explorer window on this folder' if folder else 'window bearing the document name'} "
+            f"within {max(1.0, wait_s):.0f} s (windows to look for it)"
         )
     returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
     if not returned:
-        notes.append("la fenêtre a pris le premier plan et Windows a refusé de le rendre (la garde réessaie)")
+        notes.append("the window took the foreground and Windows refused to give it back (the guard retries)")
     elif took_back:
-        notes.append("la fenêtre s'est mise devant : premier plan rendu aussitôt à l'utilisateur")
+        notes.append("the window came to the front: foreground given back to the user at once")
     log.event("open", {"via": via, "verified": verified, "pid": pid})
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
     return Launched(hwnd, app_pid, 0, via, notes, None, user_front, returned)
@@ -823,7 +822,7 @@ def launch(
     document = openable(candidate)
     if document is not None:
         if args.strip() or devtools or restart:
-            raise LaunchError("Ouvrir un dossier ou un document : ni args, ni devtools, ni restart.")
+            raise LaunchError("Opening a folder or a document: no args, no devtools, no restart.")
         return open_path(document, wait_s, user_front, before)
     exe = None
     if Path(os.path.expandvars(candidate)).exists():
@@ -841,7 +840,7 @@ def launch(
     if exe is not None and steam.is_steam_exe(exe):
         return launch_steam(exe, args, devtools, restart, wait_s, user_front, before)
     if restart:
-        raise LaunchError("restart=true : seulement pour Steam (relance avec ses commutateurs).")
+        raise LaunchError("restart=true: Steam only (restart with its switches).")
     if exe is not None:
         policy.check_launch_exe(exe, args, devtools=devtools)
         browser = policy.is_browser_exe(exe)
@@ -849,7 +848,7 @@ def launch(
             # Jamais le profil réel de Julien derrière un port DevTools : profil neuf, sans compte ni synchronisation.
             profile = fresh_profile()
             extra += f' --user-data-dir="{profile}" --no-first-run --no-default-browser-check --disable-sync'
-            notes.append("navigateur DevTools : profil neuf, sans compte ni synchronisation (supprimé ensuite)")
+            notes.append("DevTools browser: fresh profile, no account and no sync (removed afterwards)")
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = w.SW_SHOWNOACTIVATE
@@ -857,7 +856,7 @@ def launch(
             features = OCCLUSION_FEATURES + (NO_ACCOUNT_FEATURES if devtools and browser else ())
             args, disable = merge_disable_features(args, features)
             extra += f" {disable} --force-renderer-accessibility"
-            notes.append("Chromium/Electron : rendu et accessibilité maintenus même fenêtre recouverte")
+            notes.append("Chromium/Electron: rendering and accessibility kept even when the window is covered")
         command = subprocess.list2cmdline([exe]) + (" " + args if args else "") + extra
         try:
             proc = subprocess.Popen(
@@ -869,12 +868,12 @@ def launch(
                 shell=False,
             )
         except OSError as error:
-            raise LaunchError(f"Lancement impossible de « {exe} » : {error}") from error
-        pid, via = proc.pid, "exécutable"
+            raise LaunchError(f'Cannot launch "{exe}": {error}') from error
+        pid, via = proc.pid, "executable"
     else:
         entry = find_start_app(app)
         if entry is None:
-            raise LaunchError(f"« {app} » : ni exécutable, ni application du menu Démarrer.")
+            raise LaunchError(f'"{app}": neither an executable nor a Start menu app.')
         app_id = entry["AppID"]
         title_hint = entry["Name"]
         policy.check_launch_app_id(app_id, title_hint)
@@ -885,13 +884,13 @@ def launch(
         if target:
             policy.check_launch_exe(target, "")  # document ouvert par son association : jamais un script
         policy.check_launch_app_id(app_id, title_hint, args, devtools)
-        notes.append(f"menu Démarrer : « {title_hint} »")
+        notes.append(f'Start menu: "{title_hint}"')
         if "!" in app_id:
             try:
                 pid = _activate_packaged(app_id, args.strip())
-                via = "application Store"
+                via = "Store app"
             except (comtypes.COMError, OSError) as error:
-                raise LaunchError(f"Activation de « {title_hint} » refusée : {error}") from error
+                raise LaunchError(f'Activation of "{title_hint}" refused: {error}') from error
         else:
             subprocess.Popen(
                 ["explorer.exe", f"shell:AppsFolder\\{app_id}"],
@@ -899,9 +898,9 @@ def launch(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            via = "raccourci du menu Démarrer"
+            via = "Start menu shortcut"
             if args.strip():
-                notes.append("arguments ignorés : un raccourci du menu Démarrer se lance tel quel")
+                notes.append("arguments ignored: a Start menu shortcut is launched as is")
     stem = Path(exe).stem.lower() if exe else ""
     running = (lambda: proc.poll() is None) if proc is not None else None
     hwnd, took_back = _new_window(
@@ -912,9 +911,9 @@ def launch(
     if devtools and (not hwnd or w.window_pid(hwnd) not in pids):
         kill_tree(pid)
         raise LaunchError(
-            f"DevTools : aucune fenêtre du processus lancé en {max(1.0, wait_s):.0f} s (application déjà ouverte à "
-            "instance unique ? la fermer puis relancer avec devtools=true) : processus lancé fermé, aucune autre "
-            "fenêtre prise à sa place."
+            f"DevTools: no window of the launched process within {max(1.0, wait_s):.0f} s (single-instance app "
+            "already open? close it, then launch again with devtools=true): launched process closed, no other "
+            "window taken in its place."
         )
     fg = w.foreground()
     if hwnd and fg and fg != user_front:
@@ -926,22 +925,19 @@ def launch(
                 # Aucune fenêtre de Julien à qui rendre le premier plan : la nouvelle reste active, mais au fond.
                 w.SetWindowPos(hwnd, w.HWND_BOTTOM, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
                 notes.append(
-                    "aucune fenêtre n'était au premier plan : l'application s'est activée, placée au fond de "
-                    "l'empilement"
+                    "no window was in the foreground: the app activated itself, placed at the bottom of the z-order"
                 )
     if hwnd and w.foreground() != hwnd and user_front and w.IsWindow(user_front):
         w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
     if not hwnd:
-        notes.append(
-            "aucune fenêtre de cette application détectée (déjà ouverte à instance unique ? windows pour la trouver)"
-        )
+        notes.append("no window of this app detected (single-instance app already open? windows to find it)")
     if devtools:
         reason = account_found(port, profile)
         if reason:
             removed = close_account_browser(proc, pid, profile)
             raise AccountError(
-                f"Compte détecté dans le navigateur DevTools ({reason}) : fermé aussitôt (jamais le compte de l'utilisateur "
-                f"derrière un port DevTools){_profile_fate(profile, removed)}."
+                f"Account detected in the DevTools browser ({reason}): closed at once (never the user's account behind "
+                f"a DevTools port){_profile_fate(profile, removed)}."
             )
         if profile is not None and proc is not None:
             guard_account(proc, port, profile, on_account_kill)
@@ -953,30 +949,30 @@ def launch(
             ready = wait_content(auto, hwnd)
             if not ready and packages.resume_suspended(hwnd, {pid} if pid else None):
                 # Suspendue par Windows (lancée sans activation) : reprise, sans premier plan, puis contenu relu.
-                notes.append("application Store suspendue par Windows : reprise sans premier plan")
+                notes.append("Store app suspended by Windows: resumed without foreground")
                 ready = wait_content(auto, hwnd)
         if watch.stolen:
             took_back = took_back or not watch.failed
         if not ready:
             if not uwp_unshown(hwnd):
-                notes.append("contenu pas encore prêt (interface encore vide) : look avant d'agir")
+                notes.append("content not ready yet (interface still empty): look before acting")
             elif _holds_front(hwnd):
-                notes.append("application Store jamais affichée par Windows, bien qu'elle tienne le premier plan")
+                notes.append("Store app never shown by Windows, although it holds the foreground")
             else:
                 notes.append(
-                    "application Store jamais affichée par Windows (lancée sans activation, contenu suspendu : "
-                    "attendre n'y change rien) : l'afficher exige le premier plan, window(action=\"front\", "
-                    "foreground=true) avec l'accord de l'utilisateur"
+                    "Store app never shown by Windows (launched without activation, content suspended: waiting "
+                    'changes nothing): showing it requires the foreground, window(action="front", '
+                    "foreground=true) with the user's consent"
                 )
     # Premier plan relu en fin de lancement, jamais supposé : la note ne dit « rendu » que s'il l'est vraiment.
     returned = not (user_front and w.IsWindow(user_front) and _holds_front(hwnd))
     if not returned:
         notes.append(
-            "l'application a pris le premier plan et Windows a refusé de le rendre : premier plan PAS rendu à l'utilisateur "
-            "(la garde du serveur réessaie)"
+            "the app took the foreground and Windows refused to give it back: foreground NOT given back to the user "
+            "(the server's guard retries)"
         )
     elif took_back:
-        notes.append("l'application s'est mise devant : premier plan rendu aussitôt à l'utilisateur")
+        notes.append("the app came to the front: foreground given back to the user at once")
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
     if pid and app_pid != pid and w.process_name(app_pid).lower() in foreground.HOST_PROCESSES:
         app_pid = pid  # cadre UWP sans CoreWindow enfant : l'application est le processus lancé, pas l'hôte
@@ -1021,10 +1017,9 @@ def launch_steam(
         port = steam.debugging_port() if devtools else None
         if devtools and not port:
             raise LaunchError(
-                "Steam est déjà ouvert sans DevTools : ses commutateurs ne s'appliquent qu'au démarrage. Avec l'accord "
-                'de l\'utilisateur, launch(app="Steam", devtools=true, restart=true) le ferme puis le relance '
-                "(téléchargements "
-                "interrompus ; refusé si un jeu tourne). Rien n'a été fait."
+                "Steam is already open without DevTools: its switches apply only at startup. With the user's "
+                'consent, launch(app="Steam", devtools=true, restart=true) closes it, then starts it again '
+                "(downloads interrupted; refused if a game is running). Nothing was done."
             )
         hwnd = steam.main_window()
         took_back = False
@@ -1036,33 +1031,33 @@ def launch_steam(
             )  # fmt: skip
             hwnd, took_back = _wait_steam(time.monotonic() + max(5.0, wait_s), user_front, before)
         notes.append(
-            "Steam était déjà ouvert (fenêtre existante)"
+            "Steam was already open (existing window)"
             + (
-                f", DevTools déjà actif sur 127.0.0.1:{port}"
+                f", DevTools already active on 127.0.0.1:{port}"
                 if port
-                else " ; si look le trouve vide une fois recouvert, restart=true (accord de l'utilisateur) le relance avec "
+                else "; if look finds it empty once covered, restart=true (the user's consent) starts it again with "
                 "-cef-disable-occlusion -cef-force-accessibility"
             )
         )
         if took_back:
-            notes.append("Steam s'est mis devant : premier plan rendu aussitôt à l'utilisateur")
+            notes.append("Steam came to the front: foreground given back to the user at once")
         pid = w.window_pid(hwnd) if hwnd else 0
         if port:
-            log.event("steam-devtools", {"action": "enregistré", "port": port, "pid": pid})
+            log.event("steam-devtools", {"action": "registered", "port": port, "pid": pid})
         return Launched(hwnd, pid, port or 0, "Steam", notes, None, user_front, True, own_session=bool(port))
     if devtools:
         other = steam.port_taken_by_other()
         if other and other.lower() != steam.WEBHELPER:
             raise LaunchError(
-                f"Port {steam.DEVTOOLS_PORT} déjà pris par {other} : le DevTools de Steam ne pourrait pas s'y ouvrir "
-                "(et ce programme serait pris pour Steam). Rien n'a été fermé."
+                f"Port {steam.DEVTOOLS_PORT} already taken by {other}: Steam's DevTools could not open on it "
+                "(and that program would be taken for Steam). Nothing was closed."
             )
     if running:
         try:
             steam.shutdown(exe)
         except steam.SteamError as error:
             raise LaunchError(str(error)) from error
-        notes.append("Steam fermé proprement puis relancé")
+        notes.append("Steam closed cleanly, then started again")
         before = set(w.enum_windows())
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -1073,11 +1068,11 @@ def launch_steam(
             stderr=subprocess.DEVNULL, startupinfo=startupinfo,
         )  # fmt: skip
     except OSError as error:
-        raise LaunchError(f"Lancement impossible de Steam : {error}") from error
-    log.event("steam", {"action": "lancement", "devtools": devtools, "relance": running, "pid": proc.pid})
+        raise LaunchError(f"Cannot launch Steam: {error}") from error
+    log.event("steam", {"action": "launch", "devtools": devtools, "restart": running, "pid": proc.pid})
     deadline = time.monotonic() + max(wait_s, steam.START_WAIT_S)
     hwnd, took_back = _wait_steam(deadline, user_front, before)
-    notes.append("Steam : -cef-disable-occlusion -cef-force-accessibility (lisible et pilotable même recouvert)")
+    notes.append("Steam: -cef-disable-occlusion -cef-force-accessibility (readable and drivable even when covered)")
     port = 0
     if devtools:
         while time.monotonic() < deadline:
@@ -1087,19 +1082,19 @@ def launch_steam(
             time.sleep(0.5)
         if port:
             notes.append(
-                f"DevTools de Steam sur 127.0.0.1:{port} : la session Steam de l'utilisateur est accessible à tout programme "
-                'local tant que Steam reste ouvert ainsi ; launch(app="Steam", restart=true) sans devtools le referme'
+                f"Steam DevTools on 127.0.0.1:{port}: the user's Steam session is reachable by any local program "
+                'while Steam stays open this way; launch(app="Steam", restart=true) without devtools closes it'
             )
-            log.event("steam-devtools", {"action": "ouvert", "port": port, "pid": proc.pid})
+            log.event("steam-devtools", {"action": "opened", "port": port, "pid": proc.pid})
         else:
-            notes.append("DevTools de Steam : port non ouvert dans le délai (actions sans DevTools)")
+            notes.append("Steam DevTools: port not opened in time (actions without DevTools)")
     if not hwnd:
-        notes.append("fenêtre principale de Steam pas encore affichée (mise à jour, connexion ?) : windows puis look")
+        notes.append("Steam main window not shown yet (update, sign-in?): windows, then look")
     elif took_back:
-        notes.append("Steam s'est mis devant : premier plan rendu aussitôt à l'utilisateur")
+        notes.append("Steam came to the front: foreground given back to the user at once")
     returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
     pid = w.window_pid(hwnd) if hwnd else proc.pid
     return Launched(
-        hwnd, pid, port, "Steam (relancé)" if running else "Steam", notes, None, user_front, returned,
+        hwnd, pid, port, "Steam (restarted)" if running else "Steam", notes, None, user_front, returned,
         own_session=bool(port),
     )  # fmt: skip

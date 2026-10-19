@@ -43,7 +43,7 @@ OWNER_STALE_S = 3 * HEARTBEAT_S  # trois battements manqués : plus de détenteu
 MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_NOREPEAT = 0x0001, 0x0002, 0x0004, 0x4000
 VK_ESCAPE = 0x1B
 WM_HOTKEY, WM_TIMER = 0x0312, 0x0113
-HOTKEY_LABEL = "Ctrl+Alt+Maj+Échap"
+HOTKEY_LABEL = "Ctrl+Alt+Shift+Esc"
 _HOTKEY_ID = 0x4E58  # « NX »
 
 _user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -114,7 +114,7 @@ def request() -> None:
     # Contenu unique à chaque appui : deux appuis dans le même tic d'horloge de fichier (~15 ms) restent deux
     # versions distinctes, chacune reposant le verrou.
     STOP_FILE.write_text(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {os.getpid()} {os.urandom(6).hex()}", encoding="utf-8")
-    # Puis les autres agents de Julien : une erreur ici ne doit pas empêcher l'arrêt des serveurs nexus-windows.
+    # Puis les autres agents de l'utilisateur : une erreur ici ne doit pas empêcher l'arrêt des serveurs nexus-windows.
     try:
         SHARED_STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
         SHARED_STOP_FILE.write_text(
@@ -158,8 +158,8 @@ def _watch(until: threading.Event) -> None:
 
 def message() -> str:
     return (
-        f"Arrêt d'urgence demandé par l'utilisateur ({HOTKEY_LABEL}) : plus aucune action sur le bureau pendant encore "
-        f"{remaining_s():.0f} s. Attendre ses instructions dans la conversation ; ne pas contourner."
+        f"Emergency stop requested by the user ({HOTKEY_LABEL}): no more desktop actions for another "
+        f"{remaining_s():.0f} s. Wait for their instructions in the conversation; do not work around it."
     )
 
 
@@ -230,19 +230,19 @@ def hotkey_note() -> str:
     if owns_hotkey() or not _tried.is_set() or owner() is not None:
         return ""
     return (
-        f"Arrêt d'urgence {HOTKEY_LABEL} NON GARANTI : ce serveur n'a pas obtenu le raccourci (erreur {_failure}) et "
-        "aucun serveur nexus-windows à jour ne le détient (un autre programme ou un serveur ancien le tient). "
-        "Prévenir l'utilisateur."
+        f"Emergency stop {HOTKEY_LABEL} NOT GUARANTEED: this server did not get the hotkey (error {_failure}) and "
+        "no up-to-date nexus-windows server holds it (another program or an old server holds it). "
+        "Tell the user."
     )
 
 
 def status() -> str:
     """État du raccourci pour l'outil logs."""
     if owns_hotkey():
-        return "détenu par ce serveur"
+        return "held by this server"
     holder = owner()
     if holder is not None:
-        return f"détenu par {holder.get('owner') or 'le serveur'} pid {holder.get('pid')} ({holder.get('version')})"
+        return f"held by {holder.get('owner') or 'the server'} pid {holder.get('pid')} ({holder.get('version')})"
     if not _tried.is_set():
-        return "pas encore essayé"
-    return f"NON GARANTI (raccourci non obtenu, erreur {_failure}, aucun détenteur à jour)"
+        return "not tried yet"
+    return f"NOT GUARANTEED (hotkey not obtained, error {_failure}, no up-to-date holder)"

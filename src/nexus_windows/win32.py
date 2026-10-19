@@ -383,7 +383,7 @@ def command_line_args(text: str) -> list[str]:
     count = ctypes.c_int(0)
     argv = CommandLineToArgvW("x " + text, ctypes.byref(count))
     if not argv:
-        raise OSError(ctypes.get_last_error(), "CommandLineToArgvW a échoué")
+        raise OSError(ctypes.get_last_error(), "CommandLineToArgvW failed")
     try:
         return [argv[i] for i in range(1, count.value)]
     finally:

@@ -19,7 +19,7 @@ class WindowsRequired(RuntimeError):
     """Outil de bureau appelé hors Windows."""
 
 
-MESSAGE = f"nexus-windows pilote le bureau Windows : indisponible sous {sys.platform}."
+MESSAGE = f"nexus-windows drives the Windows desktop: unavailable on {sys.platform}."
 
 
 class _StubMeta(type):

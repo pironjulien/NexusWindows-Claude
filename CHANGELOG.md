@@ -6,6 +6,23 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-19
+
+### Changed
+- Everything an MCP client receives is now in English: tool descriptions, step and parameter descriptions (JSON
+  schemas), step reports, summaries, refusals, errors, warnings and the `logs` output. Same meaning, same
+  guardrails; the symbols ✓ ~ ✗ = are unchanged. Inputs keep their French aliases (key names, role prefixes such as
+  `bouton:`, scroll directions).
+- Server instructions state the real password rule: typing into a password field is always refused; password
+  managers and the secure desktop are never read nor driven (Windows credential prompts are no longer a hard block
+  since 0.9.3; README aligned).
+- The shared policy's error messages are in English.
+
+### Added
+- Startup tests: `tools/list` (instructions, descriptions, every schema description) and a series of offline error
+  and refusal responses must contain no French; instructions and descriptions must not steer the model toward or
+  away from other tools.
+
 ### Added
 - `.github/workflows/registry.yml`: after each release reaches PyPI, `server.json` is published to the official MCP
   registry by GitHub OIDC (no token, no manual login), as NexusAndroid does.

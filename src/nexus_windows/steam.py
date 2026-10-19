@@ -135,11 +135,11 @@ def shutdown(exe: str, wait_s: float = SHUTDOWN_WAIT_S) -> None:
     games = games_running(table)
     if games:
         raise SteamError(
-            f"Relance de Steam refusée : {', '.join(games)} tourne sous Steam (jeu ou lanceur, il serait fermé)."
+            f"Steam restart refused: {', '.join(games)} is running under Steam (game or launcher, it would be closed)."
         )
     if not steam_pids(table):
         return
-    log.event("steam", {"action": "fermeture", "raison": "relance avec commutateurs"})
+    log.event("steam", {"action": "shutdown", "reason": "restart with switches"})
     subprocess.Popen([exe, "-shutdown"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.monotonic() + wait_s
     while time.monotonic() < deadline:
@@ -148,7 +148,7 @@ def shutdown(exe: str, wait_s: float = SHUTDOWN_WAIT_S) -> None:
             time.sleep(1.0)  # verrous de Steam (fichiers, port) relâchés
             return
         time.sleep(0.5)
-    raise SteamError(f"Steam ne s'est pas fermé en {wait_s:.0f} s (fenêtre de confirmation ?) : rien n'a été relancé.")
+    raise SteamError(f"Steam did not close within {wait_s:.0f} s (confirmation window?): nothing was restarted.")
 
 
 def command(exe: str, args: str, devtools: bool) -> str:

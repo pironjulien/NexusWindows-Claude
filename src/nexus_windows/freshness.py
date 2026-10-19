@@ -18,7 +18,7 @@ from .codeprint import PACKAGE, SHARED_MODULE, disk_version, fingerprint, superv
 
 __all__ = ["PACKAGE", "SHARED_MODULE", "disk_version", "fingerprint", "stale_reason"]
 CHECK_EVERY_S = 30.0
-STALE = "serveur nexus-windows dépassé : reconnecter (/mcp) ou nouvelle conversation"
+STALE = "nexus-windows server out of date: reconnect (/mcp) or start a new conversation"
 # Lancé par le superviseur (reloader) : il relance le serveur sur le nouveau code avant l'appel suivant ; ce refus ne
 # sert plus qu'au cas rare d'un code changé entre sa vérification et celle du serveur (l'appel est alors rejoué).
 SUPERVISED = os.environ.get("NEXUS_WINDOWS_SUPERVISOR") is not None
@@ -27,13 +27,13 @@ SUPERVISED = os.environ.get("NEXUS_WINDOWS_SUPERVISOR") is not None
 def supervisor_status() -> str:
     """Ligne de l'outil logs : superviseur présent ou non, et à jour (il ne se recharge pas lui-même)."""
     if not SUPERVISED:
-        return "absent (serveur lancé sans superviseur : un changement de code demandera /mcp)"
+        return "absent (server started without a supervisor: a code change will require /mcp)"
     pid = os.environ.get("NEXUS_WINDOWS_SUPERVISOR", "?")
     loaded = os.environ.get("NEXUS_WINDOWS_SUPERVISOR_CODE", "")
     current = supervisor_fingerprint()
     if loaded and current and loaded != current:
-        return f"actif (superviseur pid {pid}, son propre code a changé : appliqué à la prochaine reconnexion, sans urgence)"
-    return f"actif (superviseur pid {pid}) : le serveur reprend tout seul son nouveau code avant l'appel suivant"
+        return f"active (supervisor pid {pid}, its own code changed: applied at the next reconnection, not urgent)"
+    return f"active (supervisor pid {pid}): the server reloads its new code by itself before the next call"
 
 
 LOADED = fingerprint()  # au chargement du paquet, en même temps que ses modules
@@ -56,6 +56,6 @@ def stale_reason() -> str:
             _reason = ""
         else:
             on_disk = disk_version()
-            change = f"{__version__} → {on_disk}" if on_disk != __version__ else f"{__version__} modifiée"
-            _reason = f"{STALE} (code chargé au démarrage ≠ code sur disque : {change})"
+            change = f"{__version__} → {on_disk}" if on_disk != __version__ else f"{__version__} modified"
+            _reason = f"{STALE} (code loaded at startup ≠ code on disk: {change})"
         return _reason

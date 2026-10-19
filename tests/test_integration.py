@@ -22,7 +22,7 @@ def test_click_still_works_when_devtools_page_is_busy():
     ex.get_page = busy
     outcome = ex.click("OK")
     assert outcome.ok and ("invoke", button.element) in auto.calls
-    assert any("DevTools ignoré" in n for n in ex.notes)
+    assert any("DevTools skipped" in n for n in ex.notes)
 
 
 def test_keystrokes_go_through_slices(monkeypatch):
@@ -39,7 +39,7 @@ def test_keystrokes_go_through_slices(monkeypatch):
 
     monkeypatch.setattr(actions.methods, "type_in_slices", fake_slices)
     detail = ex._keystrokes(ex.resolve("Notes")[1], "ligne1\nligne2", replace=True)
-    assert seen["text"] == "ligne1\nligne2" and "3 activations brèves" in detail
+    assert seen["text"] == "ligne1\nligne2" and "3 brief activations" in detail
     assert seen["prefix"](seen["read"]()) == 0 and seen["clear"] is False  # champ vide : rien de tapé ni à effacer
     field.element.live["value"] = "ligne1\n"
     assert seen["prefix"](seen["read"]()) == len("ligne1\n")
@@ -67,7 +67,7 @@ def test_clearing_uses_one_activation_and_delete(monkeypatch):
     monkeypatch.setattr(actions.methods, "post_key", lambda target, vk: keys.append(vk))
     monkeypatch.setattr(actions.methods, "type_in_slices", lambda *a, **k: pytest.fail("pas de tranches pour vider"))
     detail = ex._keystrokes(ex.resolve("Notes")[1], "", replace=True)
-    assert keys == [0x2E] and detail.startswith("Suppr")
+    assert keys == [0x2E] and detail.startswith("Delete")
 
 
 def test_launch_never_activates_to_show_a_store_app():

@@ -36,10 +36,10 @@ def describe(check: dict[str, Any]) -> str:
     for key in FIELDS:
         if check.get(key) is not None:
             value = check[key]
-            parts.append(f"{key}={value!r}" if isinstance(value, str) else f"{key}={'oui' if value else 'non'}")
+            parts.append(f"{key}={value!r}" if isinstance(value, str) else f"{key}={'yes' if value else 'no'}")
     if check.get("exists") is not None:
-        parts.append("présent" if check["exists"] else "absent")
-    return f"« {target} » {', '.join(parts) or 'présent'}"
+        parts.append("present" if check["exists"] else "absent")
+    return f'"{target}" {", ".join(parts) or "present"}'
 
 
 def _value(props: dict) -> str | None:
@@ -75,12 +75,12 @@ def _compare(props: dict, check: dict[str, Any]) -> Verdict:
     value = _value(props)
     if check.get("value") is not None:
         states.append(None if value is None else value == snapshot.norm(check["value"]))
-        seen.append(f"valeur {snapshot.clip(value or '?', 60)!r}")
+        seen.append(f"value {snapshot.clip(value or '?', 60)!r}")
     if check.get("contains") is not None:
         wanted = snapshot.norm(check["contains"]).lower()
         states.append(None if value is None else wanted in value.lower())
         if check.get("value") is None:
-            seen.append(f"valeur {snapshot.clip(value or '?', 60)!r}")
+            seen.append(f"value {snapshot.clip(value or '?', 60)!r}")
     readers = {
         "checked": _checked,
         "selected": lambda p: None if p.get("selected") is None else bool(p["selected"]),
@@ -93,17 +93,17 @@ def _compare(props: dict, check: dict[str, Any]) -> Verdict:
             continue
         actual = read(props)
         states.append(None if actual is None else actual == bool(check[key]))
-        seen.append(f"{key} {'?' if actual is None else ('oui' if actual else 'non')}")
+        seen.append(f"{key} {'?' if actual is None else ('yes' if actual else 'no')}")
     if check.get("exists") is False:
         states.append(False)  # l'élément est là alors qu'il devait avoir disparu
-        seen.append("présent")
+        seen.append("present")
     if not states:
         states.append(True)  # seulement « présent »
-        seen.append("présent")
+        seen.append("present")
     if any(s is False for s in states):
         return Verdict(False, ", ".join(seen))
     if any(s is None for s in states):
-        return Verdict(None, ", ".join(seen) + " (état non publié par l'élément)")
+        return Verdict(None, ", ".join(seen) + " (state not exposed by the element)")
     return Verdict(True, ", ".join(seen))
 
 
@@ -122,7 +122,7 @@ def _find(executor, target: Any) -> tuple[Any | None, str, str]:
         element, note = snapshot.pick(view, str(target))
         return element, "", note
     except snapshot.AmbiguousTarget as error:
-        raise ActionError(f"check : {error}") from None
+        raise ActionError(f"check: {error}") from None
     except snapshot.TargetError:
         pass
     hidden = snapshot.scrolled_away(view)  # présent mais hors de vue (page défilée) : il existe quand même
@@ -141,17 +141,17 @@ def evaluate(executor, check: dict[str, Any]) -> Verdict:
     if element is None:
         if check.get("exists") is False:
             if unreadable:
-                return Verdict(None, f"absent de la lecture, mais lecture incomplète ({unreadable})")
+                return Verdict(None, f"absent from the read, but the read is incomplete ({unreadable})")
             return Verdict(True, "absent")
         if unreadable:
-            return Verdict(None, f"introuvable, lecture incomplète ({unreadable})")
-        return Verdict(False, "introuvable")
+            return Verdict(None, f"not found, incomplete read ({unreadable})")
+        return Verdict(False, "not found")
     if partial:
-        return Verdict(None, f"{partial} ; nom exact ou [N] requis pour une postcondition")
+        return Verdict(None, f"{partial}; exact name or [N] required for a postcondition")
     try:
         props = executor._refresh(element.node.element)
     except uia.UIAError as error:
-        return Verdict(None, f"relecture impossible ({error})")
+        return Verdict(None, f"could not read back ({error})")
     merged = {**element.props, **(props or {})}
     return _compare(merged, check)
 

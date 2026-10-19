@@ -75,7 +75,7 @@ def _open() -> int:
     PATH.parent.mkdir(parents=True, exist_ok=True)
     handle = _CreateFileW(str(PATH), _GENERIC_RW, _SHARE_ALL, None, _OPEN_ALWAYS, 0x80, None)
     if not handle or handle == _INVALID:
-        raise OSError(ctypes.get_last_error(), f"jeton commun inaccessible : {PATH}")
+        raise OSError(ctypes.get_last_error(), f"shared token inaccessible: {PATH}")
     return handle
 
 
@@ -138,11 +138,11 @@ def other_holder() -> dict | None:
 
 
 def describe(holder: dict) -> str:
-    owner = holder.get("owner") or "un autre agent"
+    owner = holder.get("owner") or "another agent"
     since = holder.get("since")
-    held = f" depuis {time.time() - float(since):.1f} s" if isinstance(since, (int, float)) else ""
+    held = f" for {time.time() - float(since):.1f} s" if isinstance(since, (int, float)) else ""
     purpose = f" ({holder['purpose']})" if holder.get("purpose") else ""
-    return f"{owner} tient la souris et le premier plan{held}{purpose}"
+    return f"{owner} holds the mouse and the foreground{held}{purpose}"
 
 
 @contextmanager
@@ -166,7 +166,7 @@ def hold(purpose: str, wait_s: float = WAIT_S, checkpoint: Callable[[], None] | 
             if checkpoint is not None:
                 checkpoint()
             if time.monotonic() >= deadline:
-                raise Busy(f"{describe(_read_holder())} : action reportée, rien n'a été fait")
+                raise Busy(f"{describe(_read_holder())}: action postponed, nothing was done")
             time.sleep(POLL_S)
     except BaseException:
         _CloseHandle(handle)

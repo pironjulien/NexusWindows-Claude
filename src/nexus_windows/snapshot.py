@@ -114,7 +114,7 @@ FRAMEWORK_BY_CLASS = [
     ("SunAwt", "Java"),
     ("TkTopLevel", "Tk"),
     ("SALFRAME", "LibreOffice"),
-    ("CabinetWClass", "Explorateur"),
+    ("CabinetWClass", "Explorer"),
     ("UnityWndClass", "Unity"),
     ("UnrealWindow", "Unreal"),
     ("SDL_app", "SDL"),
@@ -161,7 +161,7 @@ class WindowInfo:
     framework: str
 
     def label(self) -> str:
-        return f"« {clip(self.title, 80)} » ({self.process}, {self.framework})"
+        return f'"{clip(self.title, 80)}" ({self.process}, {self.framework})'
 
 
 CEF_BROWSER_CLASS = "CefBrowserWindow"
@@ -368,7 +368,7 @@ class Element:
         )
 
     def describe(self) -> str:
-        label = f"{self.role} « {clip(self.name, 50)} »" if self.name else self.role
+        label = f'{self.role} "{clip(self.name, 50)}"' if self.name else self.role
         return f"[{self.id}] {label}" if self.id else label  # élément temporaire (sous un point) : pas de numéro
 
 
@@ -461,19 +461,19 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
                     remember_web_documents(hwnd, tree)
                 elif flushed is False:
                     notes.append(
-                        "Arbre UI Automation peut-être en retard (fenêtre Chromium recouverte : sa publication n'a pas "
-                        "pu être déclenchée) : se fier à l'image"
+                        "UI Automation tree may be stale (Chromium window covered: its publication could not be "
+                        "triggered): rely on the image"
                     )
             if win == hwnd and chromium and not _has_web_content(tree):
                 tree, ready = _wait_web_content(auto, win, tree, max_nodes)
                 if not ready:
                     web_missing = True
                     notes.append(
-                        "Contenu web absent de l'arbre UI Automation (Chromium cesse de le publier quand sa fenêtre est "
-                        "recouverte) : se fier à l'image et aux clics par coordonnées ; pour Chrome, préférer Claude in "
-                        "Chrome ; une application lancée par launch n'a pas ce problème"
+                        "Web content missing from the UI Automation tree (Chromium stops publishing it while its window "
+                        "is covered): rely on the image and clicks by coordinates; an application started by launch does not "
+                        "have this problem"
                         + (
-                            " (Steam : launch(app=\"Steam\", restart=true) avec l'accord de l'utilisateur le relance avec "
+                            ' (Steam: launch(app="Steam", restart=true), with the user\'s consent, restarts it with '
                             "-cef-disable-occlusion -cef-force-accessibility)."
                             if steam.is_steam_window(hwnd)
                             else "."
@@ -482,7 +482,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
         except uia.UIAError as error:
             if win == hwnd:
                 unreadable = True
-                notes.append(f"Arbre UI Automation de la fenêtre illisible ({str(error)[:120]}) : se fier à l'image")
+                notes.append(f"UI Automation tree of the window unreadable ({str(error)[:120]}): rely on the image")
             continue
         truncated = truncated or tree.truncated
         roots[win] = tree
@@ -610,25 +610,25 @@ def flags(e: Element) -> str:
         value = p.get("range_value")
     if value is not None and str(value) != "" and norm(str(value)) != e.name:
         shown = "••••" if p.get("password") else clip(norm(str(value)), 60)
-        out.append(f" = « {shown} »")
+        out.append(f' = "{shown}"')
     toggle = p.get("toggle") if p.get("has_toggle") else None
     if toggle is not None and e.role in ("CheckBox", "RadioButton", "Button", "MenuItem", "ListItem", "TreeItem"):
-        out.append({0: " [décoché]", 1: " [coché]", 2: " [mixte]"}.get(toggle, ""))
+        out.append({0: " [unchecked]", 1: " [checked]", 2: " [mixed]"}.get(toggle, ""))
     expand = p.get("expand")
     if (
         expand in (0, 1)
         and p.get("has_expand")
         and e.role in ("ComboBox", "MenuItem", "TreeItem", "SplitButton", "Button", "Group", "DataItem", "ListItem")
     ):
-        out.append(" [fermé]" if expand == 0 else " [ouvert]")
+        out.append(" [collapsed]" if expand == 0 else " [expanded]")
     if p.get("selected"):
-        out.append(" [sélectionné]")
+        out.append(" [selected]")
     if p.get("focused"):
         out.append(" [focus]")
     if p.get("enabled") is False:
-        out.append(" [désactivé]")
+        out.append(" [disabled]")
     if p.get("readonly") and e.role in ("Edit", "Document", "ComboBox"):
-        out.append(" [lecture seule]")
+        out.append(" [read-only]")
     return "".join(out)
 
 
@@ -666,19 +666,19 @@ def lines(
         if e.window != current_window:
             current_window = e.window
             title = w.window_text(e.window)
-            out.append(f"— fenêtre surgissante « {clip(title, 60)} » —" if title else "— menu / liste surgissante —")
+            out.append(f'— popup window "{clip(title, 60)}" —' if title else "— popup menu / list —")
         indent = "  " * min(e.depth, 8) if not query else ""
         rect = e.rect
         where = ""
         if rect is not None and coords:
             cx, cy = frame.to_image(*rect.center, view.info.rect)
             if not frame.contains_image_point(cx, cy):
-                where = " (hors de l'image)"
+                where = " (outside the image)"
             else:
                 where = f" @{cx},{cy}"
                 if e.role in CONTAINER_ROLES or e.role in ("Document", "List", "Tree", "Table", "DataGrid"):
                     where += f" {round(rect.width * frame.scale)}×{round(rect.height * frame.scale)}"
-        name = f" « {clip(e.name, 80)} »" if e.name else ""
+        name = f' "{clip(e.name, 80)}"' if e.name else ""
         out.append(f"{indent}[{e.id}] {e.role}{name}{flags(e)}{where}")
     return out, hidden
 
@@ -700,11 +700,11 @@ def capture_view(view: View) -> tuple[Image.Image, list[str]]:
             try:
                 shot = method(win)
             except Exception as error:  # noqa: BLE001
-                notes.append(f"capture {method.__name__.removeprefix('capture_')} : {error}")
+                notes.append(f"capture {method.__name__.removeprefix('capture_')}: {error}")
                 continue
             if capture.blank_ratio(shot.image) < 1.0:
                 break
-            notes.append(f"capture {shot.method} vide")
+            notes.append(f"capture {shot.method} blank")
         if shot is None:
             continue
         canvas.paste(shot.image, (shot.origin[0] - view.frame.origin[0], shot.origin[1] - view.frame.origin[1]))
@@ -900,10 +900,10 @@ def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element
     if not group:
         if view.unreadable:
             raise TargetError(
-                f"Aucun élément « {spec} » lisible : l'arbre UI Automation de la fenêtre n'a pas pu être lu (seules "
-                "ses surgissantes l'ont été). look pour voir l'image, viser par point x,y."
+                f'No readable element "{spec}": the UI Automation tree of the window could not be read (only its '
+                "popups were). Use look to see the image, target by point x,y."
             )
-        raise TargetError(f"Aucun élément « {spec} » dans la fenêtre (look pour voir la liste).")
+        raise TargetError(f'No element "{spec}" in the window (look to see the list).')
     group = sorted(group, key=lambda e: _rank(e, prefer))
     best = _rank(group[0], prefer)
     outer = _outermost([e for e in group if _rank(e, prefer) == best])
@@ -913,7 +913,7 @@ def pick(view: View, spec: str, prefer: set[str] | None = None) -> tuple[Element
     if len(tied) > 1:
         listed = ", ".join(e.describe() for e in tied[:8])
         raise AmbiguousTarget(
-            f"« {spec} » désigne plusieurs éléments : {listed}. Viser par [N] ou préciser (rôle:nom)."
+            f'"{spec}" matches several elements: {listed}. Target by [N] or narrow it down (role:name).'
         )
-    note = f"correspondance partielle : {group[0].describe()}" if kind == "partial" else ""
+    note = f"partial match: {group[0].describe()}" if kind == "partial" else ""
     return group[0], note

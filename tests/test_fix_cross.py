@@ -102,7 +102,7 @@ def test_wheel_carries_the_point_in_the_same_sendinput(sent):
 
 
 def test_typing_stops_at_julien_physical_input_between_batches(sent, monkeypatch):
-    with pytest.raises(foreground.UserInterrupted, match="L'utilisateur a utilisé le clavier"):
+    with pytest.raises(foreground.UserInterrupted, match="The user used the keyboard"):
         with realinput._borrowed(TARGET, {TARGET}):
             realinput.type_text("ab")
             monkeypatch.setattr(physical, "since", lambda moment: True)  # Julien tape au milieu
@@ -141,7 +141,7 @@ class NoScroll(FakeAuto):
 def test_offscreen_element_whose_scroll_fails_is_refused_not_clicked_at_its_old_center():
     row = node("ListItem", "Ligne 40", offscreen=True, rect=(10, 900, 190, 20))
     ex = executor(make_view(row), NoScroll())
-    with pytest.raises(actions.ActionError, match="hors de la zone visible"):
+    with pytest.raises(actions.ActionError, match="outside the visible area"):
         ex._point_of(ex.view.elements[0])
 
 
@@ -162,7 +162,7 @@ def test_partial_name_in_a_check_is_unknown_never_already_done():
     box = node("CheckBox", "Newsletter partenaires", has_toggle=True, toggle=1)
     ex = executor(make_view(box), FakeAuto())
     verdict = postcond.evaluate(ex, {"target": "Newsletter", "checked": True})
-    assert verdict.state is None and "partielle" in verdict.detail
+    assert verdict.state is None and "partial match" in verdict.detail
     exact = postcond.evaluate(ex, {"target": "Newsletter partenaires", "checked": True})
     assert exact.state is True
 
@@ -172,7 +172,7 @@ def test_replayed_routine_is_remembered_as_its_template():
     routines.remember("test.exe", "r", [{"do": "set", "target": "Nom", "text": "{{nom}}"}], FP, "T")
     todo, template = server._planned("test.exe", FP, None, "r", {"nom": "Julien"}, [])
     assert todo[0].text == "Julien" and template[0].text == "{{nom}}"
-    assert "enregistrée" in server._remember("test.exe", FP, "T", "copie", template, ["✓"], False)
+    assert "saved" in server._remember("test.exe", FP, "T", "copie", template, ["✓"], False)
     saved = json.loads((routines.ROOT / "test.exe.json").read_text(encoding="utf-8"))
     assert saved["routines"]["copie"]["steps"][0]["text"] == "{{nom}}"
     assert "Julien" not in json.dumps(saved, ensure_ascii=False)
@@ -181,16 +181,16 @@ def test_replayed_routine_is_remembered_as_its_template():
 def test_unknown_params_are_refused():
     routines.remember("test.exe", "r", [{"do": "set", "target": "Nom", "text": "{{nom}}"}], FP, "T")
     entry = routines.get("test.exe", "r")
-    with pytest.raises(routines.RoutineError, match="inconnus : nmo"):
+    with pytest.raises(routines.RoutineError, match="Unknown parameters: nmo"):
         routines.expand(entry, {"nom": "Julien", "nmo": "faute"})
-    with pytest.raises(actions.ActionError, match="inconnus"):
+    with pytest.raises(actions.ActionError, match="Unknown parameters"):
         server._filled([server.Step(do="click", target="OK")], {"x": "1"})
 
 
 # --- 6. Texte tapé d'une routine : seulement des modèles --------------------------------------------------------
 @pytest.mark.parametrize("text", ["Mon IBAN FR76 3000 {{nom}}", "Julien", "{{a}}-{{b}}"])
 def test_typed_text_with_fixed_parts_is_refused(text):
-    with pytest.raises(routines.RoutineError, match="texte tapé fixe"):
+    with pytest.raises(routines.RoutineError, match="fixed typed text"):
         routines.remember("test.exe", "r", [{"do": "type", "target": "Note", "text": text}], FP, "T")
     assert routines.names("test.exe") == []
 
@@ -198,7 +198,7 @@ def test_typed_text_with_fixed_parts_is_refused(text):
 def test_template_only_typed_text_is_accepted_and_mixed_checks_stay_local():
     routines.remember("test.exe", "r", [{"do": "type", "target": "Note", "text": " {{a}} {{b}} "}], FP, "T")
     mixed = {"steps": [{"do": "click", "target": "OK", "check": {"target": "Note", "value": "IBAN {{x}}"}}]}
-    assert routines.plain_text(mixed) == "étape 1, check.value"  # jamais copié dans le miroir
+    assert routines.plain_text(mixed) == "step 1, check.value"  # jamais copié dans le miroir
 
 
 # --- 7. {{x}} seulement dans les champs de texte ; étapes remplies revérifiées ----------------------------------
@@ -212,7 +212,7 @@ def test_template_only_typed_text_is_accepted_and_mixed_checks_stay_local():
     ],
 )
 def test_params_outside_text_fields_are_refused_at_remember(step):
-    with pytest.raises(routines.RoutineError, match="permis seulement dans text"):
+    with pytest.raises(routines.RoutineError, match="allowed only in text"):
         routines.remember("test.exe", "r", [step], FP, "T")
 
 
@@ -224,10 +224,10 @@ def test_stored_routine_filled_into_a_point_is_refused(monkeypatch):
     entry = {"steps": [{"do": "click", "target": "{{b}}"}], "fingerprint": FP, "saved": "2026-10-16T10:00:00"}
     data = {"schema": 1, "app": "test.exe", "routines": {"r": entry}}
     (folder / "test.exe.json").write_text(json.dumps(data), encoding="utf-8")
-    with pytest.raises(actions.ActionError, match="Routine refusée"):
+    with pytest.raises(actions.ActionError, match="Routine refused"):
         server._planned("test.exe", FP, None, "r", {"b": "120,340"}, [])
     monkeypatch.setattr(routines, "misplaced", lambda steps: "")  # même sans la règle des champs : refus après
-    with pytest.raises(routines.RoutineError, match="après remplissage.*point"):
+    with pytest.raises(routines.RoutineError, match="after filling in the parameters.*point"):
         routines.expand(routines.get("test.exe", "r"), {"b": "120,340"})
 
 

@@ -1,8 +1,8 @@
 {
-  "_": "Politique unique des garde-fous de bureau de Claude (nexus-windows) et d'Antigravity (Computer Use NexusAGY). Accord Claude–Antigravity du 18/10/2026 (journal-trinite.md, entrée « Garde-fous »). Tout ce qui n'est pas ici est libre. Lue par garde_fous.py (même dossier) et par le Computer Use de NexusCodex (lib/garde-fous.mjs, copie embarquée identique pour sa version publique). Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
+  "_": "Politique unique des garde-fous des outils de pilotage (bureau, navigateur, téléphone). Tout ce qui n'est pas ici est libre. Chaque outil en embarque une copie identique. Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
   "version": 1,
   "blocage_dur": {
-    "_": "Jamais lu ni piloté (règles 1 et 2 de l'accord : pas d'auto-élévation, pas de fuite de secrets). Chaque agent applique les catégories listées pour lui dans « agents ».",
+    "_": "Jamais lu ni piloté : pas d'auto-élévation, pas de fuite de secrets. Chaque outil applique les catégories listées pour lui dans « agents ».",
     "bureau_securise": {
       "raison": "invite UAC, écran de verrouillage ou ouverture de session (bureau sécurisé)",
       "processus": ["consent.exe", "lockapp.exe", "logonui.exe"],
@@ -24,13 +24,13 @@
     }
   },
   "agents": {
-    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 19/10 : Antigravity et Claude n'ont aucun blocage dur sur les identifiants Windows (saisie permise sur ordre de Julien ; les gestionnaires de mots de passe restent sanctuarisés). Codex : sa propre application reste bloquée, parce que le Computer Use de Codex y demande l'accès aux applications dans la fenêtre principale.",
+    "_": "Catégories de blocage dur appliquées par chaque outil. Les gestionnaires de mots de passe et le bureau sécurisé sont bloqués partout ; la fenêtre d'identifiants Windows ne l'est que là où elle est listée (ailleurs, saisie permise sur ordre de l'utilisateur). Un outil dont l'application principale affiche ses propres demandes d'autorisation bloque aussi cette fenêtre.",
     "claude": ["bureau_securise", "gestionnaires_mots_de_passe"],
     "antigravity": ["bureau_securise", "gestionnaires_mots_de_passe"],
     "codex": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe", "fenetre_autorisation_codex"]
   },
   "confirmation": {
-    "_": "Confirmation étanche : un geste dont la cible porte l'un de ces mots exige confirm=true, posé seulement sur l'ordre explicite de Julien ou après son oui. Ni Entrée, ni Espace, ni Ctrl+Entrée, ni Alt+lettre, ni un clic en coordonnées ne la contournent. Mise en production, push et déploiement des projets de Julien : jamais ici (autorisés durablement). Appeler : un appel téléphonique ou vocal sortant est une communication chez un tiers (relecture d'Antigravity du 18/10, règle « garde-fous stricts smartphone » de Julien). Verbes d'action seulement : « Boîte d'envoi », « Éléments envoyés » ne comptent pas (rôles non actifs).",
+    "_": "Confirmation étanche : un geste dont la cible porte l'un de ces mots exige confirm=true, posé seulement sur l'ordre explicite de l'utilisateur ou après son oui. Ni Entrée, ni Espace, ni Ctrl+Entrée, ni Alt+lettre, ni un clic en coordonnées ne la contournent. Mise en production, push et déploiement : volontairement absents de cette liste. Appeler : un appel téléphonique ou vocal sortant est une communication chez un tiers. Verbes d'action seulement : « Boîte d'envoi », « Éléments envoyés » ne comptent pas (rôles non actifs).",
     "motifs": [
       "pay(er|ez)?",
       "paiement",
@@ -115,7 +115,7 @@
         "quoi": "formatage"
       },
       {
-        "_": "« Tout effacer » est libre ailleurs (calculatrice, filtres, notifications) : confirmé seulement sur un écran de réinitialisation de l'appareil (audit NexusAndroid du 18/10).",
+        "_": "« Tout effacer » est libre ailleurs (calculatrice, filtres, notifications) : confirmé seulement sur un écran de réinitialisation de l'appareil.",
         "titre": "reinitialis(er|ez|ation)|factory reset|donnees d usine|reset (this |the |your )?(pc|phone|device|tablet)|(effacer|supprimer) toutes les donnees|erase all data",
         "verbes": "tout effacer|effacer tout|tout supprimer|erase everything|delete all|ok|confirm(er|ez)?|valid(er|ez)",
         "quoi": "réinitialisation de l'appareil"

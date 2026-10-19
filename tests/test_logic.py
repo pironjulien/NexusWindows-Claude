@@ -109,10 +109,10 @@ def test_lines_and_flags():
     )
     out, hidden = snapshot.lines(view)
     assert hidden == 0
-    assert "[coché]" in out[0]
-    assert "mixte" not in out[1]
+    assert "[checked]" in out[0]
+    assert "mixed" not in out[1]
     assert "••••" in out[2] and "secret" not in out[2]
-    assert "[lecture seule]" in out[3]
+    assert "[read-only]" in out[3]
 
 
 def test_lines_query_and_limit():

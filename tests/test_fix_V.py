@@ -190,7 +190,7 @@ def test_effect_seen_in_title_is_upgraded_to_read_back_selection():
     e = make_view(item).elements[0]
     before = (ex._signature_own(e), ((1, "Labo Web — prêt"),), None)
     change = ex._own_state_change(e, before, "effet constaté : fenêtre « Labo Web — liste Charlie »")
-    assert change == "relu ✓ sélectionné"
+    assert change == "read back ✓ selected"
 
 
 def test_effect_without_state_pattern_is_left_as_is():
@@ -258,7 +258,7 @@ def test_name_scrolled_out_of_view_is_brought_into_view():
     ex._pids = {7}
     kind, element = ex.resolve("Gel", {"Edit"})
     assert auto.scrolled == [gel.element] and element.name == "Gel"
-    assert any("hors de vue : amené à l'écran" in n and "[" not in n for n in ex.notes)  # jamais de [N] cité
+    assert any("out of view: brought on screen" in n and "[" not in n for n in ex.notes)  # jamais de [N] cité
 
 
 def test_partial_name_never_scrolls_the_page():
@@ -266,6 +266,6 @@ def test_partial_name_never_scrolls_the_page():
     auto = ScrollAuto()
     ex = actions.Executor(as_auto(auto), HWND, lambda rebuild: before, lambda *a: None)
     ex._pids = {7}
-    with pytest.raises(actions.ActionError, match="Aucun élément « Ge »"):
+    with pytest.raises(actions.ActionError, match='No element "Ge"'):
         ex.resolve("Ge", {"Edit"})
     assert auto.scrolled == []

@@ -172,7 +172,7 @@ class Automation:
         try:
             return self.uia.ElementFromHandle(hwnd)
         except comtypes.COMError as error:
-            raise UIAError(f"UI Automation ne voit pas la fenêtre {hwnd} : {error}") from error
+            raise UIAError(f"UI Automation cannot see window {hwnd}: {error}") from error
 
     def tree(self, hwnd: int, max_nodes: int = 4000) -> Node:
         """Arbre « vue contrôle » complet de la fenêtre, en un seul appel inter-processus. Au-delà de max_nodes,
@@ -187,7 +187,7 @@ class Automation:
         try:
             root_el = self.uia.ElementFromHandleBuildCache(hwnd, self._cache_children if pruned else self._cache)
         except comtypes.COMError as error:
-            raise UIAError(f"Arbre UI Automation illisible pour {hwnd} : {error}") from error
+            raise UIAError(f"UI Automation tree unreadable for {hwnd}: {error}") from error
         state = {"count": 0, "cut": False, "root": hwnd, "pid": 0}
         if pruned:
             root = self._build_pruned(root_el, 0, None, pruned, state, max_nodes)
@@ -268,14 +268,14 @@ class Automation:
         try:
             fresh = element.BuildUpdatedCache(self._cache_one)
         except comtypes.COMError as error:
-            raise UIAError(f"Élément disparu : {error}") from error
+            raise UIAError(f"Element gone: {error}") from error
         return self._props(fresh)
 
     def element_at(self, x: int, y: int):
         try:
             return self.uia.ElementFromPointBuildCache(U.tagPOINT(x, y), self._cache_one)
         except comtypes.COMError as error:
-            raise UIAError(f"Aucun élément en ({x}, {y}) : {error}") from error
+            raise UIAError(f"No element at ({x}, {y}): {error}") from error
 
     def focused(self):
         try:
@@ -292,9 +292,9 @@ class Automation:
         try:
             unknown = element.GetCurrentPattern(pattern_id)
         except comtypes.COMError as error:
-            raise UIAError(f"Motif {name} indisponible : {error}") from error
+            raise UIAError(f"Pattern {name} unavailable: {error}") from error
         if not unknown:
-            raise UIAError(f"Motif {name} non supporté par l'élément.")
+            raise UIAError(f"Pattern {name} not supported by the element.")
         return unknown.QueryInterface(interface)
 
     def invoke(self, element) -> None:
@@ -347,7 +347,7 @@ class Automation:
         try:
             element.QueryInterface(U.IUIAutomationElement3).ShowContextMenu()
         except comtypes.COMError as error:
-            raise UIAError(f"Menu contextuel UIA indisponible : {error}") from error
+            raise UIAError(f"UIA context menu unavailable: {error}") from error
 
     def select_all_text(self, element) -> None:
         """Sélectionne tout le texte de l'élément (TextPattern) : la frappe suivante le remplace."""

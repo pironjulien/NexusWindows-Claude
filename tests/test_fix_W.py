@@ -115,7 +115,7 @@ def test_expand_winforms_combo_by_message_and_read_back(combo):
     assert outcome.ok and outcome.verified and outcome.method == "CB_SHOWDROPDOWN"
     assert combo.dropped == 1 and combo.log == ["SHOWDROPDOWN 1"] and auto.calls == []  # ni UIA ni souris
     again = ex.expand("Formule", True)
-    assert again.ok and "déjà déplié" in again.line and combo.log == ["SHOWDROPDOWN 1"]  # rien renvoyé
+    assert again.ok and "already expanded" in again.line and combo.log == ["SHOWDROPDOWN 1"]  # rien renvoyé
     closed = ex.expand("Formule", False)
     assert closed.ok and closed.verified and combo.dropped == 0
 
@@ -123,7 +123,7 @@ def test_expand_winforms_combo_by_message_and_read_back(combo):
 def test_expand_that_does_not_open_is_a_failure_never_a_tilde(combo):
     combo.opens = False
     outcome = executor(winforms_view(winforms_combo_node()), FakeAuto()).expand("Formule", True)
-    assert not outcome.ok and outcome.verified is False and "ÉCHEC À LA RELECTURE" in outcome.line
+    assert not outcome.ok and outcome.verified is False and "READ-BACK FAILED" in outcome.line
 
 
 def test_simple_combo_has_nothing_to_expand(combo, monkeypatch):
@@ -141,7 +141,7 @@ def test_click_on_winforms_combo_toggles_its_list(combo):
 # --- 2. Choix dans la liste ouverte : fermer d'abord (annulation), puis choisir et valider, relu -----------------------
 def test_open_list_choice_survives_the_close_and_reaches_the_application(combo):
     combo.dropped = 1
-    assert methods.win32_combo_select(COMBO, "Bravo") == "relu ✓"
+    assert methods.win32_combo_select(COMBO, "Bravo") == "read back ✓"
     assert combo.sel == 1 and combo.committed == 1 and combo.dropped == 0
     # Ordre : fermeture (annulation de Windows) AVANT le choix, puis notifications d'un vrai choix.
     assert combo.log == ["SHOWDROPDOWN 0", "SELENDCANCEL", "SETCURSEL 1", "SELCHANGE", "SELENDOK"]
@@ -158,7 +158,7 @@ def test_the_old_order_loses_the_choice():
 
 def test_application_value_read_back_empty_is_a_failure(combo):
     combo.dropped, combo.app_resets = 1, True
-    with pytest.raises(methods.ReadBackFailed, match="vide"):
+    with pytest.raises(methods.ReadBackFailed, match="empty"):
         methods.win32_combo_select(COMBO, "Bravo")
 
 
@@ -197,7 +197,7 @@ def test_click_on_open_item_that_the_application_drops_is_a_cross(combo, monkeyp
     posted: list = []
     monkeypatch.setattr(actions.methods, "post_click", lambda *a, **k: posted.append(a))
     outcome = ex.click_element(ex._shown_id(view.elements[1]))
-    assert not outcome.ok and outcome.verified is False and "ÉCHEC À LA RELECTURE" in outcome.line
+    assert not outcome.ok and outcome.verified is False and "READ-BACK FAILED" in outcome.line
     assert posted == []  # aucun clic par messages rejoué par-dessus
 
 
@@ -280,7 +280,7 @@ def test_dropped_combos_reads_only_open_combo_boxes(monkeypatch):
 def test_unreadable_window_gives_a_clear_message():
     view = make_view()
     view.unreadable = True
-    with pytest.raises(snapshot.TargetError, match="n'a pas pu être lu"):
+    with pytest.raises(snapshot.TargetError, match="could not be read"):
         snapshot.pick(view, "Formule")
 
 
@@ -311,7 +311,7 @@ def test_click_on_option_of_open_wpf_combo_closes_it_and_reads_back():
     auto = FoldingAuto()
     ex = executor(make_view(combo, *items), auto)
     outcome = ex.click_element(ex.view.elements[2])
-    assert outcome.ok and outcome.verified and "liste refermée" in outcome.line
+    assert outcome.ok and outcome.verified and "list closed" in outcome.line
     assert auto.calls[-1] == ("collapse", combo.element)
 
 

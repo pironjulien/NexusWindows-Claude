@@ -66,7 +66,7 @@ def edge_install(tmp_path) -> Path:
 @pytest.mark.parametrize("exe", ["edge", "chrome", "electron"])
 def test_chromium_switch_prefixes_and_case_refused(prefix, switch, exe, electron_app):
     path = {"edge": EDGE, "chrome": CHROME, "electron": electron_app}[exe]
-    with pytest.raises(policy.PolicyError, match="commutateur"):
+    with pytest.raises(policy.PolicyError, match="switch opens a control channel"):
         policy.check_launch_exe(path, f"--app=https://exemple.test {prefix}{switch}")
 
 
@@ -75,7 +75,7 @@ def test_chromium_switch_prefixes_and_case_refused(prefix, switch, exe, electron
 @pytest.mark.parametrize("devtools", [False, True])
 def test_browser_profile_switches_refused_with_or_without_devtools(prefix, key, devtools):
     for exe in (EDGE, CHROME):
-        with pytest.raises(policy.PolicyError, match="profil"):
+        with pytest.raises(policy.PolicyError, match="profile"):
             policy.check_launch_exe(exe, f'"{prefix}{key}"', devtools=devtools)
 
 
@@ -112,9 +112,9 @@ def test_browser_install_annexes_are_the_browser(edge_install, electron_app):
     version = edge_install / "154.0.4258.62"
     for exe in (edge_install / "msedge_proxy.exe", edge_install / "pwahelper.exe", version / "identity_helper.exe"):
         assert policy.is_browser_exe(str(exe)) and policy.is_chromium_exe(str(exe))
-        with pytest.raises(policy.PolicyError, match="exécutable principal"):
+        with pytest.raises(policy.PolicyError, match="main executable"):
             policy.check_launch_exe(str(exe), "", devtools=True)
-        with pytest.raises(policy.PolicyError, match="profil"):
+        with pytest.raises(policy.PolicyError, match="profile"):
             policy.check_launch_exe(str(exe), "--profile-directory=Default --app-id=abc")
     policy.check_launch_exe(str(edge_install / "msedge.exe"), "", devtools=True)  # le principal : profil neuf
     policy.check_launch_exe(str(version / "msedge.exe"), "", devtools=True)
@@ -181,7 +181,7 @@ def test_account_check_before_act_kills_the_devtools_browser(tmp_path, monkeypat
     sess.check_account(HWND)  # profil neuf : rien
     assert killed == []
     sess.profiles[999] = _profile(tmp_path / "b", _fresh_local_state(edge_account_type=1))  # connexion implicite
-    with pytest.raises(launch.AccountError, match="fermé aussitôt"):
+    with pytest.raises(launch.AccountError, match="closed at once"):
         sess.check_account(HWND)
     assert killed == [999] and 999 not in sess.profiles and 999 not in sess.devtools
     sess.check_account(HWND)  # plus rien d'enregistré pour ce processus
@@ -409,7 +409,7 @@ def test_devtools_launch_without_its_window_kills_and_refuses(electron_app, monk
     monkeypatch.setattr(launch, "descendants", lambda pid: {pid})
     monkeypatch.setattr(w, "foreground", lambda: 0)
     monkeypatch.setattr(w, "enum_windows", lambda: [])
-    with pytest.raises(launch.LaunchError, match="aucune fenêtre du processus lancé"):
+    with pytest.raises(launch.LaunchError, match="no window of the launched process"):
         launch.launch(electron_app, devtools=True, wait_s=1)
     assert killed == [5555]
 
@@ -532,7 +532,7 @@ def test_page_transport_errors_are_typed(devtools):
         assert page.evaluate("1") == ["visible", TITLE]
     fake.mode = "hang"
     t0 = time.perf_counter()
-    with pytest.raises(cdp.PageBusy, match="ne répond pas"):
+    with pytest.raises(cdp.PageBusy, match="did not answer"):
         page.evaluate("1", timeout_s=0.2)
     assert time.perf_counter() - t0 < 1.5
     fake.kill_tab()
@@ -574,7 +574,7 @@ def test_busy_page_is_reported_fast_and_port_stays_alive(devtools):
 def test_invalid_devtools_list_is_a_cdp_error(devtools):
     fake, sess, *_ = devtools
     fake.list_body = "<html>pas du JSON</html>"
-    with pytest.raises(cdp.CDPError, match="injoignable"):
+    with pytest.raises(cdp.CDPError, match="unreachable"):
         cdp.targets(fake.port)
     fake.list_body = json.dumps({"pas": "une liste"})
     with pytest.raises(cdp.CDPError):
@@ -749,7 +749,7 @@ def test_start_menu_timeout_is_a_launch_error(monkeypatch):
     monkeypatch.setattr(launch.subprocess, "run", slow)
     monkeypatch.setattr(launch.log, "event", lambda *a, **k: None)
     assert launch.start_apps() == []  # le préchargement du serveur ne lève jamais
-    with pytest.raises(launch.LaunchError, match="Menu Démarrer illisible"):
+    with pytest.raises(launch.LaunchError, match="Start menu unreadable"):
         launch.find_start_app("Calculatrice")
 
 

@@ -42,7 +42,7 @@ def test_press_then_file_deleted_is_still_stopped(stop_file):
     stop.pressed()
     stop_file.unlink()  # le shell de Claude fait « rm » : rien n'est levé
     assert stop.remaining_s() > stop.HOLD_S - 5
-    with pytest.raises(worker.Stopped, match="Arrêt d'urgence"):
+    with pytest.raises(worker.Stopped, match="Emergency stop"):
         worker.check_cancelled()
 
 
@@ -243,7 +243,7 @@ def test_watch_front_closed_falls_back_to_next_window(monkeypatch):
 
 def test_brief_activation_refuses_when_target_already_took_julien_front(monkeypatch):
     desk = Desk(monkeypatch, fg=TARGET)
-    with pytest.raises(foreground.BusyUser, match="tient déjà le premier plan pris à l'utilisateur"):
+    with pytest.raises(foreground.BusyUser, match="already holds the foreground taken from the user"):
         with foreground.brief_activation(TARGET, {TARGET}, user_front=JULIEN):
             pytest.fail("activation brève sans personne à qui rendre le premier plan")
     with foreground.brief_activation(TARGET, {TARGET}) as activation:  # act : cible choisie par Julien, permise
@@ -292,7 +292,7 @@ def test_store_launch_never_activates_and_says_it_stays_empty(monkeypatch):
     monkeypatch.setattr(launch.foreground, "activate", lambda *a, **k: pytest.fail("aucune activation"))
     result = launch.launch("Calculatrice", auto=as_auto(object()))
     assert result.hwnd == TARGET and result.user_front == JULIEN
-    assert any("jamais affichée" in n for n in result.notes)
+    assert any("never shown by Windows" in n for n in result.notes)
 
 
 def test_store_launch_reports_foreground_not_given_back(monkeypatch):
@@ -315,8 +315,8 @@ def test_store_launch_reports_foreground_not_given_back(monkeypatch):
     # Exactement trois tentatives, toutes avant le retour de launch : celle de launch après l'attente de la fenêtre,
     # celle de la garde pendant wait_content, puis son dernier contrôle à la fin du bloc.
     assert gave == [JULIEN, JULIEN, JULIEN] and not result.returned and result.user_front == JULIEN
-    assert any("PAS rendu à l'utilisateur" in n for n in result.notes)
-    assert not any("rendu aussitôt" in n for n in result.notes)
+    assert any("NOT given back to the user" in n for n in result.notes)
+    assert not any("given back to the user at once" in n for n in result.notes)
 
 
 def test_store_launch_given_back_says_so(monkeypatch):
@@ -324,7 +324,7 @@ def test_store_launch_given_back_says_so(monkeypatch):
     _store_launch(monkeypatch, fg, give_back_ok=True)
     monkeypatch.setattr(launch, "uwp_unshown", lambda hwnd: False)
     result = launch.launch("Calculatrice", auto=as_auto(object()))
-    assert result.returned and any("rendu aussitôt à l'utilisateur" in n for n in result.notes)
+    assert result.returned and any("given back to the user at once" in n for n in result.notes)
 
 
 def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
@@ -345,7 +345,7 @@ def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
             pass
 
         def note(self):
-            return "L'application a pris le premier plan (une fois) : rendu aussitôt à l'utilisateur."
+            return "The app took the foreground (once): given back to the user at once."
 
     monkeypatch.setattr(server, "Watch", FakeWatch)
     monkeypatch.setattr(server, "render", lambda auto, hwnd, then, extra=None, call=None: ["\n".join(extra or ())])
@@ -354,7 +354,7 @@ def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
     out = asyncio.run(server.launch("Calculatrice"))
     assert seen["front"] == JULIEN and seen["target"] == TARGET and seen["tail_s"] == 1.6
     assert seen["kwargs"]["on_account_kill"] == server.SESSION.forget_profile
-    assert "rendu aussitôt à l'utilisateur" in out[0]
+    assert "given back to the user at once" in out[0]
 
 
 async def _sync(fn):
@@ -421,7 +421,7 @@ def test_unidentified_entry_is_never_killed(tracked):
 def test_account_at_act_kills_waits_and_removes_profile_at_once(tracked):
     sess, profile, state = tracked
     _sign_in(profile)
-    with pytest.raises(launch.AccountError, match="profil jetable supprimé"):
+    with pytest.raises(launch.AccountError, match="disposable profile removed"):
         sess.check_account(4242)
     assert state["killed"] == [999] and state["waited"] == [77]  # sortie attendue sous le même handle
     assert not profile.exists()  # sur-le-champ, pas à la purge (10 min)
@@ -507,7 +507,7 @@ def test_launch_account_at_start_closes_by_popen_and_removes_profile(tracked, mo
         return made[-1]
 
     monkeypatch.setattr(launch, "fresh_profile", fresh)
-    with pytest.raises(launch.AccountError, match="profil jetable supprimé"):
+    with pytest.raises(launch.AccountError, match="disposable profile removed"):
         launch.launch(str(exe), devtools=True, wait_s=1)
     assert state["killed"] == [5555] and calls == ["wait"] and not made[0].exists()
 
@@ -548,7 +548,7 @@ def test_capture_view_uses_wgc_only_as_last_resort(monkeypatch):
     )
     monkeypatch.setattr(capture, "capture_wgc", lambda h: used.append("wgc") or _shot(_patterned(size), "wgc"))
     _image, notes = snapshot.capture_view(view)
-    assert used == ["pw", "wgc"] and notes == ["capture printwindow vide"]
+    assert used == ["pw", "wgc"] and notes == ["capture printwindow blank"]
 
 
 # --- Vivant : chemin réel du serveur, 120 look avec image sans fuite --------------------------------------------------

@@ -344,11 +344,11 @@ class ExecutorBase:
         (suivi), mais pas changer de taille (les pixels de l'image ne correspondraient plus)."""
         frame = self.get_frame()
         if frame is None:
-            raise ActionError("Aucune image de cette fenêtre montrée : look (avec image) avant de viser un point x,y.")
-        if frame.resized(w.frame_rect(self.hwnd)):
             raise ActionError(
-                "La fenêtre a changé de taille depuis la dernière image : refaire look avant de viser x,y."
+                "No image of this window has been shown: look (with image) before targeting an x,y point."
             )
+        if frame.resized(w.frame_rect(self.hwnd)):
+            raise ActionError("The window has changed size since the last image: run look again before targeting x,y.")
         return frame
 
     def _screen_to_image(self, x: int, y: int) -> tuple[int, int]:
@@ -367,9 +367,7 @@ class ExecutorBase:
             except methods.ReadBackFailed as error:
                 # Transmis puis relu contraire : échec franc, rien d'autre n'est rejoué par-dessus.
                 attempts.append(f"{name} ✗ {_short(error)}")
-                return Outcome(
-                    False, f"{what} ({name} — ÉCHEC À LA RELECTURE : {_short(error)})", name, attempts, False
-                )
+                return Outcome(False, f"{what} ({name} — READ-BACK FAILED: {_short(error)})", name, attempts, False)
             except NoVisibleEffect as error:
                 attempts.append(f"{name} ✗ {_short(error)}")
                 if self.allow_foreground:
@@ -377,21 +375,21 @@ class ExecutorBase:
                     # ignorés, pas retardés : la vraie souris/le vrai clavier autorisés prennent le relais.
                     if error.still_unchanged():
                         continue
-                    return Outcome(True, f"{what} ({name} — changement visible, tardif)", name, attempts, None)
+                    return Outcome(True, f"{what} ({name} — visible change, delayed)", name, attempts, None)
                 # L'action par messages a pu prendre effet plus tard : ne rien rejouer par-dessus (doublon possible).
                 raise Unconfirmed(
-                    f"{what} : aucun effet visible en 0,6 s ({' ; '.join(attempts)}). L'effet a pu arriver plus tard : "
-                    "vérifier sur l'image avant toute nouvelle tentative."
+                    f"{what}: no visible effect within 0.6 s ({'; '.join(attempts)}). The effect may have arrived later: "
+                    "check the image before any new attempt."
                 ) from None
             except EXPECTED as error:
                 attempts.append(f"{name} ✗ {_short(error)}")
                 continue
             attempts.append(f"{name} ✓")
             text = detail if isinstance(detail, str) else ""
-            verified = True if text.startswith("relu ✓") else None
+            verified = True if text.startswith("read back ✓") else None
             extra = f" — {text}" if text else ""
             return Outcome(True, f"{what} ({name}{extra})", name, attempts, verified)
-        raise ActionError(f"{what} : aucune technique n'a marché ({' ; '.join(attempts) or 'aucune applicable'}).")
+        raise ActionError(f"{what}: no technique worked ({'; '.join(attempts) or 'none applicable'}).")
 
     def fresh(self, e: snapshot.Element, expected: tuple | None = None) -> snapshot.Element:
         """Relit l'élément en direct (état, focus, position). expected : identité montrée au modèle ; refus si
@@ -403,8 +401,8 @@ class ExecutorBase:
         if live is not None:
             if expected is not None and not _same_identity(expected, live):
                 raise ActionError(
-                    f"{e.describe()} a changé (désormais « {snapshot.clip(snapshot.norm(live.get('name')), 40)} ») : "
-                    "refaire look."
+                    f'{e.describe()} has changed (now "{snapshot.clip(snapshot.norm(live.get("name")), 40)}"): '
+                    "run look again."
                 )
             e.node.props.update(live)
             return self._shown_id(e)
@@ -413,18 +411,18 @@ class ExecutorBase:
             for other in self._rebuild().elements:
                 if uia.runtime_id(other.props) == rid and (expected is None or _same_identity(expected, other.props)):
                     return self._shown_id(other)
-        raise ActionError(f"{e.describe()} a disparu ou l'interface a changé : refaire look.")
+        raise ActionError(f"{e.describe()} has disappeared or the interface has changed: run look again.")
 
     def resolve(self, spec: Any, prefer: set[str] | None = None) -> tuple[str, Any]:
         """Cible → ("element", Element relu en direct) ou ("point", (x_écran, y_écran))."""
         if spec is None or spec == "":
-            raise ActionError("Cible manquante.")
+            raise ActionError("Missing target.")
         point = snapshot.parse_point(spec)
         if point is not None:
             frame = self._frame()
             if not frame.contains_image_point(*point):
                 width, height = frame.image_size
-                raise ActionError(f"Point {point} hors de l'image de la fenêtre ({width}×{height}).")
+                raise ActionError(f"Point {point} is outside the window image ({width}×{height}).")
             screen = frame.to_screen(*point, w.frame_rect(self.hwnd))
             hit = self._hit(self.view, *screen)
             self._aim(hit[0] if hit else None)
@@ -439,15 +437,15 @@ class ExecutorBase:
                 view = self._rebuild() if self.acted else self.view
                 if any(e.name == bare for e in view.elements):
                     raise ActionError(
-                        f"« {bare} » : élément [{bare}] ou élément nommé « {bare} » ? Écrire #{bare} ou nom:{bare}."
+                        f'"{bare}": element [{bare}] or element named "{bare}"? Write #{bare} or name:{bare}.'
                     )
         if ident is not None:
             shown = self.get_shown()
             if shown is None or not shown.displayed:
-                raise ActionError(f"[{ident}] : aucune liste montrée pour cette fenêtre : faire look d'abord.")
+                raise ActionError(f"[{ident}]: no list shown for this window: run look first.")
             element = shown.by_id.get(ident)
             if element is None or ident not in shown.displayed:
-                raise ActionError(f"[{ident}] n'a pas été montré dans le dernier look : refaire look (ou query=…).")
+                raise ActionError(f"[{ident}] was not shown in the last look: run look again (or query=…).")
             target = self.fresh(element, expected=shown.displayed[ident])
             self._aim(element.node)
             return "element", target
@@ -477,7 +475,7 @@ class ExecutorBase:
         try:
             element, partial = snapshot.pick(dataclasses.replace(self.view, elements=hidden), spec, prefer)
         except snapshot.AmbiguousTarget as error:
-            raise ActionError(f"{error} (hors de vue)") from None
+            raise ActionError(f"{error} (out of view)") from None
         except snapshot.TargetError:
             raise ActionError(str(missing)) from None
         if partial:  # seulement un nom exact : jamais faire défiler la page vers un homonyme approximatif
@@ -487,14 +485,14 @@ class ExecutorBase:
             self.auto.scroll_into_view(element.node.element)
         except EXPECTED as error:
             raise ActionError(
-                f"{element.describe()} est hors de vue et n'a pas pu y être amené ({_short(error)})."
+                f"{element.describe()} is out of view and could not be brought into view ({_short(error)})."
             ) from None
         for _ in range(10):
             time.sleep(0.05)
             for other in self._rebuild().elements:
                 if rid and uia.runtime_id(other.props) == rid:
-                    return other, f"{self._shown_id(other).describe()} hors de vue : amené à l'écran (ScrollIntoView)"
-        raise ActionError(f"{element.describe()} amené à l'écran mais toujours hors de vue : refaire look.")
+                    return other, f"{self._shown_id(other).describe()} out of view: brought on screen (ScrollIntoView)"
+        raise ActionError(f"{element.describe()} brought on screen but still out of view: run look again.")
 
     def _web_documents(self) -> list[uia.Node]:
         """Documents web de premier niveau de la fenêtre principale (cadres internes exclus)."""
@@ -534,19 +532,19 @@ class ExecutorBase:
             return target
         element = self._element_under(*target, roles=prefer)
         if element is None:
-            raise ActionError(f"Aucun élément « {what} » de la fenêtre sous ce point : viser par [N] ou par nom.")
+            raise ActionError(f'No "{what}" element of the window under this point: target by [N] or by name.')
         return element
 
     def _foreground_or_fail(self, what: str, fn: Callable[[], None]) -> Outcome:
         if not self.allow_foreground:
             raise NeedsForeground(
-                f"{what} : impossible en arrière-plan pour {self.view.framework}. Avec l'accord de l'utilisateur, relancer "
-                "avec foreground=true (vraie souris/clavier quelques instants)."
+                f"{what}: impossible in the background for {self.view.framework}. With the user's consent, run again "
+                "with foreground=true (real mouse/keyboard for a few moments)."
             )
         worker.check_cancelled()
         with realinput.borrowed(self.hwnd, self.windows):
             fn()
-        return Outcome(True, f"{what} (vraie souris/clavier, premier plan rendu)", "foreground")
+        return Outcome(True, f"{what} (real mouse/keyboard, foreground given back)", "foreground")
 
     def _try_or_foreground(self, chain, what: str, real: Callable[[], None]) -> Outcome:
         try:
@@ -565,7 +563,7 @@ class ExecutorBase:
             foreground.mark_own_input()
             self.auto.set_focus(e.node.element)
         took = round((time.perf_counter() - started) * 1000)
-        return f"focus UIA, activation brève {took} ms"
+        return f"UIA focus, brief activation {took} ms"
 
     # --- Empreinte visuelle (actions par messages, sans retour) -------------------------------------------------
     def _fingerprint(self) -> tuple:
@@ -594,7 +592,7 @@ class ExecutorBase:
                 time.sleep(0.06)
                 worker.check_cancelled()  # arrêt d'urgence, délai dépassé, entrée de Julien pendant une activation
                 if self._fingerprint() != before:
-                    return "changement visible"
+                    return "visible change"
                 if time.monotonic() >= deadline:
 
                     def still_unchanged() -> bool:
@@ -602,7 +600,7 @@ class ExecutorBase:
                         return self._fingerprint() == before
 
                     raise NoVisibleEffect(
-                        "aucun effet visible : l'application ignore probablement ces messages", still_unchanged
+                        "no visible effect: the application probably ignores these messages", still_unchanged
                     )
 
         return run
@@ -671,4 +669,4 @@ class ExecutorBase:
     @staticmethod
     def _refuse_secret(props: dict, label: str) -> None:
         if props.get("password"):
-            raise ActionError(f"{label} est un champ de mot de passe : je n'y écris pas (règle de sécurité).")
+            raise ActionError(f"{label} is a password field: I do not write in it (security rule).")

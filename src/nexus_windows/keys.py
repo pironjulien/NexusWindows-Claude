@@ -106,7 +106,7 @@ def _vk_for_char(ch: str) -> int:
 
     code = w.VkKeyScanW(ch)
     if code == -1:
-        raise KeyParseError(f"Touche introuvable sur la disposition clavier : {ch!r}")
+        raise KeyParseError(f"Key not found on the keyboard layout: {ch!r}")
     return code & 0xFF
 
 
@@ -115,7 +115,7 @@ def parse(combo: str) -> Combo:
     seul ou « ++ » final (« ctrl++ ») ; « ctrl+ » ou « ctrl+shift+ » (touche manquante) sont refusés."""
     text = combo.strip().replace(" ", "")
     if not text:
-        raise KeyParseError("Combinaison vide.")
+        raise KeyParseError("Empty key combination.")
     if text == "+":
         parts = ["+"]
     elif text.endswith("++") and len(text) > 2:  # « ctrl++ » : modificateurs puis la touche plus
@@ -123,12 +123,12 @@ def parse(combo: str) -> Combo:
     else:
         parts = text.split("+")
     if any(not part for part in parts):
-        raise KeyParseError(f"Combinaison incomplète : {combo.strip()!r} (touche manquante, ex. « ctrl+s »).")
+        raise KeyParseError(f"Incomplete key combination: {combo.strip()!r} (missing key, e.g. ctrl+s).")
     mods: list[int] = []
     for part in parts[:-1]:
         vk = MODIFIERS.get(part.lower())
         if vk is None:
-            raise KeyParseError(f"Modificateur inconnu : {part!r} (ctrl, alt, shift, win).")
+            raise KeyParseError(f"Unknown modifier: {part!r} (ctrl, alt, shift, win).")
         if vk not in mods:
             mods.append(vk)
     last = parts[-1]
@@ -145,7 +145,7 @@ def parse(combo: str) -> Combo:
         if last.isdigit():
             return Combo(tuple(mods), ord(last), last)
         return Combo(tuple(mods), _vk_for_char(last), last)
-    raise KeyParseError(f"Touche inconnue : {last!r}.")
+    raise KeyParseError(f"Unknown key: {last!r}.")
 
 
 def parse_sequence(keys: str) -> list[Combo]:

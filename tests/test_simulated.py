@@ -88,7 +88,7 @@ def test_first_time_while_julien_types_sends_nothing(chromium_window):
 
 def test_refused_outside_chromium_or_when_already_in_front(chromium_window, monkeypatch):
     chromium_window["fg"] = TOP  # Julien a choisi la fenêtre : la frappe ordinaire s'applique
-    with pytest.raises(methods.MethodError, match="premier plan"), methods.simulated_activation(TOP, {TOP}):
+    with pytest.raises(methods.MethodError, match="foreground"), methods.simulated_activation(TOP, {TOP}):
         pass
     monkeypatch.setattr(methods.w, "class_name", lambda h: "SDL_app")  # Steam : CEF hors d'atteinte des messages
     with pytest.raises(methods.MethodError, match="Chromium"), methods.simulated_activation(TOP, {TOP}):
@@ -124,7 +124,7 @@ def test_slices_in_simulated_mode_never_activate(monkeypatch):
         lambda value: methods.typed_prefix(value, "ab\ncd"), enter_as_key=True, slice_s=methods.SIM_SLICE_S,
         activation=lambda: contextlib.nullcontext(Sim()),
     )  # fmt: skip
-    assert typed.complete and "".join(field) == "ab\ncd" and "sans activation" in typed.detail()
+    assert typed.complete and "".join(field) == "ab\ncd" and "without activation" in typed.detail()
 
 
 def _chromium_view(*nodes):
@@ -139,14 +139,14 @@ def test_multiline_chromium_tries_simulated_typing_first_then_falls_back(monkeyp
     def keystrokes(e, text, replace, simulated=False):
         calls.append(simulated)
         if simulated:
-            raise methods.MethodError("focus sans activation non relu sur l'élément : rien n'a été tapé")
+            raise methods.MethodError("focus without activation not read back on the element: nothing was typed")
         notes.element.live["value"] = text
-        return "frappes WM_CHAR, activation brève 120 ms"
+        return "WM_CHAR keystrokes, brief activation 120 ms"
 
     monkeypatch.setattr(ex, "_keystrokes", keystrokes)
     outcome = ex.write("Notes", "ligne 1\nligne 2", replace=True)
     assert calls == [True, False] and outcome.ok and outcome.verified
-    assert "frappes sans activation ✗" in "; ".join(outcome.attempts)
+    assert "keystrokes without activation ✗" in "; ".join(outcome.attempts)
 
 
 def test_multiline_chromium_written_without_any_activation(monkeypatch):
@@ -157,11 +157,11 @@ def test_multiline_chromium_written_without_any_activation(monkeypatch):
     def keystrokes(e, text, replace, simulated=False):
         calls.append(simulated)
         notes.element.live["value"] = text
-        return "frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)"
+        return "WM_CHAR keystrokes without activation (activation simulated by messages, the user's foreground intact)"
 
     monkeypatch.setattr(ex, "_keystrokes", keystrokes)
     outcome = ex.write("Notes", "texte", replace=True)
-    assert calls == [True] and outcome.ok and outcome.method == "frappes sans activation"
+    assert calls == [True] and outcome.ok and outcome.method == "keystrokes without activation"
 
 
 def test_take_focus_is_read_back(monkeypatch):
@@ -172,7 +172,7 @@ def test_take_focus_is_read_back(monkeypatch):
     ex._take_focus(ex.resolve("Notes")[1])
     monkeypatch.setattr(auto, "take_focus", lambda element: None)  # accSelect accepté sans effet
     field.element.live["focused"] = False
-    with pytest.raises(methods.MethodError, match="non relu"):
+    with pytest.raises(methods.MethodError, match="not read back"):
         ex._take_focus(ex.resolve("Notes")[1], timeout_s=0.05)
 
     def refused(element):
@@ -198,7 +198,7 @@ def test_chromium_shortcut_without_devtools_goes_through_simulated_activation(mo
     prints = iter([("avant",), ("après",)])
     monkeypatch.setattr(ex, "_fingerprint", lambda: next(prints))
     outcome = ex.press("ctrl+k")
-    assert outcome.ok and "activation simulée" in outcome.line
+    assert outcome.ok and "simulated activation" in outcome.line
     assert combos == [([0x4B], [0x11], methods.SIM_MODIFIERS_HOLD_S)]
 
 
@@ -208,7 +208,7 @@ def test_chromium_shortcut_refusal_unchanged_when_simulation_is_impossible(monke
     monkeypatch.setattr(ex, "_focused_target_element", lambda: None)
 
     def impossible(e=None):
-        raise methods.MethodError("pas une fenêtre Chromium de premier niveau : activation simulée inapplicable")
+        raise methods.MethodError("not a top-level Chromium window: simulated activation not applicable")
 
     monkeypatch.setattr(ex, "_sim_activation", impossible)
     with pytest.raises(actions.NeedsForeground, match="devtools=true"):

@@ -139,7 +139,7 @@ def test_check_does_not_flip_when_already_checked_live():
     box.element.live["toggle"] = 1
     auto = FakeAuto()
     outcome = executor(make_view(box), auto).set_checked("Option", True)
-    assert auto.calls == [] and outcome.ok and "déjà coché" in outcome.line
+    assert auto.calls == [] and outcome.ok and "already checked" in outcome.line
 
 
 def test_name_target_rebuilds_after_an_action():
@@ -166,21 +166,21 @@ def test_id_gone_never_falls_back_to_homonym():
     gone.element.live["gone"] = True
     other = node("Button", "OK", has_invoke=True, runtime_id=(9, 9))
     ex = executor(make_view(gone), FakeAuto(), shown=make_view(gone), rebuilt=make_view(other))
-    with pytest.raises(actions.ActionError, match="refaire look"):
+    with pytest.raises(actions.ActionError, match="run look again"):
         ex.resolve(1)
 
 
 # --- Ambiguïté et correspondances partielles ---------------------------------------------------------------
 def test_ambiguous_name_is_refused():
     view = make_view(node("Button", "Supprimer", has_invoke=True), node("Button", "Supprimer", has_invoke=True))
-    with pytest.raises(actions.ActionError, match="plusieurs"):
+    with pytest.raises(actions.ActionError, match="several"):
         executor(view, FakeAuto()).click("Supprimer")
 
 
 def test_partial_unique_is_reported():
     ex = executor(make_view(node("Button", "Envoyer plus tard", has_invoke=True)), FakeAuto())
     ex.resolve("Envoyer")
-    assert any("partielle" in n for n in ex.notes)
+    assert any("partial match" in n for n in ex.notes)
 
 
 def test_partial_ambiguous_is_refused():
@@ -190,7 +190,7 @@ def test_partial_ambiguous_is_refused():
     view = make_view(
         node("Button", "Envoyer maintenant", has_invoke=True), node("Button", "Envoyer plus tard", has_invoke=True)
     )
-    with pytest.raises(actions.ActionError, match="plusieurs"):
+    with pytest.raises(actions.ActionError, match="several"):
         executor(view, FakeAuto()).resolve("Envoyer")
 
 
@@ -205,7 +205,7 @@ def test_match_option_ambiguity():
 def test_password_field_is_refused():
     field = node("Edit", "Mot de passe", has_value=True, password=True)
     auto = FakeAuto()
-    with pytest.raises(actions.ActionError, match="mot de passe"):
+    with pytest.raises(actions.ActionError, match="password field"):
         executor(make_view(field), auto).write("Mot de passe", "secret", replace=True)
     assert auto.calls == []
 
@@ -222,7 +222,7 @@ def test_excluded_windows_refused(monkeypatch):
     monkeypatch.setattr(server.foreground, "app_pid", lambda h: 1)
     monkeypatch.setattr(server.w, "process_name", lambda p: "conhost.exe")
     monkeypatch.setattr(server.w, "window_text", lambda h: "Invite de commandes")
-    with pytest.raises(actions.ActionError, match="refusée"):
+    with pytest.raises(actions.ActionError, match="action refused"):
         server._check_actionable_window(1)
 
 
@@ -290,7 +290,7 @@ def test_outcome_symbols():
 # --- Contrat de cible v3 -----------------------------------------------------------------------------------------
 def test_id_without_shown_view_is_refused():
     view = make_view(node("Button", "A", has_invoke=True))
-    with pytest.raises(actions.ActionError, match="faire look"):
+    with pytest.raises(actions.ActionError, match="run look first"):
         executor(view, FakeAuto()).resolve(1)
 
 
@@ -299,13 +299,13 @@ def test_id_whose_element_changed_is_refused():
     b = node("Button", "Annuler", has_invoke=True)
     shown = make_view(a, b)
     b.element.live["name"] = "Supprimer"  # même place dans l'arbre, autre élément (ligne insérée, liste décalée)
-    with pytest.raises(actions.ActionError, match="a changé"):
+    with pytest.raises(actions.ActionError, match="has changed"):
         executor(shown, FakeAuto(), shown=shown).resolve(2)
 
 
 def test_bare_digit_matching_a_name_is_ambiguous():
     view = make_view(node("Button", "A", has_invoke=True), node("Button", "7", has_invoke=True))
-    with pytest.raises(actions.ActionError, match="#7 ou nom:7"):
+    with pytest.raises(actions.ActionError, match="#7 or name:7"):
         executor(view, FakeAuto(), shown=view).resolve("7")
 
 
@@ -330,7 +330,7 @@ def test_point_covered_by_other_window_uses_target_snapshot(monkeypatch):
 
 # --- Intentions jamais réduites à un clic au hasard ----------------------------------------------------------
 def test_check_on_non_toggle_is_refused():
-    with pytest.raises(actions.ActionError, match="pas une case"):
+    with pytest.raises(actions.ActionError, match="not a checkbox"):
         executor(make_view(node("Button", "Valider", has_invoke=True)), FakeAuto()).set_checked("Valider", True)
 
 
@@ -341,7 +341,7 @@ def test_radio_cannot_be_unchecked():
 
 
 def test_match_option_exact_duplicates_refused():
-    with pytest.raises(methods.AmbiguousOption, match="2 fois"):
+    with pytest.raises(methods.AmbiguousOption, match="2 times"):
         methods.match_option(["Paris", "Paris", "Lyon"], "paris")
 
 
@@ -362,7 +362,7 @@ def test_failed_readback_reports_without_echoing_value():
             self.calls.append(("set_value", text))  # l'application ignore l'écriture
 
     outcome = executor(make_view(field), Deaf()).write("Nom", "nouveau", replace=True)
-    assert not outcome.ok and "RELECTURE" in outcome.line
+    assert not outcome.ok and "READ-BACK FAILED" in outcome.line
     assert "confidentielle" not in outcome.line and "nouveau" not in outcome.line
 
 
@@ -372,7 +372,7 @@ def test_expect_already_present_is_not_proof():
     ex = executor(make_view(button, status), FakeAuto())
     steps = [server.Step(do="click", target="Lancer", expect="Terminé")]
     report, failed = server._run_steps(ex, steps, HWND, as_call())
-    assert not failed and "non probant" in report[0] and report[0].split()[1] == "~"
+    assert not failed and "(not proof)" in report[0] and report[0].split()[1] == "~"
 
 
 # --- Politique de sécurité ------------------------------------------------------------------------------------
@@ -412,7 +412,7 @@ def test_policy_unreadable_fails_closed(monkeypatch, tmp_path):
     from nexus_windows import policy
 
     monkeypatch.setattr(policy.garde_fous, "POLICY_FILE", tmp_path / "absent.json")
-    with pytest.raises(policy.PolicyError, match="échec fermé"):
+    with pytest.raises(policy.PolicyError, match="fail closed"):
         policy.act_refusal("notepad.exe", "Notepad", "")
 
 
@@ -480,10 +480,10 @@ def test_emergency_stop_blocks_then_expires(tmp_path, monkeypatch):
     monkeypatch.setattr(stop.log, "event", lambda *a, **k: None)
     worker.check_cancelled()  # pas d'arrêt : rien
     stop.pressed()
-    with pytest.raises(worker.Stopped, match="Arrêt d'urgence"):
+    with pytest.raises(worker.Stopped, match="Emergency stop"):
         worker.check_cancelled()
     monkeypatch.setattr(realinput, "_ALLOWED", {1})
-    with pytest.raises(realinput.ForegroundError, match="Arrêt d'urgence"):
+    with pytest.raises(realinput.ForegroundError, match="Emergency stop"):
         realinput._guard()
     with pytest.raises(worker.Stopped):  # une saisie en cours s'interrompt aussi
         methods_post_chars_blocked()
@@ -524,7 +524,7 @@ def test_stopped_batch_keeps_its_report(tmp_path, monkeypatch):
     with pytest.raises(worker.Stopped) as caught:
         server._run_steps(ex, steps, HWND, as_call())
     text = str(caught.value)
-    assert text.startswith("1. ~ clic sur Button") and "2. ⛔ click interrompu" in text
+    assert text.startswith("1. ~ click on Button") and "2. ⛔ click interrupted" in text
 
 
 def test_instructions_fit_in_mcp_limit():
@@ -559,7 +559,7 @@ def test_id_listed_but_not_displayed_is_refused():
     a, b = node("Button", "A", has_invoke=True), node("Button", "B", has_invoke=True)
     shown = make_view(a, b)
     shown.displayed = {1: snapshot.identity(a.props)}  # seul [1] a été listé (query, troncature, marques)
-    with pytest.raises(actions.ActionError, match="pas été montré"):
+    with pytest.raises(actions.ActionError, match="was not shown"):
         executor(shown, FakeAuto(), shown=shown).resolve(2)
 
 
@@ -568,9 +568,9 @@ def test_identity_is_the_displayed_one_not_the_refreshed_one():
     shown = make_view(b)
     ex = executor(shown, FakeAuto(), shown=shown)
     b.element.live["name"] = "Supprimer"
-    with pytest.raises(actions.ActionError, match="a changé"):
+    with pytest.raises(actions.ActionError, match="has changed"):
         ex.resolve(1)
-    with pytest.raises(actions.ActionError, match="a changé"):  # même après une relecture qui a mis à jour le cache
+    with pytest.raises(actions.ActionError, match="has changed"):  # même après une relecture qui a mis à jour le cache
         b.props["name"] = "Supprimer"
         ex.resolve(1)
 
@@ -578,24 +578,24 @@ def test_identity_is_the_displayed_one_not_the_refreshed_one():
 def test_point_requires_a_shown_image_of_the_same_size(monkeypatch):
     view = make_view(node("Button", "A", has_invoke=True))
     ex = executor(view, FakeAuto())
-    with pytest.raises(actions.ActionError, match="Aucune image"):
+    with pytest.raises(actions.ActionError, match="No image"):
         ex.resolve("10,10")
     frame = snapshot.frame_for(w.Rect(0, 0, 400, 300), anchor=(0, 0), anchor_size=(400, 300))
     ex.get_frame = lambda: frame
     monkeypatch.setattr(actions.w, "frame_rect", lambda h: w.Rect(50, 50, 450, 350))  # déplacée : suivie
     assert ex.resolve("10,10") == ("point", (60, 60))
     monkeypatch.setattr(actions.w, "frame_rect", lambda h: w.Rect(0, 0, 800, 600))  # agrandie : refus
-    with pytest.raises(actions.ActionError, match="changé de taille"):
+    with pytest.raises(actions.ActionError, match="changed size"):
         ex.resolve("10,10")
 
 
 def test_expand_never_invokes_a_non_expandable_element():
     button = node("Button", "Valider", has_invoke=True)
     auto = FakeAuto()
-    with pytest.raises(actions.ActionError, match="pas dépliable"):
+    with pytest.raises(actions.ActionError, match="not expandable"):
         executor(make_view(button), auto).expand("Valider", True)
     leaf = node("TreeItem", "Feuille", has_expand=True, expand=3)
-    with pytest.raises(actions.ActionError, match="feuille"):
+    with pytest.raises(actions.ActionError, match="leaf element"):
         executor(make_view(leaf), auto).expand("Feuille", True)
     assert auto.calls == []
 
@@ -683,7 +683,7 @@ def test_popups_exclude_taskbar_and_windows_owned_by_others(monkeypatch):
 def test_activation_interrupted_by_physical_input(monkeypatch):
     monkeypatch.setattr(foreground.physical, "available", lambda: True)
     monkeypatch.setattr(foreground.physical, "since", lambda moment: True)
-    with pytest.raises(foreground.UserInterrupted, match="pendant l'activation"):
+    with pytest.raises(foreground.UserInterrupted, match="during the brief activation"):
         foreground.Activation(0.0).check("rien n'a été tapé")
     monkeypatch.setattr(foreground.physical, "since", lambda moment: False)
     foreground.Activation(0.0).check("rien n'a été tapé")

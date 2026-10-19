@@ -43,7 +43,7 @@ def load(path: Path | None = None) -> dict[str, Any]:
                 return _cache[1]
         data = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
-        raise GardeFousError(f"politique des garde-fous illisible ({target}) : {error}") from error
+        raise GardeFousError(f"guardrail policy unreadable ({target}): {error}") from error
     _validate(data, target)
     with _lock:
         _cache = (key, data)
@@ -66,7 +66,7 @@ def _validate(data: Any, target: Path) -> None:
         assert isinstance(confirmation["roles_non_actifs"], list)
         assert isinstance(confirmation["roles_declencheurs"], list)
     except (AssertionError, KeyError, TypeError, re.error) as error:
-        raise GardeFousError(f"politique des garde-fous invalide ({target}) : {error!r}") from error
+        raise GardeFousError(f"guardrail policy invalid ({target}): {error!r}") from error
 
 
 CURRENCIES = str.maketrans({"€": " eur ", "$": " usd ", "£": " gbp ", "¥": " jpy "})
@@ -84,7 +84,7 @@ def plain(text: Any) -> str:
 def _categories(agent: str) -> list[tuple[str, dict[str, Any]]]:
     data = load()
     if agent not in AGENTS:
-        raise GardeFousError(f"agent inconnu de la politique : {agent!r} (attendu : {', '.join(AGENTS)})")
+        raise GardeFousError(f"agent unknown to the policy: {agent!r} (expected: {', '.join(AGENTS)})")
     blocks = data["blocage_dur"]
     return [(name, blocks[name]) for name in data["agents"][agent]]
 

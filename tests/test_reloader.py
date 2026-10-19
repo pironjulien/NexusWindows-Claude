@@ -44,7 +44,7 @@ for line in sys.stdin:
             continue
         if name == "stale-once" and (here / "stale").exists():
             (here / "stale").unlink()
-            text(msg_id, "serveur nexus-windows dépassé : reconnecter (/mcp) (test). Rien n'a été fait.", True)
+            text(msg_id, "nexus-windows server out of date: reconnect (/mcp) (test). Nothing was done.", True)
             continue
         text(msg_id, f"pid {os.getpid()} version {version}")
 """
@@ -133,7 +133,7 @@ def test_relays_and_announces_list_changed(harness):
     init = harness.out.reply(harness.send("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}}))
     assert init["result"]["capabilities"]["tools"]["listChanged"] is True  # le superviseur sait prévenir le client
     result = harness.call("look")
-    assert "version 1.0" in _text(result) and "rechargé" not in _text(result)
+    assert "version 1.0" in _text(result) and "reloaded" not in _text(result)
 
 
 def test_new_code_reloads_before_next_call_without_reconnection(harness):
@@ -142,8 +142,8 @@ def test_new_code_reloads_before_next_call_without_reconnection(harness):
     harness.new_code("2.0")
     second = harness.call("act")
     text = _text(second)
-    assert text.startswith("nexus-windows rechargé sur son nouveau code (1.0 → 2.0), sans reconnexion")
-    assert "refaire look" in text and "version 2.0" in text
+    assert text.startswith("nexus-windows reloaded on its new code (1.0 → 2.0), without reconnecting")
+    assert "look again" in text and "version 2.0" in text
     assert _pid(second) != _pid(first)
     seen = (harness.dir / f"seen-{_pid(second)}").read_text().split()
     assert seen[:3] == ["initialize", "notifications/initialized", "tools/list"]  # poignée de main rejouée
@@ -155,7 +155,7 @@ def test_changed_tool_list_is_signalled_not_fatal(harness):
     harness.handshake()
     harness.new_code("2.0", tools=["look", "act", "clipboard"])
     text = _text(harness.call("look"))
-    assert "outils changés (nouveaux : clipboard)" in text and "/mcp" in text and "version 2.0" in text
+    assert "tools changed (new: clipboard)" in text and "/mcp" in text and "version 2.0" in text
     harness.out.wait(lambda m: m.get("method") == "notifications/tools/list_changed")
 
 
@@ -166,7 +166,7 @@ def test_stale_refusal_is_replayed_on_new_code(harness):
     before = _pid(harness.call("look"))
     (harness.dir / "stale").write_text("1")
     result = harness.call("stale-once")
-    assert not result["isError"] and "dépassé" not in _text(result)
+    assert not result["isError"] and "out of date" not in _text(result)
     assert _pid(result) != before
 
 
@@ -200,7 +200,7 @@ def test_hung_call_is_abandoned_then_reload_proceeds(harness, monkeypatch):
     result = harness.out.reply(harness.send("tools/call", {"name": "look", "arguments": {}}), timeout=5.0)["result"]
     assert "version 2.0" in _text(result)  # serveur figé relancé plutôt que tout bloquer
     lost = harness.out.reply(hung)["result"]
-    assert lost["isError"] and "issue INCONNUE" in _text(lost)
+    assert lost["isError"] and "UNKNOWN outcome" in _text(lost)
 
 
 def test_late_cancel_after_answer_leaves_nothing_behind(harness):
@@ -214,7 +214,7 @@ def test_late_cancel_after_answer_leaves_nothing_behind(harness):
 def test_child_crash_reports_unknown_outcome_then_restarts(harness):
     harness.handshake()
     crashed = harness.call("crash")
-    assert crashed["isError"] and "issue INCONNUE" in _text(crashed)
+    assert crashed["isError"] and "UNKNOWN outcome" in _text(crashed)
     after = harness.call("look")
     assert not after["isError"] and "version 1.0" in _text(after)
 
@@ -225,7 +225,7 @@ def test_broken_new_code_answers_cleanly_and_recovers(harness, monkeypatch):
     harness.sup.command = [sys.executable, "-c", "import sys; sys.stderr.write('SyntaxError: test\\n'); sys.exit(1)"]
     harness.new_code("2.0")
     broken = harness.call("look")
-    assert broken["isError"] and "n'a pas pu redémarrer" in _text(broken) and "Rien n'a été fait" in _text(broken)
+    assert broken["isError"] and "could not restart" in _text(broken) and "Nothing was done" in _text(broken)
     harness.sup.command = good
     assert "version 2.0" in _text(harness.call("look"))  # code réparé : l'appel suivant repart
 
@@ -234,6 +234,10 @@ def test_stale_answer_detection():
     def answer(text: str) -> dict[str, Any]:
         return {"id": 1, "result": {"content": [{"type": "text", "text": text}], "isError": True}}
 
+    assert reloader.is_stale_answer(answer("nexus-windows server out of date: reconnect (/mcp) (x). Nothing was done."))
+    assert reloader.is_stale_answer(answer("Warning: nexus-windows server out of date (x).\nlist"))
+    assert not reloader.is_stale_answer(answer("Window not found: nexus-windows server out of date"))
+    # Formes françaises encore reconnues : un enfant lancé sur un code d'avant la traduction peut encore répondre.
     assert reloader.is_stale_answer(
         answer("serveur nexus-windows dépassé : reconnecter (/mcp) (x). Rien n'a été fait.")
     )
