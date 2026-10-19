@@ -6,6 +6,7 @@ Julien ou l'application change l'interface entre deux appels.
 
 from __future__ import annotations
 
+import json
 from typing import cast
 
 import pytest
@@ -383,8 +384,6 @@ def test_policy_hard_block_only(tmp_path):
     for process, cls, title in [
         ("consent.exe", "x", "Contrôle de compte d'utilisateur"),
         ("LockApp.exe", "x", ""),
-        ("CredentialUIBroker.exe", "x", "Sécurité Windows"),
-        ("svchost.exe", "Credential Dialog Xaml Host", "Sécurité Windows"),
         ("KeePassXC.exe", "x", "KeePass"),
     ]:
         assert policy.act_refusal(process, cls, title), process
@@ -399,6 +398,9 @@ def test_policy_hard_block_only(tmp_path):
         ("Antigravity.exe", "Chrome_WidgetWin_1", "Antigravity"),  # l'AUTRE agent : permis
         ("Codex.exe", "x", "Codex"),
         ("notepad.exe", "Notepad", "Sans titre"),
+        # Relecture du 19/10 (garde-fous.json) : invites d'identifiants Windows sans blocage dur pour Claude.
+        ("CredentialUIBroker.exe", "x", "Sécurité Windows"),
+        ("svchost.exe", "Credential Dialog Xaml Host", "Sécurité Windows"),
     ]:
         assert policy.act_refusal(process, cls, title) is None, process
     assert policy.act_refusal("claude.exe", "Chrome_WidgetWin_1", "Claude") is None  # relecture du 18/10
@@ -530,6 +532,15 @@ def test_instructions_fit_in_mcp_limit():
     for tool in ("look", "act", "launch", "windows", "window", "logs"):
         doc = getattr(server, tool).__doc__ or ""
         assert len(doc) <= 2048, tool
+
+
+def test_client_texts_are_neutral():
+    """Ce que lit tout client tiers (instructions, descriptions des outils et de leurs champs) ne nomme personne."""
+    seen = server.INSTRUCTIONS + json.dumps(server.Step.model_json_schema(), ensure_ascii=False)
+    for tool in ("look", "act", "launch", "windows", "window", "logs"):
+        seen += getattr(server, tool).__doc__ or ""
+    assert server.INSTRUCTIONS.startswith("The user's Windows desktop")
+    assert "Julien" not in seen
 
 
 def test_devtools_page_survives_title_change():

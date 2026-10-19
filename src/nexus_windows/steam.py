@@ -5,10 +5,10 @@ Mesuré le 2026-10-14 : sans commutateur, une fenêtre Steam recouverte n'est ni
 - `-cef-disable-occlusion` « disables Chromium window occlusion testing » : la fenêtre recouverte reste dessinée ;
 - `-cef-force-accessibility` : arbre d'accessibilité publié d'emblée (--force-renderer-accessibility) ;
 - `-cef-enable-debugging` « enables Chromium remote debugging, defaulting to localhost:8080 » : port DevTools sur
-  127.0.0.1 (Steam ajoute --remote-allow-origins=*), qui ouvre la session Steam de Julien à tout programme local tant
-  que Steam reste ouvert ainsi. Seulement par launch(app="Steam", devtools=true), avec l'accord de Julien ; jamais
+  127.0.0.1 (Steam ajoute --remote-allow-origins=*), qui ouvre la session Steam de l'utilisateur à tout programme local tant
+  que Steam reste ouvert ainsi. Seulement par launch(app="Steam", devtools=true), avec l'accord de l'utilisateur ; jamais
   fourni par le modèle dans args (policy.CHROMIUM_DENY_SWITCHES).
-Les commutateurs ne valent qu'au démarrage : Steam déjà ouvert doit être relancé (restart=true, accord de Julien :
+Les commutateurs ne valent qu'au démarrage : Steam déjà ouvert doit être relancé (restart=true, accord de l'utilisateur :
 Steam se ferme, téléchargements interrompus ; refusé si un jeu tourne).
 """
 

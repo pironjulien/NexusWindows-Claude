@@ -73,7 +73,7 @@ class PointerActions(ExecutorBase):
 
     def _window_under(self, x: int, y: int) -> int:
         """Fenêtre de la cible sous un point écran, par la géométrie : surgissantes et dialogues du haut vers le bas,
-        puis la fenêtre principale. Pas window_at seul : un dialogue de la cible recouvert par une fenêtre de Julien
+        puis la fenêtre principale. Pas window_at seul : un dialogue de la cible recouvert par une fenêtre de l'utilisateur
         doit rester visé, et jamais la fenêtre principale SOUS une surgissante de la cible."""
         for window in _top_down(self.windows - {self.hwnd}, self.view.windows[1:]):
             if _covers(window, x, y):
@@ -172,7 +172,7 @@ class PointerActions(ExecutorBase):
 
     # --- Défilement ---------------------------------------------------------------------------------------------
     def _scroll_container_at(self, x: int, y: int) -> uia.Node | None:
-        """Conteneur défilable de la CIBLE au point : jamais celui d'une fenêtre de Julien qui la recouvre, ni celui
+        """Conteneur défilable de la CIBLE au point : jamais celui d'une fenêtre de l'utilisateur qui la recouvre, ni celui
         d'une fenêtre de la cible SOUS une de ses surgissantes."""
         view = self._rebuild() if self.acted else self.view
         node: uia.Node | None = None

@@ -745,3 +745,57 @@ def test_first_name_rebuilds_only_an_older_snapshot(fresh, rebuilt):
     ex._pids = {7}
     ex.resolve("Valider")
     assert (True in asked) is rebuilt
+
+
+# --- Bouton à menu Chromium (aria-haspopup) : cliquer, c'est ouvrir ---------------------------------------------------
+@pytest.mark.parametrize(
+    ("role", "first", "second"),
+    [
+        ("Button", "UIA Expand/Collapse", "UIA Invoke"),
+        ("MenuItem", "UIA Expand/Collapse", "UIA Invoke"),
+        ("ComboBox", "UIA Expand/Collapse", "UIA Invoke"),
+        ("SplitButton", "UIA Invoke", "UIA Expand/Collapse"),  # la partie principale exécute sa commande
+        ("TreeItem", "UIA Invoke", "UIA Expand/Collapse"),  # le clic sélectionne
+    ],
+)
+def test_chromium_expandable_click_order_keeps_both_techniques(role, first, second):
+    element = chrome(role, "Plus", has_invoke=True, has_expand=True, expand=0, rect=(100, 200, 80, 30))
+    view = make_view(element)
+    view.framework = view.info.framework = "Chromium"
+    ex = executor(view, FoldingAuto())
+    seen = chains(ex)
+    ex.click_element(view.elements[0])
+    assert seen[0][:2] == [first, second]
+
+
+def test_expand_accepts_a_button_with_expand_collapse(clock):
+    button = node("Button", "Options", has_expand=True, expand=0)
+    auto = FoldingAuto()
+    outcome = executor(make_view(button), auto).expand("Options", True)
+    assert outcome.ok and outcome.verified and auto.calls == [("expand", button.element)]
+
+
+def test_expand_refuses_a_plain_button_without_invoking_it(clock):
+    button = node("Button", "Supprimer", has_invoke=True)
+    auto = FakeAuto()
+    with pytest.raises(actions.ActionError, match="pas dépliable"):
+        executor(make_view(button), auto).expand("Supprimer", True)
+    assert auto.calls == []
+
+
+# --- Bureau interactif : un fil lancé hors du bureau « Default » n'y verrait aucune fenêtre ---------------------------
+def test_default_desktop_opened_once_then_reused(monkeypatch):
+    opened: list[str] = []
+    attached: list[int] = []
+    monkeypatch.setattr(w, "_hdesk_default", None)
+    monkeypatch.setattr(w, "OpenDesktopW", lambda name, *a: opened.append(name) or 4242)
+    monkeypatch.setattr(w, "SetThreadDesktop", lambda h: attached.append(h) or 1)
+    assert w.ensure_default_desktop() and w.ensure_default_desktop()
+    assert opened == ["Default"] and attached == [4242, 4242]
+
+
+def test_default_desktop_refused_is_harmless(monkeypatch):
+    monkeypatch.setattr(w, "_hdesk_default", None)
+    monkeypatch.setattr(w, "OpenDesktopW", lambda *a: None)  # accès refusé : rien à rattacher
+    monkeypatch.setattr(w, "SetThreadDesktop", lambda h: pytest.fail("rattachement sans bureau"))
+    assert w.ensure_default_desktop() is False

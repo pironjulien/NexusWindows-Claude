@@ -1,17 +1,17 @@
-"""Protection du premier plan de Julien pendant qu'on agit en arrière-plan.
+"""Protection du premier plan de l'utilisateur pendant qu'on agit en arrière-plan.
 
 Certaines applications s'activent d'elles-mêmes quand on agit sur elles (le proxy UIA des boutons Win32 appelle
 SetForegroundWindow avant BM_CLICK ; Chromium s'active sur une prise de focus…). `Watch` surveille le premier plan
 pendant tout un appel d'outil (et un court instant après) : si la cible le prend, il est rendu aussitôt à la fenêtre
-de Julien (≈10 ms mesurés). Si Julien agit lui-même (clic, Alt+Tab, touche Windows, barre des tâches), on le suit
+de l'utilisateur (≈10 ms mesurés). Si l'utilisateur agit lui-même (clic, Alt+Tab, touche Windows, barre des tâches), on le suit
 sans lutter — AltGr (Ctrl gauche + Alt droit, courant en AZERTY) n'est pas un Alt+Tab.
 
-Activation brève (Chromium ne lit le clavier que fenêtre active) : jamais sans pause de Julien ni bouton tenu,
+Activation brève (Chromium ne lit le clavier que fenêtre active) : jamais sans pause de l'utilisateur ni bouton tenu,
 jamais sans fenêtre à qui rendre le premier plan, interrompue à sa première entrée physique (contrôle à chaque
 caractère posté et à chaque point de contrôle du thread bureau), et découpée en tranches courtes (methods.py).
 
 Identité de la cible : par FENÊTRES (la fenêtre, ses surgissantes, les fenêtres qu'elle possède, et celles que ses
-processus créent pendant l'action), jamais par le seul processus : Julien peut avoir une autre fenêtre du même
+processus créent pendant l'action), jamais par le seul processus : l'utilisateur peut avoir une autre fenêtre du même
 programme (un second Edge, un autre document) qui n'est pas la cible. Les applications UWP sont hébergées par
 ApplicationFrameHost, partagé : le processus réel est celui de leur CoreWindow.
 """
@@ -38,11 +38,11 @@ QUIET_S = 1.0  # pause de Julien exigée avant toute activation (clavier, bouton
 
 
 class UserInterrupted(RuntimeError):
-    """Julien a touché clavier ou souris pendant une activation brève : ses frappes ont pu arriver dans la cible."""
+    """L'utilisateur a touché clavier ou souris pendant une activation brève : ses frappes ont pu arriver dans la cible."""
 
 
 class BusyUser(RuntimeError):
-    """Activation brève impossible sans risque pour Julien : il tape ou tient un bouton de souris, ou le premier plan
+    """Activation brève impossible sans risque pour l'utilisateur : il tape ou tient un bouton de souris, ou le premier plan
     n'a aucune fenêtre à qui être rendu ensuite (fenêtre système masquée, aucune fenêtre)."""
 
 
@@ -96,7 +96,7 @@ _OWN_INPUT = (
 
 def mark_own_input(window_ms: int = 150) -> None:
     """Nos activations et nos SendInput autorisés peuvent produire des entrées synthétiques qui changent
-    GetLastInputInfo : on les date pour ne pas les prendre pour Julien."""
+    GetLastInputInfo : on les date pour ne pas les prendre pour l'utilisateur."""
     global _OWN_INPUT
     now = w.GetTickCount()
     _OWN_INPUT = (now, (now + window_ms) & _MASK)
@@ -107,7 +107,7 @@ def _between(tick: int, start: int, end: int) -> bool:
 
 
 def user_idle_ms() -> int:
-    """Temps depuis la dernière entrée PHYSIQUE de Julien (Raw Input : les entrées injectées, les nôtres comme celles
+    """Temps depuis la dernière entrée PHYSIQUE de l'utilisateur (Raw Input : les entrées injectées, les nôtres comme celles
     d'UI Automation, ne comptent pas). Repli sans Raw Input : GetLastInputInfo, nos activations datées écartées."""
     if physical.available():
         return int(min(physical.idle_s(), 86_400.0) * 1000)
@@ -120,7 +120,7 @@ def user_idle_ms() -> int:
 
 
 def user_input_since(started: float, started_tick: int) -> bool:
-    """Julien a-t-il touché clavier, boutons ou molette depuis `started` (time.monotonic) / `started_tick`
+    """L'utilisateur a-t-il touché clavier, boutons ou molette depuis `started` (time.monotonic) / `started_tick`
     (GetTickCount relevé au même instant) ? Raw Input si disponible (entrées injectées écartées). Repli sans Raw
     Input : dernière entrée du système postérieure au début, hors de nos propres entrées datées (mark_own_input)."""
     if physical.available():
@@ -134,7 +134,7 @@ def user_input_since(started: float, started_tick: int) -> bool:
 
 
 def wait_typing_pause(quiet_s: float = QUIET_S, max_wait_s: float = 4.0) -> bool:
-    """Attend que Julien marque une pause (rien au clavier, aux boutons ni à la molette depuis quiet_s, et aucun
+    """Attend que l'utilisateur marque une pause (rien au clavier, aux boutons ni à la molette depuis quiet_s, et aucun
     bouton tenu : un glisser en cours n'est pas une pause, Raw Input ne voyant que les transitions). Faux s'il reste
     actif."""
     deadline = time.monotonic() + max_wait_s
@@ -151,9 +151,9 @@ def _down(vk: int) -> bool:
 
 
 def user_is_switching() -> bool:
-    """Julien est en train de changer de fenêtre lui-même : bouton de souris enfoncé, Alt ou touche Windows.
+    """L'utilisateur est en train de changer de fenêtre lui-même : bouton de souris enfoncé, Alt ou touche Windows.
 
-    AltGr (Ctrl gauche + Alt droit, courant en AZERTY : @ # { } [ ] | € ~) ne compte pas : Julien tape, il ne change
+    AltGr (Ctrl gauche + Alt droit, courant en AZERTY : @ # { } [ ] | € ~) ne compte pas : l'utilisateur tape, il ne change
     pas de fenêtre. Alt droit seul, sans Ctrl gauche, reste un Alt."""
     if w.mouse_button_down() or _down(VK_LMENU) or _down(VK_LWIN) or _down(VK_RWIN):
         return True
@@ -209,7 +209,7 @@ def target_windows(hwnd: int, extra: list[int] | None = None) -> set[int]:
 
 def belongs_to(fg: int, windows: set[int], pids: set[int], known_before: set[int] | None = None) -> bool:
     """La fenêtre `fg` fait-elle partie de la cible ? Par fenêtre d'abord ; par processus seulement pour une fenêtre
-    apparue pendant l'action (absente de `known_before`), jamais pour une fenêtre que Julien avait déjà."""
+    apparue pendant l'action (absente de `known_before`), jamais pour une fenêtre que l'utilisateur avait déjà."""
     if not fg:
         return False
     if fg in windows or w.root(fg) in windows or owned_by(fg, windows):
@@ -224,8 +224,8 @@ def belongs_to(fg: int, windows: set[int], pids: set[int], known_before: set[int
 
 # --- Rendre / prendre le premier plan --------------------------------------------------------------------------
 def _attempt(prev: int, expected_fg: int) -> None:
-    """Tentative unique ; abandonnée si le premier plan a changé entre-temps (Julien a pu passer ailleurs).
-    On ne s'attache qu'à la file d'entrée de la fenêtre qui a pris le premier plan, jamais à celle de Julien."""
+    """Tentative unique ; abandonnée si le premier plan a changé entre-temps (l'utilisateur a pu passer ailleurs).
+    On ne s'attache qu'à la file d'entrée de la fenêtre qui a pris le premier plan, jamais à celle de l'utilisateur."""
     fg = w.foreground()
     if fg != expected_fg:
         return
@@ -242,7 +242,7 @@ def _attempt(prev: int, expected_fg: int) -> None:
 
 
 def _next_user_window(exclude: set[int]) -> int:
-    """Première fenêtre d'application visible de l'ordre Z qui n'est pas la cible (fenêtre de Julien disparue)."""
+    """Première fenêtre d'application visible de l'ordre Z qui n'est pas la cible (fenêtre de l'utilisateur disparue)."""
     from .snapshot import is_app_window  # import local : snapshot importe ce module
 
     for hwnd in w.enum_windows():
@@ -294,7 +294,7 @@ def _hand_over(prev: int, exclude: set[int]) -> bool:
     d'une application Store : AttachThreadInput → ERROR_ACCESS_DENIED, mesuré) : notre SetForegroundWindow est alors
     refusé. On demande au fil QUI DÉTIENT le premier plan de le rendre lui-même : WM_SYSCOMMAND SC_HOTKEY, que
     DefWindowProc traite par SetForegroundWindow(lParam) (mesuré : rendu en 2 à 3 ms, cible ni réduite ni déplacée).
-    Seulement à une fenêtre de la cible (exclude), jamais à une fenêtre de Julien."""
+    Seulement à une fenêtre de la cible (exclude), jamais à une fenêtre de l'utilisateur."""
     fg = w.foreground()
     if not fg or fg == prev or not (fg in exclude or w.root(fg) in exclude or owned_by(fg, exclude)):
         return False
@@ -308,7 +308,7 @@ def _hand_over(prev: int, exclude: set[int]) -> bool:
 
 
 def give_back(prev: int, timeout_s: float = 0.6, exclude: set[int] | None = None) -> bool:
-    """Rend le premier plan à la fenêtre de Julien `prev` (ou, si elle a disparu ou n'est pas une fenêtre à qui le
+    """Rend le premier plan à la fenêtre de l'utilisateur `prev` (ou, si elle a disparu ou n'est pas une fenêtre à qui le
     rendre — sélecteur, barre des tâches, fenêtre masquée —, à sa fenêtre suivante). Si Windows refuse (cible Store),
     la fenêtre de la cible au premier plan le rend elle-même (_hand_over)."""
     if prev and w.foreground() == prev:
@@ -326,7 +326,7 @@ def give_back(prev: int, timeout_s: float = 0.6, exclude: set[int] | None = None
 
 def system_foreground() -> str:
     """Le premier plan est-il tenu par une fenêtre système masquée ? (Windows 11 : après Échap dans la Recherche ou
-    le menu Démarrer, la CoreWindow masquée de SearchHost reste au premier plan tant que Julien n'a cliqué nulle part.)
+    le menu Démarrer, la CoreWindow masquée de SearchHost reste au premier plan tant que l'utilisateur n'a cliqué nulle part.)
     Windows refuse alors toute activation programmatique (mesuré : attache de file, Alt simulé, focus UIA)."""
     fg = w.foreground()
     if not fg:
@@ -337,7 +337,7 @@ def system_foreground() -> str:
 
 
 def _checkpoint() -> None:
-    """Juste avant de mettre une fenêtre devant : arrêt d'urgence, appel abandonné, Julien qui reprend la main."""
+    """Juste avant de mettre une fenêtre devant : arrêt d'urgence, appel abandonné, l'utilisateur qui reprend la main."""
     from .worker import check_cancelled  # import local : worker importe ce module
 
     check_cancelled()
@@ -356,7 +356,7 @@ def _ask_holder(hwnd: int) -> bool:
     """Le premier plan est tenu par une fenêtre dont Windows refuse d'attacher la file (cadre d'application Store,
     ApplicationFrameHost : ERROR_ACCESS_DENIED, mesuré le 2026-10-14 avec la Calculatrice devant) : on demande au fil
     qui le détient de le céder lui-même à la cible (WM_SYSCOMMAND SC_HOTKEY, traité par DefWindowProc comme
-    SetForegroundWindow(lParam) ; mécanisme déjà mesuré pour le rendre à Julien, voir _hand_over). Rien d'autre n'est
+    SetForegroundWindow(lParam) ; mécanisme déjà mesuré pour le rendre à l'utilisateur, voir _hand_over). Rien d'autre n'est
     envoyé à cette fenêtre. Jamais quand une fenêtre système masquée tient le premier plan."""
     fg = w.foreground()
     if not fg or fg == hwnd or system_foreground():
@@ -371,7 +371,7 @@ def _ask_holder(hwnd: int) -> bool:
 
 
 class Activation:
-    """Activation brève en cours : Julien a-t-il touché clavier ou souris (physiquement) depuis son début ?"""
+    """Activation brève en cours : l'utilisateur a-t-il touché clavier ou souris (physiquement) depuis son début ?"""
 
     def __init__(
         self, started: float, front: int = 0, windows: set[int] | None = None, pids: set[int] | None = None
@@ -386,7 +386,7 @@ class Activation:
         return user_input_since(self.started, self.started_tick)
 
     def give_back(self) -> None:
-        """Rend le premier plan à Julien si c'est encore la cible qui l'a (s'il est passé ailleurs entre-temps, on ne
+        """Rend le premier plan à l'utilisateur si c'est encore la cible qui l'a (s'il est passé ailleurs entre-temps, on ne
         lui impose pas l'ancienne fenêtre)."""
         fg = w.foreground()
         if self.front and self.front not in self.windows and fg != self.front:
@@ -394,12 +394,12 @@ class Activation:
                 give_back(self.front, exclude=self.windows)
 
     def check(self, consequence: str) -> None:
-        """À la première entrée physique de Julien : premier plan rendu sur-le-champ, puis UserInterrupted."""
+        """À la première entrée physique de l'utilisateur : premier plan rendu sur-le-champ, puis UserInterrupted."""
         if self.interrupted():
             self.give_back()
             took = round((time.monotonic() - self.started) * 1000)
             raise UserInterrupted(
-                f"Julien a utilisé le clavier ou la souris pendant l'activation brève ({took} ms) : {consequence}."
+                f"L'utilisateur a utilisé le clavier ou la souris pendant l'activation brève ({took} ms) : {consequence}."
             )
 
     def checkpoint(self) -> None:
@@ -422,7 +422,7 @@ def check_activation() -> None:
 
 @contextmanager
 def agent_token(purpose: str):
-    """Jeton commun aux agents de Julien (agentlock) : on attend qu'un autre agent ait rendu souris et premier plan
+    """Jeton commun aux agents de l'utilisateur (agentlock) : on attend qu'un autre agent ait rendu souris et premier plan
     avant de les prendre (sinon BusyUser), et on le tient jusqu'à la fin du bloc."""
     try:
         with agentlock.hold(purpose, checkpoint=_checkpoint):
@@ -435,15 +435,15 @@ def agent_token(purpose: str):
 def brief_activation(target: int, windows: set[int] | None = None, user_front: int = 0):
     """Bloc où la cible peut être active un court instant (Chromium ne lit le clavier que fenêtre active).
 
-    Prend d'abord le jeton commun aux agents (agent_token), puis attend une pause de Julien (sinon BusyUser), refuse si le premier plan n'a aucune fenêtre à qui être rendu
+    Prend d'abord le jeton commun aux agents (agent_token), puis attend une pause de l'utilisateur (sinon BusyUser), refuse si le premier plan n'a aucune fenêtre à qui être rendu
     (aucune, ou fenêtre système masquée : Windows refuserait aussi l'activation), relève sa fenêtre APRÈS la pause,
     suspend la surveillance, puis rend le premier plan à cette fenêtre en sortie. Pendant le bloc, toute entrée
-    physique de Julien l'interrompt au prochain point de contrôle (check_activation).
+    physique de l'utilisateur l'interrompt au prochain point de contrôle (check_activation).
 
-    user_front : fenêtre de Julien relevée par l'appelant AVANT que la cible ait pu prendre la main (launch). Si la
+    user_front : fenêtre de l'utilisateur relevée par l'appelant AVANT que la cible ait pu prendre la main (launch). Si la
     cible tient alors le premier plan, elle le lui a pris : le relevé désignerait la cible elle-même, rien ne serait
     rendu en sortie et « rendu » serait faux : refus (BusyUser). Sans user_front (act), une cible au premier plan est
-    celle que Julien a choisie (comme pour Watch) : l'activation est permise et n'a rien à rendre.
+    celle que l'utilisateur a choisie (comme pour Watch) : l'activation est permise et n'a rien à rendre.
     """
     with agent_token("activation brève"), _brief_activation(target, windows, user_front) as activation:
         yield activation
@@ -453,7 +453,7 @@ def brief_activation(target: int, windows: set[int] | None = None, user_front: i
 def _brief_activation(target: int, windows: set[int] | None, user_front: int):
     if not wait_typing_pause():
         raise BusyUser(
-            "Julien tape, bouge la souris ou tient un bouton en ce moment : frappe reportée pour ne pas capter ses "
+            "L'utilisateur tape, bouge la souris ou tient un bouton en ce moment : frappe reportée pour ne pas capter ses "
             "touches."
         )
     _checkpoint()  # arrêt d'urgence demandé pendant l'attente de la pause
@@ -468,7 +468,7 @@ def _brief_activation(target: int, windows: set[int] | None, user_front: int):
     windows = windows or target_windows(target)
     if user_front and front != user_front and belongs_to(front, windows, set()):  # par fenêtre seulement
         raise BusyUser(
-            "l'application tient déjà le premier plan pris à Julien : aucune activation brève (il n'y aurait personne "
+            "l'application tient déjà le premier plan pris à l'utilisateur : aucune activation brève (il n'y aurait personne "
             "à qui le rendre ensuite)"
         )
     activation = Activation(time.monotonic(), front, windows, target_pids(target, list(windows)))
@@ -490,7 +490,7 @@ _LIVE: set[Watch] = set()  # surveillances en cours (traînes comprises), pour a
 
 
 def adopt_foreground() -> None:
-    """Premier plan donné volontairement (window front autorisé par Julien) : les surveillances en cours, traînes
+    """Premier plan donné volontairement (window front autorisé par l'utilisateur) : les surveillances en cours, traînes
     comprises, l'adoptent au lieu de le « rendre ». À appeler sous suspended(), une fois la fenêtre devant."""
     fg = w.foreground()
     with _LOCK:
@@ -508,7 +508,7 @@ class Watch:
     def __init__(
         self, target: int, windows: list[int] | None = None, tail_s: float | None = None, front: int = 0
     ) -> None:
-        """front : fenêtre de Julien relevée par l'appelant avant que la cible ait pu la prendre (launch). La garde
+        """front : fenêtre de l'utilisateur relevée par l'appelant avant que la cible ait pu la prendre (launch). La garde
         la prend pour référence au lieu du premier plan courant : si la cible le tient déjà (vol non rendu), elle
         démarre quand même et le lui rend."""
         self.target = target
@@ -529,7 +529,7 @@ class Watch:
         return belongs_to(hwnd, self.windows, self.pids, self.known_before)
 
     def _follow(self, fg: int) -> None:
-        """Le premier plan de référence devient `fg` (fenêtre où Julien est passé, ou cible qu'il a choisie)."""
+        """Le premier plan de référence devient `fg` (fenêtre où l'utilisateur est passé, ou cible qu'il a choisie)."""
         self.front = fg
         self._alt_pending = False
         self._switcher_seen = time.monotonic() if fg and w.class_name(fg) in SWITCHER_CLASSES else None
@@ -615,6 +615,6 @@ class Watch:
         if not self.stolen:
             return ""
         if self.failed:
-            return "L'application a pris le premier plan et Windows a refusé de le rendre à Julien."
+            return "L'application a pris le premier plan et Windows a refusé de le rendre à l'utilisateur."
         times = "une fois" if self.stolen == 1 else f"{self.stolen} fois"
-        return f"L'application a pris le premier plan ({times}) : rendu aussitôt à Julien."
+        return f"L'application a pris le premier plan ({times}) : rendu aussitôt à l'utilisateur."

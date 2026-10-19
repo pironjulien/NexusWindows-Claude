@@ -664,7 +664,7 @@ def test_logs_show_server_state(tmp_path, monkeypatch):
     out = asyncio.run(server.logs(5))
     lines = out.splitlines()
     assert "à jour" in lines[0] and lines[1].startswith("Rechargement automatique : ")
-    assert lines[2].startswith("Arrêt d'urgence") and lines[3].startswith("Entrées de Julien")
+    assert lines[2].startswith("Arrêt d'urgence") and lines[3].startswith("Entrées de l'utilisateur")
     assert lines[-1] == "Journal vide."
     monkeypatch.setattr(physical, "_ok", True)
     monkeypatch.setattr(physical, "counts", {"physical": 3, "injected": 9})

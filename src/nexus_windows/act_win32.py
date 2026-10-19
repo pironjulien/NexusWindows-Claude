@@ -127,11 +127,11 @@ class Win32Actions(ExecutorBase):
 
     def _keystrokes(self, e: snapshot.Element, text: str, replace: bool, simulated: bool = False) -> str:
         """Focus UIA puis caractères WM_CHAR vers la fenêtre de la cible qui a le clavier, par tranches d'activation
-        brève (le focus UIA active la fenêtre ; Chromium ne lit le clavier que fenêtre active) : pause de Julien
+        brève (le focus UIA active la fenêtre ; Chromium ne lit le clavier que fenêtre active) : pause de l'utilisateur
         attendue, contrôle explicite de l'activation avant de poster, premier plan rendu à chaque échéance.
 
         simulated (Chromium) : aucune activation réelle. Focus DOM par accSelect relu, tranches en activation simulée
-        (methods.simulated_activation) : le premier plan de Julien n'est jamais pris.
+        (methods.simulated_activation) : le premier plan de l'utilisateur n'est jamais pris.
 
         Chaque tranche est confirmée par la valeur RELUE du champ (début du texte qu'il contient) : la suite repart de
         là, sans doublon. Champ illisible : rien n'est tapé (MethodError). Texte qui n'a pas pu être tapé en entier et

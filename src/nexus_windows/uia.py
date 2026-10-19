@@ -182,7 +182,7 @@ class Automation:
         toutes les fenêtres du bureau. L'arbre est alors lu niveau par niveau le long de ses seuls ancêtres (le reste
         en un appel par branche) et la liste déroulante y reste une feuille ; sa liste ouverte (ComboLBox) est lue avec
         sa propre fenêtre, comme toute surgissante. Jamais une fenêtre de premier plan d'un autre processus dans
-        l'arbre (fenêtres de Julien)."""
+        l'arbre (fenêtres de l'utilisateur)."""
         pruned = w.dropped_combos(hwnd)
         try:
             root_el = self.uia.ElementFromHandleBuildCache(hwnd, self._cache_children if pruned else self._cache)

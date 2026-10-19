@@ -182,3 +182,24 @@ def refusal(what: str, label: Any, word: str) -> str:
         "Ordre explicite de Julien pour CE geste → renvoyer l'étape avec confirm=true ; initiative de l'agent → lui "
         "demander d'abord."
     )
+
+
+def check_blind_paste(steps: Any) -> str:
+    """Interdiction formelle de chaîner un collage (Ctrl+V) et une validation (Entrée, confirm) dans le même lot."""
+    if not isinstance(steps, list):
+        return ""
+    pasted = False
+    for i, s in enumerate(steps):
+        if not isinstance(s, dict):
+            continue
+        act = str(s.get("action", "")).lower().replace("-", "_").strip()
+        key = str(s.get("key", "")).lower().strip()
+        if act == "key" and ("ctrl+v" in key or "control+v" in key):
+            pasted = True
+        elif pasted:
+            if (act == "key" and key in ("enter", "return")) or s.get("confirm"):
+                return (
+                    f"Étape {i} ({act}) : interdiction de chaîner un collage (Ctrl+V) et une validation "
+                    "(Entrée / confirm) dans le même lot. Le texte collé doit être relu et vérifié avant d'envoyer."
+                )
+    return ""

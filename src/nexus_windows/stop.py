@@ -1,4 +1,4 @@
-"""Arrêt d'urgence de Julien : Ctrl+Alt+Maj+Échap fige nexus-windows dans TOUTES les conversations.
+"""Arrêt d'urgence de l'utilisateur : Ctrl+Alt+Maj+Échap fige nexus-windows dans TOUTES les conversations.
 
 Chaque conversation de Claude a son propre serveur ; un seul peut détenir le raccourci (RegisterHotKey) : les autres
 réessaient régulièrement et prennent le relais quand le détenteur s'arrête. Le détenteur le signale par un battement
@@ -15,7 +15,7 @@ Toute action en cours s'interrompt au prochain point de contrôle et toute nouve
 le réarme (jamais il ne le lève : un double appui par réflexe ne doit pas relancer l'outil). Aucun chemin de code ne
 le lève avant l'échéance. Limite : un serveur démarré APRÈS la suppression du fichier ne voit pas l'arrêt.
 
-Arrêt COMMUN aux agents de Julien (protocole commun emergency-stop.md) : chaque appui écrit aussi
+Arrêt COMMUN aux agents de l'utilisateur (protocole commun emergency-stop.md) : chaque appui écrit aussi
 ~/.nexus/stop, que NexusAGY et NexusCodex surveillent ; et ce serveur s'arrête quand l'un d'eux l'écrit (le même
 raccourci, détenu par l'harnais qui l'a obtenu). Le détenteur, quel qu'il soit, bat dans ~/.nexus/stop.owner.
 """
@@ -158,7 +158,7 @@ def _watch(until: threading.Event) -> None:
 
 def message() -> str:
     return (
-        f"Arrêt d'urgence demandé par Julien ({HOTKEY_LABEL}) : plus aucune action sur le bureau pendant encore "
+        f"Arrêt d'urgence demandé par l'utilisateur ({HOTKEY_LABEL}) : plus aucune action sur le bureau pendant encore "
         f"{remaining_s():.0f} s. Attendre ses instructions dans la conversation ; ne pas contourner."
     )
 
@@ -184,7 +184,7 @@ def _fresh_owner(path: Path) -> dict | None:
 
 def owner() -> dict | None:
     """Détenteur vivant du raccourci (battement de moins de OWNER_STALE_S secondes) : un serveur nexus-windows ou un
-    autre agent de Julien (NexusAGY, NexusCodex) qui suit le protocole commun ; sinon None."""
+    autre agent de l'utilisateur (NexusAGY, NexusCodex) qui suit le protocole commun ; sinon None."""
     return _fresh_owner(OWNER_FILE) or _fresh_owner(SHARED_OWNER_FILE)
 
 
@@ -232,7 +232,7 @@ def hotkey_note() -> str:
     return (
         f"Arrêt d'urgence {HOTKEY_LABEL} NON GARANTI : ce serveur n'a pas obtenu le raccourci (erreur {_failure}) et "
         "aucun serveur nexus-windows à jour ne le détient (un autre programme ou un serveur ancien le tient). "
-        "Prévenir Julien."
+        "Prévenir l'utilisateur."
     )
 
 

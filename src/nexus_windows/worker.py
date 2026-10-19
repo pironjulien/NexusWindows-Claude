@@ -4,7 +4,7 @@ UI Automation est créé et utilisé sur ce seul thread (appartement multithread
 appel au-delà du délai, le thread est abandonné ET son jeton d'annulation est levé : dès qu'il se débloque, il
 s'arrête au prochain point de contrôle (avant chaque étape, chaque technique, chaque attente) au lieu de finir
 l'action dans le dos de l'utilisateur. Un nouveau thread prend le relais. Ces points de contrôle servent aussi à
-l'arrêt d'urgence de Julien et à l'interruption d'une activation brève dès qu'il touche clavier ou souris.
+l'arrêt d'urgence de l'utilisateur et à l'interruption d'une activation brève dès qu'il touche clavier ou souris.
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ class Cancelled(RuntimeError):
 
 
 class Stopped(Cancelled):
-    """Arrêt d'urgence de Julien : ne plus rien faire, mais rendre compte de ce qui a été fait."""
+    """Arrêt d'urgence de l'utilisateur : ne plus rien faire, mais rendre compte de ce qui a été fait."""
 
 
 def check_cancelled() -> None:
     """Point de contrôle : à appeler avant toute action sur le bureau dans un travail du thread COM. Arrête aussi
-    tout sur l'arrêt d'urgence de Julien (stop.py) et, pendant une activation brève, à sa première entrée physique
+    tout sur l'arrêt d'urgence de l'utilisateur (stop.py) et, pendant une activation brève, à sa première entrée physique
     (premier plan rendu sur-le-champ, puis foreground.UserInterrupted)."""
     token: threading.Event | None = getattr(_LOCAL, "cancel", None)
     if token is not None and token.is_set():

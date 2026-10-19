@@ -50,7 +50,7 @@ CHOICE_ROLES = {
     "RadioButton",
 }
 CHECK_ROLES = {"CheckBox", "RadioButton", "ListItem", "TreeItem", "MenuItem", "Button"}
-EXPAND_ROLES = {"ComboBox", "TreeItem", "MenuItem", "SplitButton", "Group", "DataItem"}
+EXPAND_ROLES = {"ComboBox", "TreeItem", "MenuItem", "SplitButton", "Group", "DataItem", "Button"}
 SCROLL_ROLES = {"List", "Tree", "Document", "Pane", "DataGrid", "Table", "Group"}
 LEAF_ROLES = {
     "Button", "CheckBox", "RadioButton", "Hyperlink", "MenuItem", "TabItem", "ListItem", "TreeItem", "DataItem",
@@ -322,7 +322,7 @@ class ExecutorBase:
     @property
     def windows(self) -> set[int]:
         """Fenêtres de la cible : principale, surgissantes, dialogues possédés. Jamais une autre fenêtre du même
-        programme (Julien peut avoir son propre Edge, son propre document)."""
+        programme (L'utilisateur peut avoir son propre Edge, son propre document)."""
         if self._windows is None:
             self._windows = foreground.target_windows(self.hwnd, self.view.windows)
         return self._windows
@@ -472,7 +472,7 @@ class ExecutorBase:
         self, spec: str, prefer: set[str] | None, missing: snapshot.TargetError
     ) -> tuple[snapshot.Element, str]:
         """Nom absent de la partie visible : élément de ce nom exact hors de vue parce que la page ou la liste a défilé,
-        amené à l'écran (UIA ScrollIntoView, comme Julien ferait défiler) puis relu dans un instantané frais."""
+        amené à l'écran (UIA ScrollIntoView, comme l'utilisateur ferait défiler) puis relu dans un instantané frais."""
         hidden = snapshot.scrolled_away(self.view)
         try:
             element, partial = snapshot.pick(dataclasses.replace(self.view, elements=hidden), spec, prefer)
@@ -540,7 +540,7 @@ class ExecutorBase:
     def _foreground_or_fail(self, what: str, fn: Callable[[], None]) -> Outcome:
         if not self.allow_foreground:
             raise NeedsForeground(
-                f"{what} : impossible en arrière-plan pour {self.view.framework}. Avec l'accord de Julien, relancer "
+                f"{what} : impossible en arrière-plan pour {self.view.framework}. Avec l'accord de l'utilisateur, relancer "
                 "avec foreground=true (vraie souris/clavier quelques instants)."
             )
         worker.check_cancelled()
@@ -559,7 +559,7 @@ class ExecutorBase:
 
     def _quiet_focus(self, e: snapshot.Element) -> str:
         """Focus UIA dans une activation brève : il active souvent la fenêtre (Win32, WPF, Chromium). On attend une
-        pause de Julien, puis on lui rend le premier plan aussitôt ; le compte rendu le signale."""
+        pause de l'utilisateur, puis on lui rend le premier plan aussitôt ; le compte rendu le signale."""
         started = time.perf_counter()
         with foreground.brief_activation(self.hwnd, self.windows):
             foreground.mark_own_input()

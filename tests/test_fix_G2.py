@@ -243,7 +243,7 @@ def test_watch_front_closed_falls_back_to_next_window(monkeypatch):
 
 def test_brief_activation_refuses_when_target_already_took_julien_front(monkeypatch):
     desk = Desk(monkeypatch, fg=TARGET)
-    with pytest.raises(foreground.BusyUser, match="tient déjà le premier plan pris à Julien"):
+    with pytest.raises(foreground.BusyUser, match="tient déjà le premier plan pris à l'utilisateur"):
         with foreground.brief_activation(TARGET, {TARGET}, user_front=JULIEN):
             pytest.fail("activation brève sans personne à qui rendre le premier plan")
     with foreground.brief_activation(TARGET, {TARGET}) as activation:  # act : cible choisie par Julien, permise
@@ -315,7 +315,7 @@ def test_store_launch_reports_foreground_not_given_back(monkeypatch):
     # Exactement trois tentatives, toutes avant le retour de launch : celle de launch après l'attente de la fenêtre,
     # celle de la garde pendant wait_content, puis son dernier contrôle à la fin du bloc.
     assert gave == [JULIEN, JULIEN, JULIEN] and not result.returned and result.user_front == JULIEN
-    assert any("PAS rendu à Julien" in n for n in result.notes)
+    assert any("PAS rendu à l'utilisateur" in n for n in result.notes)
     assert not any("rendu aussitôt" in n for n in result.notes)
 
 
@@ -324,7 +324,7 @@ def test_store_launch_given_back_says_so(monkeypatch):
     _store_launch(monkeypatch, fg, give_back_ok=True)
     monkeypatch.setattr(launch, "uwp_unshown", lambda hwnd: False)
     result = launch.launch("Calculatrice", auto=as_auto(object()))
-    assert result.returned and any("rendu aussitôt à Julien" in n for n in result.notes)
+    assert result.returned and any("rendu aussitôt à l'utilisateur" in n for n in result.notes)
 
 
 def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
@@ -345,7 +345,7 @@ def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
             pass
 
         def note(self):
-            return "L'application a pris le premier plan (une fois) : rendu aussitôt à Julien."
+            return "L'application a pris le premier plan (une fois) : rendu aussitôt à l'utilisateur."
 
     monkeypatch.setattr(server, "Watch", FakeWatch)
     monkeypatch.setattr(server, "render", lambda auto, hwnd, then, extra=None, call=None: ["\n".join(extra or ())])
@@ -354,7 +354,7 @@ def test_server_launch_guards_with_julien_front(monkeypatch, tmp_path):
     out = asyncio.run(server.launch("Calculatrice"))
     assert seen["front"] == JULIEN and seen["target"] == TARGET and seen["tail_s"] == 1.6
     assert seen["kwargs"]["on_account_kill"] == server.SESSION.forget_profile
-    assert "rendu aussitôt à Julien" in out[0]
+    assert "rendu aussitôt à l'utilisateur" in out[0]
 
 
 async def _sync(fn):

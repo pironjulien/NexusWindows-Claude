@@ -2,14 +2,14 @@
 
 Accord Claude–Antigravity du 18/10/2026 (journal de la trinité, « Garde-fous ») : un garde-fou n'existe que s'il
 empêche une auto-élévation ou une fuite de secrets, ou s'il demande l'accord avant un geste sans retour qui touche des
-tiers, de l'argent ou détruit. Julien travaille en « ignorer les permissions » : le shell de Claude fait déjà tout,
+tiers, de l'argent ou détruit. L'utilisateur travaille en « ignorer les permissions » : le shell de Claude fait déjà tout,
 donc consoles, interpréteurs, Explorateur, barre des tâches, outils d'administration et autres agents sont libres.
 
 - BLOCAGE DUR (garde-fous.json, catégories de « claude ») : bureau sécurisé (UAC, verrouillage, ouverture de session),
   fenêtres d'identifiants Windows, gestionnaires de mots de passe. L'application Claude et la fenêtre d'Antigravity
   sont permises (relecture du 18/10 : aucune demande d'autorisation n'y passe en « ignorer les permissions »).
 - CONFIRMATION ÉTANCHE : confirm.py (mêmes motifs, même fichier).
-- LANCEMENT : seulement ce qui exposerait une session de Julien (profil de navigateur choisi par le modèle, port
+- LANCEMENT : seulement ce qui exposerait une session de l'utilisateur (profil de navigateur choisi par le modèle, port
   DevTools ou extension chargée sur un navigateur ; devtools=true ouvre un profil neuf).
 Politique absente ou illisible : toute action refusée (échec fermé). `look` reste toujours permis, sauf blocage dur.
 """
@@ -92,7 +92,7 @@ def _has_any(folder: Path, names) -> bool:
 
 def is_browser_exe(exe: str) -> bool:
     """Exécutable d'un dossier d'installation de navigateur Chromium : le navigateur lui-même, mais aussi ses annexes
-    (msedge_proxy, pwahelper, chrome_proxy, dossier de version…), qui ouvrent les mêmes profils, ceux de Julien.
+    (msedge_proxy, pwahelper, chrome_proxy, dossier de version…), qui ouvrent les mêmes profils, ceux de l'utilisateur.
     Repère : l'exécutable principal ou la DLL du navigateur dans son dossier ou l'un des deux parents."""
     path = Path(os.path.expandvars(exe))
     if path.name.lower() in BROWSER_EXES:
@@ -143,7 +143,7 @@ def switch_refusal(args: str, chromium: bool = True, browser: bool = True, devto
             return f"le commutateur {key} ouvre un canal de contrôle sur les sessions du navigateur (devtools=true)"
         if key in PROFILE_SWITCHES and (browser or devtools):
             return (
-                f"le commutateur {key} choisirait un profil du navigateur (celui de Julien ?) : jamais fourni par le "
+                f"le commutateur {key} choisirait un profil du navigateur (celui de l'utilisateur ?) : jamais fourni par le "
                 "modèle ; devtools=true ouvre un profil neuf"
             )
     return None
@@ -154,7 +154,7 @@ def _refuse(reason: str) -> PolicyError:
 
 
 def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
-    """Refuse seulement ce qui ouvrirait une session de Julien à un canal de contrôle : DevTools hors de l'exécutable
+    """Refuse seulement ce qui ouvrirait une session de l'utilisateur à un canal de contrôle : DevTools hors de l'exécutable
     principal d'un navigateur (son profil neuf), profil choisi par le modèle, commutateurs de débogage. Un alias
     d'exécution WindowsApps est jugé sur sa cible résolue aussi."""
     target = Path(os.path.expandvars(path))
@@ -166,7 +166,7 @@ def check_launch_exe(path: str, args: str, devtools: bool = False) -> None:
         if devtools and browser and name not in BROWSER_EXES:
             raise _refuse(
                 f"devtools=true seulement sur l'exécutable principal du navigateur (msedge.exe, chrome.exe…), jamais "
-                f"sur {name}, qui ouvrirait le profil de Julien"
+                f"sur {name}, qui ouvrirait le profil de l'utilisateur"
             )
         reason = switch_refusal(
             args, chromium=browser or is_chromium_exe(str(candidate)), browser=browser, devtools=devtools

@@ -229,7 +229,7 @@ MENU_CLASSES = {"#32768", "ComboLBox", "DropDown"}
 def popups_of(hwnd: int) -> list[int]:
     """Fenêtres surgissantes visibles de la cible au-dessus d'elle (menus, listes, dialogues) : possédées par elle,
     ou créées par SON fil (menus, listes déroulantes, surgissantes WPF/Chromium sans propriétaire). Jamais une
-    fenêtre possédée par une autre fenêtre (une fenêtre de Julien du même programme), ni la barre des tâches ou le
+    fenêtre possédée par une autre fenêtre (une fenêtre de l'utilisateur du même programme), ni la barre des tâches ou le
     bureau (même processus que l'Explorateur)."""
     pid = w.window_pid(hwnd)
     thread = w.window_thread(hwnd)
@@ -264,7 +264,7 @@ def popups_of(hwnd: int) -> list[int]:
 
 
 def restore_behind(hwnd: int) -> bool:
-    """Fenêtre réduite → restaurée sans activation, tout au fond de l'empilement (Julien ne la voit pas surgir)."""
+    """Fenêtre réduite → restaurée sans activation, tout au fond de l'empilement (L'utilisateur ne la voit pas surgir)."""
     if not w.IsIconic(hwnd):
         return False
     placement = w.WINDOWPLACEMENT()
@@ -473,7 +473,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
                         "recouverte) : se fier à l'image et aux clics par coordonnées ; pour Chrome, préférer Claude in "
                         "Chrome ; une application lancée par launch n'a pas ce problème"
                         + (
-                            ' (Steam : launch(app="Steam", restart=true) avec l\'accord de Julien le relance avec '
+                            " (Steam : launch(app=\"Steam\", restart=true) avec l'accord de l'utilisateur le relance avec "
                             "-cef-disable-occlusion -cef-force-accessibility)."
                             if steam.is_steam_window(hwnd)
                             else "."

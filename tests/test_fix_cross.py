@@ -102,7 +102,7 @@ def test_wheel_carries_the_point_in_the_same_sendinput(sent):
 
 
 def test_typing_stops_at_julien_physical_input_between_batches(sent, monkeypatch):
-    with pytest.raises(foreground.UserInterrupted, match="Julien a utilisé le clavier"):
+    with pytest.raises(foreground.UserInterrupted, match="L'utilisateur a utilisé le clavier"):
         with realinput._borrowed(TARGET, {TARGET}):
             realinput.type_text("ab")
             monkeypatch.setattr(physical, "since", lambda moment: True)  # Julien tape au milieu

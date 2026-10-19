@@ -6,6 +6,26 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-19 — Neutral texts for any client
+
+### Changed
+- Server instructions sent to every MCP client are now in English and neutral ("the user"): no personal name.
+  Tool descriptions, field descriptions and messages returned to the model say « l'utilisateur » (they stay in
+  French). Same rules, same guardrails. A test checks that nothing sent to a client names anyone.
+- Policy test aligned with the shared guardrails of 2026-10-19: Windows credential prompts are no longer a hard
+  block for Claude (password managers and the secure desktop still are).
+
+### Fixed
+- Memory: the Windows.Graphics.Capture fallback (used only when PrintWindow returns a blank image) loaded the GPU
+  driver, numpy and OpenCV inside the conversation's server: +772 MB private memory and ~25 threads, never released.
+  It now runs in `wgc_helper`, a helper process started on demand, restarted if it dies and stopped after 61.8 s
+  idle or when the server exits (+14 MB on the server side).
+- Chromium/Electron menu buttons (aria-haspopup, ExpandCollapse pattern): `click` opens them with Expand/Collapse
+  first (Invoke only if nothing moved); `expand`/`collapse` accept a collapsible button too.
+- A server started outside the interactive desktop saw no window: its thread now attaches to the « Default »
+  desktop before listing windows or reading the foreground.
+- Shared guardrails updated (« Réinitialiser » confirmed again except for harmless actions such as filters or zoom).
+
 ### Added
 - README: animated demo recorded from the real tool (docs/assets/demo.webp).
 

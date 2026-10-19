@@ -1,9 +1,9 @@
-"""Entrées PHYSIQUES de Julien (touches, boutons et molette de la souris), distinguées de toute entrée injectée.
+"""Entrées PHYSIQUES de l'utilisateur (touches, boutons et molette de la souris), distinguées de toute entrée injectée.
 
 GetLastInputInfo compte aussi les entrées injectées : les nôtres (SendInput autorisé), celles d'UI Automation (son
 SetFocus injecte une touche VK 0xB9) ou d'un autre programme. Raw Input, lui, donne le périphérique d'origine : une
 entrée injectée n'en a pas (hDevice nul). Une fenêtre de messages invisible reçoit ces notifications en arrière-plan
-(RIDEV_INPUTSINK). Aucun crochet : rien ne s'insère dans la chaîne d'entrée de Julien, aucune latence ajoutée, et le
+(RIDEV_INPUTSINK). Aucun crochet : rien ne s'insère dans la chaîne d'entrée de l'utilisateur, aucune latence ajoutée, et le
 contenu des touches n'est ni lu ni gardé — seulement l'instant de la dernière entrée physique.
 """
 
@@ -138,12 +138,12 @@ def available() -> bool:
 
 
 def idle_s() -> float:
-    """Secondes depuis la dernière entrée physique de Julien (infini si aucune depuis le démarrage)."""
+    """Secondes depuis la dernière entrée physique de l'utilisateur (infini si aucune depuis le démarrage)."""
     return float("inf") if not _last else time.monotonic() - _last
 
 
 def since(moment: float) -> bool:
-    """Julien a-t-il touché clavier ou souris (physiquement) depuis `moment` (time.monotonic) ?"""
+    """L'utilisateur a-t-il touché clavier ou souris (physiquement) depuis `moment` (time.monotonic) ?"""
     return _last > moment
 
 

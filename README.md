@@ -342,8 +342,8 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 
 ## Limits
 
-- Tool descriptions, step reports, refusal messages and code comments are in French; the API itself (tool names,
-  parameters, step actions) is in English.
+- Server instructions are in English. Tool descriptions, step reports, refusal messages and code comments are in
+  French; the API itself (tool names, parameters, step actions) is in English.
 - Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
   been checked.
 - Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's

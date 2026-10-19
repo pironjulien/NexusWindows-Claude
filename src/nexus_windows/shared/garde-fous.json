@@ -24,8 +24,8 @@
     }
   },
   "agents": {
-    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 18/10 (accord) : Antigravity reste le recours pour les invites d'identifiants Windows (Claude ne tape pas de mot de passe) ; la fenêtre de l'agent lui-même n'est bloquée pour aucun des deux (aucune demande d'autorisation n'y passe : Julien travaille en « ignorer les permissions », Antigravity n'en affiche pas). Codex (Computer Use de NexusCodex, 18/10) : sa propre application reste bloquée, parce que le Computer Use de Codex y demande l'accès aux applications dans la fenêtre principale ; il ne tape pas de mot de passe (identifiants Windows bloqués, comme Claude).",
-    "claude": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe"],
+    "_": "Catégories de blocage dur appliquées par chaque outil. Relecture du 19/10 : Antigravity et Claude n'ont aucun blocage dur sur les identifiants Windows (saisie permise sur ordre de Julien ; les gestionnaires de mots de passe restent sanctuarisés). Codex : sa propre application reste bloquée, parce que le Computer Use de Codex y demande l'accès aux applications dans la fenêtre principale.",
+    "claude": ["bureau_securise", "gestionnaires_mots_de_passe"],
     "antigravity": ["bureau_securise", "gestionnaires_mots_de_passe"],
     "codex": ["bureau_securise", "identifiants_windows", "gestionnaires_mots_de_passe", "fenetre_autorisation_codex"]
   },
@@ -67,7 +67,8 @@
       "format (the |this )?(disk|drive|partition|volume)",
       "format(er|ez) (le |la |l |ce |cette |votre )?(telephone|appareil|tablette)",
       "format (the |this |your )?(phone|device|tablet)",
-      "reinitialis(er|ez)(?! (les |la |le )?(filtres?|zoom|affichage|vue|recherche|tri|mise en page))",
+      "reinitialis(er|ez)(?! (les |la |le |l |ce |cette |vos |mes )?(filtres?|zoom|affichage|vue|recherche|tri|mise en page|formulaire|champs?|zone|texte|selection|couleurs?)\\b)",
+      "reinitialisation (des donnees )?d usine",
       "factory reset",
       "reset (this pc|(the )?app|to factory( settings)?|all settings)",
       "reset (this |the |your )?(pc|phone|device|tablet)",

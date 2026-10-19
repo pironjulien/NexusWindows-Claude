@@ -153,7 +153,7 @@ def win32_button_click(control: int) -> str:
 
 def win32_tab_select(control: int, index: int) -> str:
     """Onglet Win32/WinForms : TCM_SETCURFOCUS change l'onglet choisi ET notifie le parent (TCN_SELCHANGING/CHANGE),
-    comme un clic, sans souris. (UIA Legacy DoDefaultAction y ferait un VRAI clic : curseur de Julien déplacé.)"""
+    comme un clic, sans souris. (UIA Legacy DoDefaultAction y ferait un VRAI clic : curseur de l'utilisateur déplacé.)"""
     if not _is_class(control, TAB_CLASSES):
         raise MethodError("Pas un contrôle d'onglets Win32.")
     count = w.send_message(control, TCM_GETITEMCOUNT)
@@ -332,7 +332,7 @@ def post_chars(target: int, text: str, check: Callable[[], None] | None = None) 
     type_in_slices, qui relit chaque Entrée et confirme chaque tranche).
 
     check : contrôle appelé avant CHAQUE caractère ; par défaut celui de l'activation brève en cours sur ce fil (à la
-    première entrée physique de Julien : premier plan rendu, puis foreground.UserInterrupted).
+    première entrée physique de l'utilisateur : premier plan rendu, puis foreground.UserInterrupted).
     """
     checkpoint = check or foreground.check_activation
     sent = 0
@@ -356,7 +356,7 @@ class fake_modifiers:
     """Fait croire au thread cible que des touches de modification sont enfoncées (Ctrl, Alt, Maj).
 
     GetKeyState lit l'état clavier de la file d'entrée du thread : on s'attache brièvement à la file du thread
-    cible (jamais à celui de Julien), on y pose l'état voulu, puis on restaure et on se détache.
+    cible (jamais à celui de l'utilisateur), on y pose l'état voulu, puis on restaure et on se détache.
     """
 
     def __init__(self, target: int, vks: list[int], hold_s: float = 0.15) -> None:
@@ -405,7 +405,7 @@ def post_combo(target: int, vks: list[int], modifiers: list[int], hold_s: float 
 def keyboard_target(top: int, windows: set[int] | None = None) -> int:
     """Fenêtre qui reçoit le clavier dans la cible : focus du thread de la cible s'il est dans une de ses fenêtres
     (fenêtre principale, enfant, dialogue possédé), sinon la fenêtre principale elle-même. Jamais une fenêtre de
-    Julien, même si elle partage le thread."""
+    l'utilisateur, même si elle partage le thread."""
     allowed = windows or {top}
     info = w.focus_info(top)
     if info is not None:
@@ -444,7 +444,7 @@ _PRIMED: set[int] = set()  # processus déjà passés par une activation simulé
 
 
 class SimulatedActivation:
-    """Activation simulée en cours. Les touches de Julien vont à SA fenêtre, jamais à la cible : rien à interrompre,
+    """Activation simulée en cours. Les touches de l'utilisateur vont à SA fenêtre, jamais à la cible : rien à interrompre,
     sauf s'il a lui-même mis la cible au premier plan pendant la frappe (ses touches s'y mêleraient)."""
 
     def __init__(self, top: int, windows: set[int]) -> None:
@@ -457,7 +457,7 @@ class SimulatedActivation:
 
     def check(self, consequence: str) -> None:
         if self._julien_in_target():
-            raise foreground.UserInterrupted(f"Julien est passé dans la fenêtre et y tape : {consequence}.")
+            raise foreground.UserInterrupted(f"L'utilisateur est passé dans la fenêtre et y tape : {consequence}.")
 
     def checkpoint(self) -> None:
         self.check("frappe arrêtée ; ses touches ont pu arriver dans la cible : vérifier la cible (look)")
@@ -468,8 +468,8 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
     """Bloc où la fenêtre Chromium `top` se croit active sans l'être : WM_NCACTIVATE puis WM_ACTIVATE envoyés
     (synchrones), désactivation POSTÉE en sortie, donc traitée après tout ce qui a été posté dans le bloc (des messages
     envoyés passeraient devant les caractères encore en file, qui seraient jetés). Fenêtre réellement au premier plan
-    (choisie par Julien) : MethodError, la frappe ordinaire s'applique. Première fois pour ce processus : jeton commun et
-    pause de Julien (son droit de premier plan de lancement peut être utilisé, voir plus haut)."""
+    (choisie par l'utilisateur) : MethodError, la frappe ordinaire s'applique. Première fois pour ce processus : jeton commun et
+    pause de l'utilisateur (son droit de premier plan de lancement peut être utilisé, voir plus haut)."""
     windows = windows or {top}
     if not w.IsWindow(top) or not w.class_name(top).startswith(CHROMIUM_TOP_CLASS):
         raise MethodError("pas une fenêtre Chromium de premier niveau : activation simulée inapplicable")
@@ -481,7 +481,7 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
             stack.enter_context(foreground.agent_token("activation simulée (première fois)"))
             if not foreground.wait_typing_pause():
                 raise foreground.BusyUser(
-                    "Julien tape, bouge la souris ou tient un bouton en ce moment : première frappe sans activation "
+                    "L'utilisateur tape, bouge la souris ou tient un bouton en ce moment : première frappe sans activation "
                     "reportée (l'application peut encore prendre le premier plan une fois)."
                 )
         if w.send_message(top, WM_NCACTIVATE, 1, 0) is None or w.send_message(top, WM_ACTIVATE, WA_ACTIVE, 0) is None:
@@ -630,12 +630,12 @@ class Typed:
         if self.stopped:
             return f"frappe arrêtée ({self.state()}) : {self.stopped}"
         if self.simulated:
-            return "frappes WM_CHAR sans activation (activation simulée par messages, premier plan de Julien intact)"
+            return "frappes WM_CHAR sans activation (activation simulée par messages, premier plan de l'utilisateur intact)"
         if self.slices <= 1:
             return f"frappes WM_CHAR, activation brève {self.active_ms} ms"
         return (
             f"frappes WM_CHAR en {self.slices} activations brèves (la plus longue {self.longest_ms} ms, {self.active_ms} "
-            "ms au total, premier plan rendu à Julien entre chacune) ; texte long : launch avec devtools=true l'écrit "
+            "ms au total, premier plan rendu à l'utilisateur entre chacune) ; texte long : launch avec devtools=true l'écrit "
             "sans aucune activation"
         )
 
@@ -670,13 +670,13 @@ def type_in_slices(
     Invariant : un lot n'est envoyé que si tout le texte avant lui est relu dans le champ ; rien n'est jamais renvoyé
     (un caractère non relu a pu être seulement retardé). clear : le contenu d'origine sélectionné est effacé
     (Suppr) et relu vide avant tout caractère. En Chromium (enter_as_key), chaque Entrée est relue (valeur changée)
-    avant la suite : son saut de ligne arrive en fin de file. Contrôle de Julien à chaque caractère et à chaque
+    avant la suite : son saut de ligne arrive en fin de file. Contrôle de l'utilisateur à chaque caractère et à chaque
     relecture (premier plan rendu, UserInterrupted).
 
     Arrêt (Typed.stopped, texte partiel) : ce qui a été envoyé n'est pas relu à temps hors activation, valeur
-    illisible, qui n'est pas un début du texte ou qui recule, tranches trop courtes pour envoyer, Julien occupé. Lève
+    illisible, qui n'est pas un début du texte ou qui recule, tranches trop courtes pour envoyer, l'utilisateur occupé. Lève
     BusyUser ou MethodError si aucune touche n'est partie (une autre technique peut être essayée), UserInterrupted
-    (avec l'état du champ) à une entrée physique de Julien, worker.Stopped / Cancelled.
+    (avec l'état du champ) à une entrée physique de l'utilisateur, worker.Stopped / Cancelled.
     """
     return _SliceTyping(hwnd, windows, text, prepare, read, prefix, enter_as_key, slice_s, clear, activation).run()
 
@@ -917,7 +917,7 @@ def _checked_rank(control: int, count_msg: int, len_msg: int, text_msg: int, ind
 
 def win32_combo_select_index(control: int, index: int, name: str) -> str:
     """Option n° index d'une liste déroulante Win32/WinForms (homonymes distingués par leur rang), contrôlée par son
-    libellé avant toute modification, puis choisie comme par Julien (_combo_commit)."""
+    libellé avant toute modification, puis choisie comme par l'utilisateur (_combo_commit)."""
     if not _is_class(control, COMBO_CLASSES):
         raise MethodError("Pas une liste déroulante Win32.")
     _checked_rank(control, CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT, index, name)

@@ -1,7 +1,7 @@
-"""Vraie souris et vrai clavier (SendInput) : uniquement pour les actions que Julien a autorisées (foreground=True).
+"""Vraie souris et vrai clavier (SendInput) : uniquement pour les actions que l'utilisateur a autorisées (foreground=True).
 
 La fenêtre cible passe devant, l'action est jouée, puis le curseur revient à sa place et le premier plan à la
-fenêtre de Julien. Refus net si Windows ne met pas la cible devant (sinon les entrées iraient ailleurs).
+fenêtre de l'utilisateur. Refus net si Windows ne met pas la cible devant (sinon les entrées iraient ailleurs).
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ _SINCE: tuple[float, int] | None = None  # début de l'emprunt (time.monotonic, 
 
 
 def _guard(x: int | None = None, y: int | None = None) -> None:
-    """Avant chaque lot d'entrées réelles : Julien ne doit pas avoir touché clavier, boutons ou molette depuis le début
-    de l'emprunt, la cible doit être devant, et le point viser une de ses fenêtres. Sinon (Julien a repris la main,
+    """Avant chaque lot d'entrées réelles : l'utilisateur ne doit pas avoir touché clavier, boutons ou molette depuis le début
+    de l'emprunt, la cible doit être devant, et le point viser une de ses fenêtres. Sinon (L'utilisateur a repris la main,
     une autre fenêtre s'est intercalée) on s'arrête au lieu d'écrire chez lui."""
     if not _ALLOWED:
         raise ForegroundError("Entrée réelle hors d'un emprunt autorisé : refusée.")
@@ -34,12 +34,12 @@ def _guard(x: int | None = None, y: int | None = None) -> None:
         raise ForegroundError(stop.message())
     if _SINCE is not None and foreground.user_input_since(*_SINCE):
         raise foreground.UserInterrupted(
-            "Julien a utilisé le clavier ou la souris pendant la vraie souris/clavier : arrêt, rien d'autre envoyé ; "
+            "L'utilisateur a utilisé le clavier ou la souris pendant la vraie souris/clavier : arrêt, rien d'autre envoyé ; "
             "ce qui précède a pu arriver dans la cible : vérifier la cible (look)"
         )
     if w.root(w.foreground()) not in _ALLOWED:
         raise ForegroundError(
-            "La cible n'est plus au premier plan (Julien a repris la main ?) : arrêt, rien d'autre envoyé."
+            "La cible n'est plus au premier plan (L'utilisateur a repris la main ?) : arrêt, rien d'autre envoyé."
         )
     if x is not None and y is not None and w.window_at(x, y) not in _ALLOWED:
         raise ForegroundError(f"Le point ({x}, {y}) ne vise pas la fenêtre cible (recouverte ?) : arrêt.")
@@ -77,7 +77,7 @@ def _absolute(x: int, y: int) -> tuple[int, int]:
 
 def _at(flags: int, x: int, y: int, data: int = 0) -> w.INPUT:
     """Événement souris AU point (x, y) de l'écran : déplacement absolu sur le bureau virtuel joint au bouton ou à la
-    molette, pour que l'événement tombe là où on vise même si Julien bouge la souris au même moment."""
+    molette, pour que l'événement tombe là où on vise même si l'utilisateur bouge la souris au même moment."""
     ax, ay = _absolute(x, y)
     return _mouse(flags | w.MOUSEEVENTF_MOVE | w.MOUSEEVENTF_ABSOLUTE | w.MOUSEEVENTF_VIRTUALDESK, ax, ay, data)
 
@@ -95,13 +95,13 @@ def bring_to_front(hwnd: int) -> bool:
 
 
 def put_in_front(hwnd: int) -> bool:
-    """window(action="front"), autorisé par Julien : comme un emprunt, pause de Julien attendue (sinon BusyUser) et
+    """window(action="front"), autorisé par l'utilisateur : comme un emprunt, pause de l'utilisateur attendue (sinon BusyUser) et
     arrêt d'urgence contrôlé juste avant ; la cible passe devant sous suspension de la garde, et les surveillances en
     cours (traîne d'un appel précédent comprise) adoptent ce premier plan voulu au lieu de le rendre. Jeton commun aux
     agents tenu le temps de la mise au premier plan."""
     with foreground.agent_token("fenêtre mise devant"):
         if not foreground.wait_typing_pause():
-            raise foreground.BusyUser("Julien utilise la souris ou le clavier : mise au premier plan reportée.")
+            raise foreground.BusyUser("L'utilisateur utilise la souris ou le clavier : mise au premier plan reportée.")
         worker.check_cancelled()
         with foreground.suspended():
             if not bring_to_front(hwnd):
@@ -134,14 +134,14 @@ class Hold:
         self.user_took_over = False
 
     def checkpoint(self) -> None:
-        """Entre deux étapes : Julien a-t-il repris la main (touche, clic, molette ; Raw Input, sinon GetLastInputInfo
+        """Entre deux étapes : l'utilisateur a-t-il repris la main (touche, clic, molette ; Raw Input, sinon GetLastInputInfo
         hors de nos entrées) ? Alors le lot s'arrête et le premier plan lui reste. Sinon, la cible est remise devant si
         une autre fenêtre s'est intercalée."""
         if foreground.user_input_since(self.started, self.started_tick):
             self.user_took_over = True
             raise foreground.UserInterrupted(
-                "Julien a utilisé le clavier ou la souris pendant le lot au premier plan : lot arrêté, premier plan "
-                "laissé à Julien"
+                "L'utilisateur a utilisé le clavier ou la souris pendant le lot au premier plan : lot arrêté, premier plan "
+                "laissé à l'utilisateur"
             )
         if w.root(w.foreground()) not in self.windows:
             worker.check_cancelled()
@@ -158,16 +158,16 @@ def current_hold() -> Hold | None:
 
 
 def _target_still_front(windows: set[int], pids: set[int]) -> bool:
-    """Le premier plan est-il encore à la cible ? Sinon Julien (ou une autre de ses fenêtres) l'a pris entre-temps : on
+    """Le premier plan est-il encore à la cible ? Sinon l'utilisateur (ou une autre de ses fenêtres) l'a pris entre-temps : on
     ne lui impose pas l'ancienne fenêtre (comme foreground.Activation.give_back)."""
     return foreground.belongs_to(w.foreground(), windows, pids, set())
 
 
 @contextmanager
 def held(hwnd: int, windows: set[int] | None = None):
-    """foreground=true accordé : la cible passe devant (après une pause de Julien) et y reste pendant tout le lot ;
+    """foreground=true accordé : la cible passe devant (après une pause de l'utilisateur) et y reste pendant tout le lot ;
     les surveillances du premier plan l'adoptent au lieu de le « rendre ». À la sortie (fin, erreur, arrêt
-    d'urgence), premier plan rendu à la fenêtre de Julien (sauf s'il a repris la main lui-même) et curseur remis si
+    d'urgence), premier plan rendu à la fenêtre de l'utilisateur (sauf s'il a repris la main lui-même) et curseur remis si
     nous l'avons déplacé et qu'il n'a pas bougé depuis. Jeton commun aux agents tenu pendant tout le lot."""
     with foreground.agent_token("lot au premier plan"), _held(hwnd, windows) as hold:
         yield hold
@@ -178,7 +178,7 @@ def _held(hwnd: int, windows: set[int] | None):
     global _HOLD, _LAST_MOVE
     if not foreground.wait_typing_pause():
         raise foreground.BusyUser(
-            "Julien utilise la souris ou le clavier : lot au premier plan reporté, rien n'a été fait."
+            "L'utilisateur utilise la souris ou le clavier : lot au premier plan reporté, rien n'a été fait."
         )
     worker.check_cancelled()
     previous = w.foreground()
@@ -206,10 +206,10 @@ def _held(hwnd: int, windows: set[int] | None):
 
 @contextmanager
 def borrowed(hwnd: int, windows: set[int] | None = None):
-    """Met la cible devant le temps du bloc (après une pause de Julien), puis rend curseur et premier plan.
+    """Met la cible devant le temps du bloc (après une pause de l'utilisateur), puis rend curseur et premier plan.
 
     Chaque lot d'entrées vérifie d'abord que la cible est toujours devant (et le point sur elle) ; la garde est
-    suspendue lot par lot. Le curseur n'est remis en place que si nous l'avons déplacé et que Julien ne l'a pas
+    suspendue lot par lot. Le curseur n'est remis en place que si nous l'avons déplacé et que l'utilisateur ne l'a pas
     bougé depuis. Jeton commun aux agents tenu pendant tout l'emprunt.
     """
     with foreground.agent_token("vraie souris ou vrai clavier"), _borrowed(hwnd, windows):
@@ -220,7 +220,9 @@ def borrowed(hwnd: int, windows: set[int] | None = None):
 def _borrowed(hwnd: int, windows: set[int] | None):
     global _LAST_MOVE, _ALLOWED, _TOKEN, _SINCE
     if not foreground.wait_typing_pause():
-        raise foreground.BusyUser("Julien utilise la souris ou le clavier : emprunt reporté, rien n'a été envoyé.")
+        raise foreground.BusyUser(
+            "L'utilisateur utilise la souris ou le clavier : emprunt reporté, rien n'a été envoyé."
+        )
     worker.check_cancelled()  # arrêt d'urgence demandé pendant l'attente : rien n'est mis devant
     previous = w.foreground()
     cursor = w.cursor_pos()
@@ -266,7 +268,7 @@ _BTN = {
 
 def click(x: int, y: int, button: str = "left", count: int = 1) -> None:
     """Déplacement, appuis et relâchements en UN SEUL SendInput, chacun avec les coordonnées absolues du point :
-    Windows ne glisse aucune autre entrée au milieu, le clic ne peut pas tomber sous le curseur de Julien."""
+    Windows ne glisse aucune autre entrée au milieu, le clic ne peut pas tomber sous le curseur de l'utilisateur."""
     global _LAST_MOVE
     _guard(x, y)
     down, up = _BTN[button]

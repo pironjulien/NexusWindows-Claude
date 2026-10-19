@@ -1,4 +1,4 @@
-"""Jeton commun aux agents de Julien (NexusClaude, NexusAGY, NexusCodex) pour la souris et le premier plan.
+"""Jeton commun aux agents de l'utilisateur (NexusClaude, NexusAGY, NexusCodex) pour la souris et le premier plan.
 
 Protocole commun : `foreground-token.md`. Tenir le jeton = verrou exclusif LockFileEx sur l'octet
 2^32 de `~/.nexus/foreground.lock` (local au poste, hors OneDrive). Windows le libère à la fermeture du handle,

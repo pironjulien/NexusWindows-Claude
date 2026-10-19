@@ -229,7 +229,7 @@ class UiaActions(ExecutorBase):
         return outcome
 
     def _focused_target_element(self) -> snapshot.Element | None:
-        """Élément qui a le focus DANS LA CIBLE (jamais le focus système quand c'est une fenêtre de Julien)."""
+        """Élément qui a le focus DANS LA CIBLE (jamais le focus système quand c'est une fenêtre de l'utilisateur)."""
         if w.root(w.foreground()) in self.windows:
             focused = self.auto.focused()
             if focused is not None:
@@ -715,7 +715,7 @@ class UiaActions(ExecutorBase):
 
     def _close_menus(self, opened: list[snapshot.Element], clicked: bool) -> None:
         """Menus dépliés par un chemin qui a échoué : repliés du plus profond au premier (un menu ouvert reste une
-        surgissante au-dessus des fenêtres de Julien). Sans motif ExpandCollapse, l'action par défaut le referme, mais
+        surgissante au-dessus des fenêtres de l'utilisateur). Sans motif ExpandCollapse, l'action par défaut le referme, mais
         seulement si le dernier clic n'a pas été tenté : il a pu fermer le menu, qu'elle rouvrirait."""
         for item in reversed(opened):
             if item.props.get("has_expand"):

@@ -649,16 +649,8 @@ def _handles_and_private_mb() -> tuple[int, float]:
 
 
 @pytest.mark.live
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "fuite intermittente de windows-capture 2.0.1, d'un processus à l'autre : ~1 handle noyau par capture dans "
-        "certains processus (recheck6 : +120 à +161 par série de 120 ; recheck7/G : ce test 460 → 580 une fois sur "
-        "deux), aucune dans d'autres (3 960 captures des sondes, en STA, MTA, sans COM, sous pytest). Cause native "
-        "non identifiée. Le serveur n'utilise plus WGC qu'en dernier recours (image PrintWindow vide) ; la garde de "
-        "non-fuite porte sur son chemin réel (test_fix_G2::test_server_120_looks_with_image_do_not_leak)."
-    ),
-)
+# Depuis le 19/10/2026, WGC passe par wgc_helper : la fuite intermittente de windows-capture 2.0.1 (~1 handle noyau
+# par capture, recheck6/7) reste dans ce processus d'appoint, arrêté après une minute sans usage, plus dans le serveur.
 def test_wgc_120_captures_do_not_leak():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lab"))
     import apps
@@ -769,3 +761,50 @@ def test_start_menu_rows_are_validated(monkeypatch):
     monkeypatch.setattr(launch, "_START_APPS_ERROR", "")
     monkeypatch.setattr(launch.subprocess, "run", lambda *a, **k: Out())
     assert launch.find_start_app("calc") == {"Name": "Calculatrice", "AppID": "X!App"}
+
+
+@pytest.mark.live
+def test_wgc_runs_in_a_helper_that_frees_its_memory(monkeypatch):
+    """19/10/2026 : la capture WGC chargeait le pilote graphique et opencv DANS le serveur (+770 Mo privés, +25 fils,
+    jamais rendus). Elle passe par wgc_helper : le serveur reste léger, l'appoint s'arrête seul après inactivité."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lab"))
+    import apps
+
+    def private_mb(pid: int) -> float:
+        kernel32 = ctypes.WinDLL("kernel32")
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        handle = kernel32.OpenProcess(0x1000 | 0x0010, False, pid)  # QUERY_LIMITED_INFORMATION | VM_READ
+        pmc = _PMC()
+        pmc.cb = ctypes.sizeof(_PMC)
+        ctypes.WinDLL("psapi").GetProcessMemoryInfo(ctypes.c_void_p(handle), ctypes.byref(pmc), pmc.cb)
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return pmc.PrivateUsage / 2**20
+
+    monkeypatch.setenv("NEXUS_WGC_IDLE_S", "2")
+    if capture._HELPER is not None:  # appoint d'un test précédent, lancé avec l'attente par défaut
+        capture._HELPER.kill()
+        capture._HELPER = None
+    app = apps.launch("win32", x=140, y=140)
+    try:
+        _, private0 = _handles_and_private_mb()
+        for _ in range(3):
+            assert capture.capture_wgc(app.hwnd).image.size[0] > 0
+        _, private1 = _handles_and_private_mb()
+        helper = capture._HELPER
+        assert helper is not None and helper.poll() is None
+        # Le poids est bien chez l'appoint (lanceur du venv + vrai Python, son enfant).
+        out = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"(Get-CimInstance Win32_Process -Filter 'ParentProcessId={helper.pid}').ProcessId",
+            ],
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+        assert private_mb(helper.pid) + sum(private_mb(int(p)) for p in out) > 100
+    finally:
+        app.close()
+    assert private1 - private0 < 30, (round(private0, 1), round(private1, 1))
+    helper.wait(10)  # arrêt seul après NEXUS_WGC_IDLE_S sans demande

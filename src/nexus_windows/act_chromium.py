@@ -47,21 +47,34 @@ class ChromiumActions(ExecutorBase):
             chain.append(("focus UIA", lambda: self._quiet_focus(e)))
         elif role == "CheckBox" and p.get("has_toggle"):
             chain.append(("UIA Toggle", self._effect(e, lambda: self.auto.toggle(e.node.element))))
-        elif p.get("has_invoke"):
-            chain.append(("UIA Invoke", self._effect(e, lambda: self.auto.invoke(e.node.element))))
-        elif p.get("has_legacy"):
-            chain.append(
-                ("UIA action par défaut", self._effect(e, lambda: self.auto.legacy_default_action(e.node.element)))
+        else:
+            expandable = bool(p.get("has_expand")) and role in (
+                "ComboBox",
+                "MenuItem",
+                "SplitButton",
+                "TreeItem",
+                "Button",
             )
-        if role not in ("Edit", "Document"):
-            if p.get("has_expand") and role in ("ComboBox", "MenuItem", "SplitButton", "TreeItem"):
-                expanded = p.get("expand") == 1
+            expand_step = (
+                "UIA Expand/Collapse",
+                self._effect(
+                    e, lambda: (self.auto.collapse if p.get("expand") == 1 else self.auto.expand)(e.node.element)
+                ),
+            )
+            # Liste, menu ou bouton à menu (aria-haspopup) : cliquer, c'est ouvrir ; Expand d'abord, Invoke ensuite si
+            # rien n'a bougé. Bouton partagé et nœud d'arbre : le clic exécute ou sélectionne, Invoke d'abord.
+            expand_first = expandable and role in ("ComboBox", "MenuItem", "Button")
+            if expand_first:
+                chain.append(expand_step)
+            if p.get("has_invoke"):
+                chain.append(("UIA Invoke", self._effect(e, lambda: self.auto.invoke(e.node.element))))
+            elif p.get("has_legacy"):
                 chain.append(
-                    (
-                        "UIA Expand/Collapse",
-                        self._effect(e, lambda: (self.auto.collapse if expanded else self.auto.expand)(e.node.element)),
-                    )
+                    ("UIA action par défaut", self._effect(e, lambda: self.auto.legacy_default_action(e.node.element)))
                 )
+            if expandable and not expand_first:
+                chain.append(expand_step)
+        if role not in ("Edit", "Document"):
             if not p.get("has_invoke"):
                 child = self._clickable_descendant(e)
                 if child is not None:
@@ -417,7 +430,7 @@ class ChromiumActions(ExecutorBase):
             return outcome
         outcome.ok = False
         outcome.line += (
-            " — ÉCHEC À LA RELECTURE : relancer avec foreground=true (accord de Julien) ou lancer l'application avec "
+            " — ÉCHEC À LA RELECTURE : relancer avec foreground=true (accord de l'utilisateur) ou lancer l'application avec "
             "devtools=true"
         )
         return outcome

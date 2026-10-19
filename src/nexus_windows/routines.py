@@ -15,7 +15,7 @@ tout texte fixe y est refusé à l'enregistrement. Au rejeu, un paramètre manqu
 remplies repassent la règle des cibles sémantiques.
 Fichiers : ~/.claude/nexus-claude/routines/<exécutable>.json (local au poste, hors OneDrive).
 
-Miroir entre les PC de Julien : NexusClaude/routines/<exécutable>.json dans le dépôt (synchronisé par OneDrive, suivi
+Miroir entre les PC de l'utilisateur : NexusClaude/routines/<exécutable>.json dans le dépôt (synchronisé par OneDrive, suivi
 par Git). Il ne garde que la définition des routines (étapes, empreinte, titre, date d'enregistrement), jamais leurs
 statistiques de rejeu, et JAMAIS de texte saisi en clair : une routine dont un texte (`text`, `check.value`,
 `check.contains`) n'est pas fait que de modèles `{{x}}` reste locale au poste. Fusion par date : pour chaque routine, la
@@ -43,7 +43,7 @@ _REPO = Path(__file__).resolve().parents[3]  # NexusClaude (sources lancées dep
 
 def _default_mirror() -> Path | None:
     """Miroir du dépôt : NEXUS_ROUTINES_MIRROR s'il est posé (vide : aucun) ; sinon NexusClaude/routines, sauf pour un
-    serveur de test isolé (NEXUS_WINDOWS_HOME), qui ne doit jamais toucher aux routines de Julien."""
+    serveur de test isolé (NEXUS_WINDOWS_HOME), qui ne doit jamais toucher aux routines de l'utilisateur."""
     explicit = os.environ.get("NEXUS_ROUTINES_MIRROR")
     if explicit is not None:
         return Path(explicit) if explicit.strip() else None

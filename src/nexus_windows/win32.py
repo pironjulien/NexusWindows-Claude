@@ -122,6 +122,11 @@ class LASTINPUTINFO(ctypes.Structure):
 
 WNDENUMPROC = ctypes.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
 
+OpenDesktopW = _fn(user32, "OpenDesktopW", w.HANDLE, w.LPCWSTR, w.DWORD, w.BOOL, w.DWORD)
+SetThreadDesktop = _fn(user32, "SetThreadDesktop", w.BOOL, w.HANDLE)
+DESKTOP_ALL_ACCESS = 0x01FF
+_hdesk_default: int | None = None  # bureau interactif « Default », ouvert une fois
+
 EnumWindows = _fn(user32, "EnumWindows", w.BOOL, WNDENUMPROC, w.LPARAM)
 EnumChildWindows = _fn(user32, "EnumChildWindows", w.BOOL, w.HWND, WNDENUMPROC, w.LPARAM)
 IsWindow = _fn(user32, "IsWindow", w.BOOL, w.HWND)
@@ -474,6 +479,7 @@ def client_rect_screen(hwnd: int) -> Rect:
 
 
 def foreground() -> int:
+    ensure_default_desktop()
     return handle(GetForegroundWindow())
 
 
@@ -504,7 +510,21 @@ def focus_info(hwnd: int) -> GUITHREADINFO | None:
     return gui
 
 
+def ensure_default_desktop() -> bool:
+    """Rattache le thread courant au bureau interactif 'Default' sur WinSta0."""
+    global _hdesk_default
+    try:
+        if not _hdesk_default:
+            _hdesk_default = handle(OpenDesktopW("Default", 0, False, DESKTOP_ALL_ACCESS))
+        if _hdesk_default:
+            return bool(SetThreadDesktop(_hdesk_default))
+    except Exception:
+        pass
+    return False
+
+
 def enum_windows() -> list[int]:
+    ensure_default_desktop()
     out: list[int] = []
 
     @WNDENUMPROC

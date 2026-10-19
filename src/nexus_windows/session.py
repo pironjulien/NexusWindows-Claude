@@ -191,10 +191,10 @@ class Session:
                 self.drop_process(pid)
 
     def check_account(self, hwnd: int) -> None:
-        """Avant chaque act : jamais un compte de Julien derrière un navigateur DevTools. Un compte apparu après le
+        """Avant chaque act : jamais un compte de l'utilisateur derrière un navigateur DevTools. Un compte apparu après le
         lancement (connexion implicite, synchronisation) ferme aussitôt ce navigateur, lancé par l'outil, et supprime
         son profil. Le processus est identifié par (pid, heure de création) sous un handle tenu ouvert : un pid
-        réattribué à un programme de Julien n'est jamais fermé, son entrée est seulement oubliée."""
+        réattribué à un programme de l'utilisateur n'est jamais fermé, son entrée est seulement oubliée."""
         from . import launch
 
         pid = w.window_pid(hwnd)
@@ -222,7 +222,7 @@ class Session:
                 self.forget(other)
         raise launch.AccountError(
             f"Compte détecté dans le navigateur DevTools ({reason}) : fermé aussitôt, rien n'a été fait (jamais le "
-            f"compte de Julien derrière un port DevTools){launch._profile_fate(profile, removed)}."
+            f"compte de l'utilisateur derrière un port DevTools){launch._profile_fate(profile, removed)}."
         )
 
     def page(self, hwnd: int, title: str | None = None) -> cdp.Page | None:

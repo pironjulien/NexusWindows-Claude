@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import ctypes
+import json
+import subprocess
+import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from PIL import Image, ImageStat
@@ -115,8 +119,93 @@ def _end_wgc(control, done: threading.Event) -> None:
     control.stop()
 
 
+_HELPER: subprocess.Popen | None = None
+_HELPER_LOCK = threading.Lock()
+HELPER_START_S = 16.18  # premier appel : démarrage de Python et import de windows-capture (numpy, opencv)
+
+
+HELPER_READ_S = 5.0  # marge pour une image déjà prise : quelques Mo à copier dans le tube
+
+
+def _bounded(helper: subprocess.Popen, read: Callable[[], bytes], timeout_s: float) -> bytes:
+    """Lecture sur le tube du processus d'appoint ; figé au-delà de timeout_s : arrêté (jamais le worker COM bloqué)."""
+    box: list[bytes] = []
+    reader = threading.Thread(target=lambda: box.append(read()), daemon=True)
+    reader.start()
+    reader.join(timeout_s)
+    if reader.is_alive():
+        helper.kill()
+        return b""
+    return box[0] if box else b""
+
+
+def _drop(helper: subprocess.Popen) -> None:
+    """Appoint dans un état inconnu (muet, image tronquée) : arrêté ; le suivant repart d'un processus neuf."""
+    global _HELPER
+    helper.kill()
+    if _HELPER is helper:
+        _HELPER = None
+
+
+def _ask(request: bytes, timeout_s: float) -> tuple[subprocess.Popen, bytes]:
+    """Envoie la demande au processus d'appoint (lancé s'il ne tourne pas) ; ligne vide : il est tenu pour mort.
+    Le délai de démarrage (import de windows-capture) ne s'ajoute que pour un processus qui vient d'être lancé."""
+    global _HELPER
+    fresh = _HELPER is None or _HELPER.poll() is not None
+    if fresh:
+        _HELPER = subprocess.Popen(
+            [sys.executable, "-m", "nexus_windows.wgc_helper"], stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
+        )  # fmt: skip
+    helper = _HELPER
+    assert helper is not None and helper.stdin is not None and helper.stdout is not None
+    stdout = helper.stdout
+    try:
+        helper.stdin.write(request)
+        helper.stdin.flush()
+        head = _bounded(helper, stdout.readline, timeout_s + HELPER_READ_S + (HELPER_START_S if fresh else 0))
+    except OSError:
+        head = b""
+    if not head:
+        _drop(helper)
+    return helper, head
+
+
 def capture_wgc(hwnd: int, timeout_s: float = 2.0) -> Shot:
-    """Windows.Graphics.Capture sans bordure jaune ni curseur (composition DWM, fonctionne recouverte).
+    """Windows.Graphics.Capture, faite dans le processus d'appoint wgc_helper (lancé à la demande, arrêté après une
+    minute sans usage) : sa mémoire (pilote graphique, numpy, opencv : ~770 Mo) ne reste pas dans ce serveur."""
+    if w.IsIconic(hwnd):
+        raise CaptureError("Fenêtre réduite : rien à capturer.")
+    start = time.perf_counter()
+    request = json.dumps({"hwnd": hwnd, "timeout": timeout_s}).encode() + b"\n"
+    with _HELPER_LOCK:
+        # Processus arrêté entre deux captures (inactivité, plantage) : relancé une fois.
+        helper, head = _ask(request, timeout_s)
+        if not head:
+            helper, head = _ask(request, timeout_s)
+        if not head:
+            raise CaptureError("Windows.Graphics.Capture : processus d'appoint arrêté sans réponse.")
+        try:
+            answer = json.loads(head)
+        except ValueError:
+            _drop(helper)
+            raise CaptureError("Windows.Graphics.Capture : réponse illisible du processus d'appoint.") from None
+        if not answer.get("ok"):
+            raise CaptureError(answer.get("error") or "Windows.Graphics.Capture : échec.")
+        size = answer["width"] * answer["height"] * 3
+        stdout = helper.stdout
+        assert stdout is not None
+        raw = _bounded(helper, lambda: stdout.read(size), HELPER_READ_S)
+        if len(raw) != size:
+            _drop(helper)
+            raise CaptureError("Windows.Graphics.Capture : image tronquée.")
+    image = Image.frombytes("RGB", (answer["width"], answer["height"]), raw)
+    return Shot(image, (answer["left"], answer["top"]), "wgc", (time.perf_counter() - start) * 1000)
+
+
+def capture_wgc_inline(hwnd: int, timeout_s: float = 2.0) -> Shot:
+    """Windows.Graphics.Capture sans bordure jaune ni curseur (composition DWM, fonctionne recouverte), dans CE
+    processus : réservé à wgc_helper (voir capture_wgc).
 
     Dernier recours seulement (snapshot.capture_view : image PrintWindow vide ou en échec) : dans un régime
     intermittent, windows-capture a perdu ~1 handle noyau par capture (recheck6), sans cause native identifiée."""

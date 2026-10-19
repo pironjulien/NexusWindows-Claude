@@ -1,7 +1,7 @@
 """Lancement d'applications en arrière-plan : exécutable, commande, ou nom du menu Démarrer (applis Store comprises).
 
 La nouvelle fenêtre ne doit pas prendre la main : démarrage sans activation quand Windows le permet, puis premier
-plan rendu à Julien et fenêtre glissée juste sous la sienne si l'application s'est activée d'elle-même.
+plan rendu à l'utilisateur et fenêtre glissée juste sous la sienne si l'application s'est activée d'elle-même.
 Identité : la fenêtre lancée est celle d'un processus de l'arbre lancé ; titre et nom d'exécutable ne servent qu'aux
 lancements sans processus connu (raccourci du menu Démarrer) ou au lanceur qui se termine (calc → CalculatorApp),
 jamais à un navigateur.
@@ -44,7 +44,7 @@ class LaunchError(RuntimeError):
 
 
 class AccountError(LaunchError):
-    """Un compte (celui de Julien ?) est apparu dans un navigateur DevTools : il a été fermé."""
+    """Un compte (celui de l'utilisateur ?) est apparu dans un navigateur DevTools : il a été fermé."""
 
 
 @dataclass
@@ -214,7 +214,7 @@ def _new_window(
     fallback: bool = True,
     running: Callable[[], bool] | None = None,
 ) -> tuple[int, bool]:
-    """Attend la fenêtre de l'application lancée — jamais une fenêtre sans lien — et rend le premier plan à Julien dès
+    """Attend la fenêtre de l'application lancée — jamais une fenêtre sans lien — et rend le premier plan à l'utilisateur dès
     qu'une nouvelle fenêtre de l'application le prend pendant l'attente. Renvoie (hwnd ou 0, premier plan repris).
 
     pid connu : seules les fenêtres de l'arbre lancé comptent (mode strict), aussi pour rendre le premier plan. Le
@@ -625,7 +625,7 @@ _kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
 
 def openable(candidate: str) -> Path | None:
     """Chemin existant d'un dossier ou d'un document (pas d'un programme) : ouvert par son association, comme un
-    double-clic de Julien. Un programme, quel que soit son nom, reste un lancement d'exécutable (et sa politique)."""
+    double-clic de l'utilisateur. Un programme, quel que soit son nom, reste un lancement d'exécutable (et sa politique)."""
     if not candidate:
         return None
     path = Path(os.path.expandvars(os.path.expanduser(candidate)))
@@ -771,7 +771,7 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
         notes.append(f"ouverture vérifiée ({where}, {shown})")
         if shared:
             notes.append(
-                "ouvert dans une fenêtre que Julien avait déjà (nouvel onglet ou document de la même instance) : ne "
+                "ouvert dans une fenêtre que l'utilisateur avait déjà (nouvel onglet ou document de la même instance) : ne "
                 "pas fermer cette fenêtre, elle porte aussi ses propres onglets ou documents (fermer seulement "
                 "l'onglet ouvert, ctrl+w)"
             )
@@ -791,7 +791,7 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
     if not returned:
         notes.append("la fenêtre a pris le premier plan et Windows a refusé de le rendre (la garde réessaie)")
     elif took_back:
-        notes.append("la fenêtre s'est mise devant : premier plan rendu aussitôt à Julien")
+        notes.append("la fenêtre s'est mise devant : premier plan rendu aussitôt à l'utilisateur")
     log.event("open", {"via": via, "verified": verified, "pid": pid})
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
     return Launched(hwnd, app_pid, 0, via, notes, None, user_front, returned)
@@ -807,7 +807,7 @@ def launch(
     restart: bool = False,
 ) -> Launched:
     """on_account_kill(profil) : appelé quand la garde de compte ferme le navigateur DevTools lancé (le serveur y
-    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de Julien)."""
+    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur)."""
     notes: list[str] = []
     user_front = w.foreground()
     before = set(w.enum_windows())
@@ -940,7 +940,7 @@ def launch(
         if reason:
             removed = close_account_browser(proc, pid, profile)
             raise AccountError(
-                f"Compte détecté dans le navigateur DevTools ({reason}) : fermé aussitôt (jamais le compte de Julien "
+                f"Compte détecté dans le navigateur DevTools ({reason}) : fermé aussitôt (jamais le compte de l'utilisateur "
                 f"derrière un port DevTools){_profile_fate(profile, removed)}."
             )
         if profile is not None and proc is not None:
@@ -966,17 +966,17 @@ def launch(
                 notes.append(
                     "application Store jamais affichée par Windows (lancée sans activation, contenu suspendu : "
                     "attendre n'y change rien) : l'afficher exige le premier plan, window(action=\"front\", "
-                    "foreground=true) avec l'accord de Julien"
+                    "foreground=true) avec l'accord de l'utilisateur"
                 )
     # Premier plan relu en fin de lancement, jamais supposé : la note ne dit « rendu » que s'il l'est vraiment.
     returned = not (user_front and w.IsWindow(user_front) and _holds_front(hwnd))
     if not returned:
         notes.append(
-            "l'application a pris le premier plan et Windows a refusé de le rendre : premier plan PAS rendu à Julien "
+            "l'application a pris le premier plan et Windows a refusé de le rendre : premier plan PAS rendu à l'utilisateur "
             "(la garde du serveur réessaie)"
         )
     elif took_back:
-        notes.append("l'application s'est mise devant : premier plan rendu aussitôt à Julien")
+        notes.append("l'application s'est mise devant : premier plan rendu aussitôt à l'utilisateur")
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
     if pid and app_pid != pid and w.process_name(app_pid).lower() in foreground.HOST_PROCESSES:
         app_pid = pid  # cadre UWP sans CoreWindow enfant : l'application est le processus lancé, pas l'hôte
@@ -985,7 +985,7 @@ def launch(
 
 # --- Steam ----------------------------------------------------------------------------------------------------
 def _wait_steam(deadline: float, user_front: int, before: set[int]) -> tuple[int, bool]:
-    """Attend la fenêtre principale de Steam (steamwebhelper), en rendant le premier plan à Julien dès qu'une fenêtre
+    """Attend la fenêtre principale de Steam (steamwebhelper), en rendant le premier plan à l'utilisateur dès qu'une fenêtre
     de Steam le prend (fenêtre de mise à jour de steam.exe comprise)."""
     took_back = False
     while True:
@@ -1011,8 +1011,8 @@ def launch_steam(
     exe: str, args: str, devtools: bool, restart: bool, wait_s: float, user_front: int, before: set[int]
 ) -> Launched:
     """Steam avec -cef-disable-occlusion -cef-force-accessibility (lisible et pilotable recouvert), et
-    -cef-enable-debugging si devtools (port 127.0.0.1:8080 sur la session de Julien : seulement avec son accord).
-    Steam déjà ouvert : ses commutateurs ne changent qu'à une relance (restart, accord de Julien ; refusée si un jeu
+    -cef-enable-debugging si devtools (port 127.0.0.1:8080 sur la session de l'utilisateur : seulement avec son accord).
+    Steam déjà ouvert : ses commutateurs ne changent qu'à une relance (restart, accord de l'utilisateur ; refusée si un jeu
     tourne). Tout est contrôlé AVANT de fermer Steam."""
     policy.check_launch_exe(exe, args)  # arguments du modèle : jamais de port DevTools ni de commutateur dangereux
     notes: list[str] = []
@@ -1022,7 +1022,8 @@ def launch_steam(
         if devtools and not port:
             raise LaunchError(
                 "Steam est déjà ouvert sans DevTools : ses commutateurs ne s'appliquent qu'au démarrage. Avec l'accord "
-                'de Julien, launch(app="Steam", devtools=true, restart=true) le ferme puis le relance (téléchargements '
+                'de l\'utilisateur, launch(app="Steam", devtools=true, restart=true) le ferme puis le relance '
+                "(téléchargements "
                 "interrompus ; refusé si un jeu tourne). Rien n'a été fait."
             )
         hwnd = steam.main_window()
@@ -1039,12 +1040,12 @@ def launch_steam(
             + (
                 f", DevTools déjà actif sur 127.0.0.1:{port}"
                 if port
-                else " ; si look le trouve vide une fois recouvert, restart=true (accord de Julien) le relance avec "
+                else " ; si look le trouve vide une fois recouvert, restart=true (accord de l'utilisateur) le relance avec "
                 "-cef-disable-occlusion -cef-force-accessibility"
             )
         )
         if took_back:
-            notes.append("Steam s'est mis devant : premier plan rendu aussitôt à Julien")
+            notes.append("Steam s'est mis devant : premier plan rendu aussitôt à l'utilisateur")
         pid = w.window_pid(hwnd) if hwnd else 0
         if port:
             log.event("steam-devtools", {"action": "enregistré", "port": port, "pid": pid})
@@ -1086,7 +1087,7 @@ def launch_steam(
             time.sleep(0.5)
         if port:
             notes.append(
-                f"DevTools de Steam sur 127.0.0.1:{port} : la session Steam de Julien est accessible à tout programme "
+                f"DevTools de Steam sur 127.0.0.1:{port} : la session Steam de l'utilisateur est accessible à tout programme "
                 'local tant que Steam reste ouvert ainsi ; launch(app="Steam", restart=true) sans devtools le referme'
             )
             log.event("steam-devtools", {"action": "ouvert", "port": port, "pid": proc.pid})
@@ -1095,7 +1096,7 @@ def launch_steam(
     if not hwnd:
         notes.append("fenêtre principale de Steam pas encore affichée (mise à jour, connexion ?) : windows puis look")
     elif took_back:
-        notes.append("Steam s'est mis devant : premier plan rendu aussitôt à Julien")
+        notes.append("Steam s'est mis devant : premier plan rendu aussitôt à l'utilisateur")
     returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
     pid = w.window_pid(hwnd) if hwnd else proc.pid
     return Launched(

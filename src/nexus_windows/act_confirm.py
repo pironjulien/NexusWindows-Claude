@@ -2,7 +2,7 @@
 
 Un geste dont l'effet part chez un tiers, coûte de l'argent ou détruit (payer, envoyer, publier, supprimer
 définitivement, formater, désinstaller, réinitialiser, résilier, passer un dépôt en public) exige confirm=true sur
-l'étape, posé seulement sur l'ordre explicite de Julien ou après son oui. Le contrôle porte sur CE QUE LE GESTE
+l'étape, posé seulement sur l'ordre explicite de l'utilisateur ou après son oui. Le contrôle porte sur CE QUE LE GESTE
 DÉCLENCHE, pas sur sa forme, pour ne pas être contourné :
 - clic (simple ou double) sur un élément, par [N], par nom ou en coordonnées : le déclencheur sous le point (bouton,
   lien, élément de menu, ou l'élément lui-même s'il est générique), un texte dans un bouton comptant pour le bouton ;
