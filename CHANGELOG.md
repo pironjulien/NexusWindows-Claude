@@ -6,7 +6,14 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
-## [0.10.0] - 2026-10-19
+## [0.10.1] - 2026-10-19
+
+### Fixed
+- The new client-text tests moved to `tests/test_english.py` (Windows only): in `tests/test_startup.py` they imported
+  the desktop modules, which broke the Linux startup check of the release build, so 0.10.0 never reached PyPI.
+  0.10.1 ships the 0.10.0 changes below.
+
+## [0.10.0] - 2026-10-19 (not on PyPI)
 
 ### Changed
 - Everything an MCP client receives is now in English: tool descriptions, step and parameter descriptions (JSON
