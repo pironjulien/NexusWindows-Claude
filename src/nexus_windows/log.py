@@ -17,6 +17,8 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+from . import indicator
+
 ROOT = Path(os.environ.get("NEXUS_WINDOWS_HOME", Path.home() / ".claude" / "nexus-claude"))
 LOG_DIR = ROOT / "logs"
 IMAGE_DIR = LOG_DIR / "images"
@@ -87,6 +89,7 @@ class Call:
         self.notes: dict[str, Any] = {}
         self.start = time.perf_counter()
         self.error: str | None = None
+        self._busy = False
 
     def step(self, **fields: Any) -> None:
         self.steps.append(_short(fields))
@@ -101,9 +104,13 @@ class Call:
         (IMAGE_DIR / f"{self.id}{'-' + label if label else ''}.png").write_bytes(png)
 
     def __enter__(self) -> Call:
+        self._busy = indicator.begin(self.tool)  # logo « agent au travail » pendant les actions
         return self
 
     def __exit__(self, exc_type, exc, _tb) -> None:
+        if self._busy:
+            self._busy = False
+            indicator.end()
         if exc is not None and self.error is None:
             self.error = f"{exc_type.__name__}: {exc}"
             self.notes["trace"] = "".join(traceback.format_exception(exc_type, exc, _tb, limit=8))[-3000:]

@@ -646,11 +646,71 @@ def openable(candidate: str) -> Path | None:
 
 
 URI = re.compile(r"^([a-z][a-z0-9+.-]+):", re.IGNORECASE)  # deux lettres au moins : « C: » reste un chemin
-# Schémas qui exécutent ou installent quelque chose, ou ouvrent un fichier distant : jamais par launch.
-REFUSED_SCHEMES = {
-    "file", "ms-msdt", "search-ms", "search", "ms-officecmd", "javascript", "vbscript", "ms-appinstaller",
-    "ms-cxh", "ms-cxh-full", "mk", "its", "ms-its", "hcp", "res", "ldap",
+# Garde-fou par CONFIRMATION, pas par blocage (règle de Julien : garde-fous dans les outils ; relectures du 20/10 : un
+# blocage des seuls documents était une façade tant que cmd.exe restait permis). Exécuter ou installer quelque chose
+# — interpréteur, installeur, script, raccourci, lien, schéma d'une autre application — demande confirm=true, donné
+# seulement sur l'ordre explicite de l'utilisateur pour CE lancement. Le reste s'ouvre librement.
+ALLOWED_SCHEMES = {"ms-settings", "mailto", "http", "https", "ms-windows-store"}  # sans confirmation
+RUNNERS = {
+    "cmd.exe", "powershell.exe", "pwsh.exe", "powershell_ise.exe", "wscript.exe", "cscript.exe", "mshta.exe",
+    "msiexec.exe", "wusa.exe", "rundll32.exe", "regsvr32.exe", "regedit.exe", "reg.exe", "py.exe", "pyw.exe",
+    "python.exe", "pythonw.exe", "node.exe", "wsl.exe", "bash.exe", "conhost.exe", "wt.exe", "schtasks.exe",
+    "sc.exe", "bitsadmin.exe", "certutil.exe", "wmic.exe", "msbuild.exe", "installutil.exe", "dfsvc.exe",
+    "appinstaller.exe", "hh.exe", "control.exe", "mmc.exe",
 }  # fmt: skip
+# Exécutables ordinaires sans argument, qui exécutent ce qu'on leur passe (explorer.exe ms-msdt:…, explorer.exe x.lnk).
+RUNNERS_WITH_ARGS = {"explorer.exe"}
+# Extensions qui exécutent, installent ou redirigent même quand leur programme associé n'est pas reconnu.
+RUNNABLE_DOCUMENTS = {
+    ".bat", ".cmd", ".com", ".pif", ".scr", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".hta",
+    ".msi", ".msp", ".msix", ".msixbundle", ".appx", ".appxbundle", ".appinstaller", ".application", ".lnk", ".url",
+    ".website", ".reg", ".cpl", ".inf", ".jar", ".settingcontent-ms", ".library-ms", ".search-ms", ".searchconnector-ms",
+    ".diagcab", ".scf", ".theme", ".themepack", ".deskthemepack", ".xbap", ".gadget", ".msc", ".chm",
+    ".py", ".pyw", ".appref-ms", ".msu", ".xll", ".iqy", ".rdp", ".vhd", ".vhdx", ".iso", ".img",
+}  # fmt: skip
+_shlwapi = ctypes.WinDLL("shlwapi") if hasattr(ctypes, "WinDLL") else None
+ASSOCSTR_EXECUTABLE = 2
+
+
+def associated_program(suffix: str) -> str:
+    """Programme qui ouvre ce type de fichier sur ce poste (AssocQueryString, verbe open), « » si inconnu."""
+    if _shlwapi is None or not suffix:
+        return ""
+    size = ctypes.c_uint32(520)
+    buffer = ctypes.create_unicode_buffer(size.value)
+    if _shlwapi.AssocQueryStringW(0, ASSOCSTR_EXECUTABLE, suffix, "open", buffer, ctypes.byref(size)) != 0:
+        return ""
+    return buffer.value
+
+
+def runner_reason(exe: str, args: str = "") -> str:
+    """Raison de demander confirmation pour ce programme (interpréteur, installeur, hôte de script), « » sinon."""
+    name = Path(exe).name.lower()
+    if name in RUNNERS or (name in RUNNERS_WITH_ARGS and args.strip()):
+        return f"{name} runs commands, scripts or installers"
+    return ""
+
+
+def document_reason(path: Path) -> str:
+    """Raison de demander confirmation pour ouvrir ce document : il s'exécute, installe ou redirige (par son extension
+    ou par le programme associé sur ce poste : .py → pyw.exe, .msu → wusa.exe…), « » sinon."""
+    suffix = path.suffix.lower()
+    if suffix in RUNNABLE_DOCUMENTS:
+        return f"{suffix} files run, install or redirect when opened"
+    program = associated_program(suffix)
+    if program and Path(program).name.lower() in RUNNERS:
+        return f"{suffix} files are opened by {Path(program).name}, which runs them"
+    return ""
+
+
+def _require_confirm(reason: str, what: str, confirm: bool) -> None:
+    if reason and not confirm:
+        raise LaunchError(
+            f'"{what}": {reason}. Needs confirm=true, only on the user\'s explicit order for THIS launch: '
+            "nothing was launched."
+        )
+
+
 SETTINGS_PROCESS = "systemsettings.exe"
 URI_WINDOW_S = 5.0  # attente de la fenêtre d'une adresse ; au-delà, la note renvoie à windows
 SETTINGS_SETTLE_S = 1.6  # Paramètres : fenêtre stable depuis ce délai (le cadre s'affiche 1 à 2 s après la CoreWindow)
@@ -659,7 +719,26 @@ SETTINGS_SETTLE_S = 1.6  # Paramètres : fenêtre stable depuis ce délai (le ca
 def uri_scheme(candidate: str) -> str:
     """Schéma d'une adresse (« ms-settings », « mailto », « https »), « » si ce n'en est pas une."""
     match = URI.match(candidate)
-    return match.group(1).lower() if match and " " not in candidate else ""
+    return match.group(1).lower() if match else ""
+
+
+URI_FRONT_S = 2.5  # adresse prise par une application déjà ouverte : surveillance du premier plan pendant ce délai
+
+
+def _give_back_while(user_front: int, deadline: float) -> bool:
+    """Jusqu'à deadline : toute autre fenêtre qui prend le premier plan de l'utilisateur (sans qu'il change lui-même de
+    fenêtre) le lui rend aussitôt. Vrai si on a dû le rendre."""
+    took_back = False
+    started, tick = time.monotonic(), w.GetTickCount()
+    while user_front and w.IsWindow(user_front) and time.monotonic() < deadline:
+        if foreground.user_input_since(started, tick):
+            break  # l'utilisateur a touché clavier ou souris : la fenêtre au premier plan est peut-être son choix
+        fg = w.root(w.foreground())
+        mine = {w.root(user_front)} | {w.root(o) for o in [w.owner(fg)] if o}  # dialogue d'une fenêtre de l'utilisateur
+        if fg and fg not in mine and not foreground.user_is_switching() and not foreground.system_foreground():
+            took_back = foreground.give_back(user_front, exclude={fg}) or took_back
+        time.sleep(0.05)
+    return took_back
 
 
 def _is_settings(hwnd: int) -> bool:
@@ -699,8 +778,6 @@ def _settings_behind(user_front: int, deadline: float) -> tuple[int, bool]:
 def open_uri(uri: str, scheme: str, wait_s: float, user_front: int, before: set[int]) -> Launched:
     """Adresse ouverte par l'application qui gère son schéma (ms-settings: → page des Paramètres, mailto:…), sans
     activation demandée ; fenêtre retrouvée : la nouvelle, ou celle des Paramètres pour ms-settings (réutilisée)."""
-    if scheme in REFUSED_SCHEMES:
-        raise LaunchError(f'"{scheme}:" addresses are refused (they run, install or fetch something): nothing opened.')
     notes: list[str] = []
     pid = shell_open(uri)
     deadline = time.monotonic() + min(max(1.0, wait_s), URI_WINDOW_S)
@@ -710,6 +787,11 @@ def open_uri(uri: str, scheme: str, wait_s: float, user_front: int, before: set[
         hwnd, took_back = _settings_behind(user_front, deadline)
     elif pid:
         hwnd, took_back = _new_window(before, pid, "", "", deadline, user_front, fallback=False)
+    if not hwnd and scheme != "ms-settings":
+        # Application déjà ouverte qui prend l'adresse (navigateur, messagerie), directement ou par un lanceur court
+        # qui lui délègue : si elle prend le premier plan, il est rendu (relectures : il restait pris, compte rendu
+        # « rendu » faux).
+        took_back = _give_back_while(user_front, time.monotonic() + URI_FRONT_S) or took_back
     if hwnd:
         notes.append(f'opened by "{w.process_name(foreground.app_pid(hwnd))}"')
     else:
@@ -890,9 +972,12 @@ def launch(
     auto: uia.Automation | None = None,
     on_account_kill: Callable[[Path], None] | None = None,
     restart: bool = False,
+    confirm: bool = False,
 ) -> Launched:
     """on_account_kill(profil) : appelé quand la garde de compte ferme le navigateur DevTools lancé (le serveur y
-    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur)."""
+    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur).
+    confirm : ordre explicite de l'utilisateur pour CE lancement d'un programme qui exécute ou installe (voir
+    runner_reason) ; sans lui, refus avant tout lancement."""
     notes: list[str] = []
     user_front = w.foreground()
     before = set(w.enum_windows())
@@ -909,11 +994,15 @@ def launch(
     if document is not None:
         if args.strip() or devtools or restart:
             raise LaunchError("Opening a folder or a document: no args, no devtools, no restart.")
+        if document.is_file():
+            _require_confirm(document_reason(document), document.name, confirm)
         return open_path(document, wait_s, user_front, before)
     scheme = uri_scheme(candidate)
     if scheme and not Path(candidate).exists():
         if args.strip() or devtools or restart:
             raise LaunchError("Opening an address: no args, no devtools, no restart.")
+        if scheme not in ALLOWED_SCHEMES:
+            _require_confirm(f'"{scheme}:" addresses run another program (call, game, document…)', candidate, confirm)
         return open_uri(candidate, scheme, wait_s, user_front, before)
     exe = None
     if Path(os.path.expandvars(candidate)).exists():
@@ -934,6 +1023,7 @@ def launch(
         raise LaunchError("restart=true: Steam only (restart with its switches).")
     if exe is not None:
         policy.check_launch_exe(exe, args, devtools=devtools)
+        _require_confirm(runner_reason(exe, args), Path(exe).name, confirm)
         browser = policy.is_browser_exe(exe)
         if devtools and browser:
             # Jamais le profil réel de Julien derrière un port DevTools : profil neuf, sans compte ni synchronisation.
@@ -971,9 +1061,10 @@ def launch(
         target = _app_id_path(app_id)
         if target and target.lower().endswith(".exe"):
             # Exécutable : politique et identité par processus.
-            return launch(target, args, devtools, wait_s, auto, on_account_kill, restart)
+            return launch(target, args, devtools, wait_s, auto, on_account_kill, restart, confirm)
         if target:
-            policy.check_launch_exe(target, "")  # document ouvert par son association : jamais un script
+            # Raccourci du menu Démarrer vers un document : même règle qu'un document ouvert par son association.
+            _require_confirm(document_reason(Path(target)), title_hint, confirm)
         policy.check_launch_app_id(app_id, title_hint, args, devtools)
         notes.append(f'Start menu: "{title_hint}"')
         if "!" in app_id:

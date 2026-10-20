@@ -32,6 +32,9 @@ def _guard(x: int | None = None, y: int | None = None) -> None:
         raise ForegroundError("Real input outside an allowed borrow: refused.")
     if stop.remaining_s() > 0:
         raise ForegroundError(stop.message())
+    # Appel abandonné (délai dépassé) : plus aucune entrée réelle, même au milieu d'une longue saisie (relecture de
+    # Codex : type_text continuait après l'annulation du worker).
+    worker.check_cancelled()
     if _SINCE is not None and foreground.user_input_since(*_SINCE):
         raise foreground.UserInterrupted(
             "The user used the keyboard or mouse during the real mouse/keyboard input: stopped, nothing else sent; "
@@ -311,24 +314,29 @@ def type_text(text: str) -> None:
         time.sleep(0.002)
 
 
+PANEL_SHORTCUTS = {((), 0x5B), ((0x5B,), ord("A")), ((0x5B,), ord("N"))}  # Démarrer, réglages rapides, notifications
+
+
 def shell_shortcut(combo: keys.Combo) -> None:
-    """Raccourci Windows (touche Windows seule ou avec une lettre) : il va au shell, jamais dans la fenêtre de
-    l'utilisateur ; sert à ouvrir un panneau de Windows dans un lot foreground=true accordé. Arrêt d'urgence respecté."""
-    if 0x5B not in (*combo.modifiers, combo.key) or (combo.modifiers and set(combo.modifiers) != {0x5B}):
-        raise ForegroundError("Only Windows-key shortcuts (win, win+letter) go to the shell.")
+    """Raccourci d'un panneau de Windows (Win, Win+A, Win+N) : il va au shell, jamais dans la fenêtre de l'utilisateur ;
+    sert à ouvrir un panneau dans un lot foreground=true accordé. Aucun autre (Win+L verrouille, Win+R exécute :
+    relecture). Arrêt d'urgence et appel abandonné respectés."""
+    if (tuple(combo.modifiers), combo.key) not in PANEL_SHORTCUTS:
+        raise ForegroundError("Only the Windows-key shortcuts of panels (win, win+a, win+n) go to the shell.")
     if stop.remaining_s() > 0:
         raise ForegroundError(stop.message())
+    worker.check_cancelled()
     downs = [_key(vk) for vk in combo.modifiers] + [_key(combo.key)]
     ups = [_key(combo.key, up=True)] + [_key(vk, up=True) for vk in reversed(combo.modifiers)]
     _send(*downs, *ups)
 
 
-def escape_to(hwnd: int) -> None:
-    """Échap au clavier réel, seulement si `hwnd` (un panneau de Windows ouvert par nous) tient le premier plan :
-    il se referme, rien n'arrive dans une fenêtre de l'utilisateur."""
+def escape_to(windows: set[int]) -> None:
+    """Échap au clavier réel, seulement si une de ces fenêtres (un panneau de Windows ouvert par nous) tient le premier
+    plan : il se referme, rien n'arrive dans une fenêtre de l'utilisateur."""
     if stop.remaining_s() > 0:
         raise ForegroundError(stop.message())
-    if w.root(w.foreground()) != hwnd:
+    if w.root(w.foreground()) not in windows:
         return
     _send(_key(0x1B), _key(0x1B, up=True))
 

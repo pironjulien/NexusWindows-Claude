@@ -737,3 +737,51 @@ def test_guard_judges_alt_tab_on_release(monkeypatch):
     state.update(button=True, over=julien)  # bouton tenu dans SA fenêtre pendant que la cible s'active : vol
     watch._check()
     assert state["gave_back"] == 1
+
+
+# --- Relecture de Codex (20/10) : vrai clavier vers la cible désignée -----------------------------------------
+class FocusAuto(FakeAuto):
+    """Le focus UIA se déplace vraiment : set_focus le donne à l'élément visé, le retire aux autres."""
+
+    def __init__(self, *elements: FakeEl) -> None:
+        super().__init__()
+        self.elements = elements
+
+    def set_focus(self, element: FakeEl) -> None:
+        self.calls.append(("set_focus", element))
+        for other in self.elements:
+            other.live["focused"] = other is element
+
+
+def test_real_keys_go_to_the_named_target(monkeypatch):
+    """WPF, A a le focus, l'étape vise B : act(key ctrl+a, target=B, foreground=true) donnait les touches à A."""
+    old = node("Edit", "Old", has_value=True, focused=True)
+    wanted = node("Edit", "Wanted", has_value=True, focused=False)
+    auto = FocusAuto(old.element, wanted.element)
+    ex = executor(make_view(old, wanted), auto)
+    ex.allow_foreground = True
+    recipients: list[str] = []
+    monkeypatch.setattr(actions.realinput, "borrowed", lambda *a, **k: __import__("contextlib").nullcontext())
+    monkeypatch.setattr(
+        actions.realinput,
+        "press",
+        lambda combo: recipients.append(
+            next(e.live["name"] for e in (old.element, wanted.element) if e.live["focused"])
+        ),
+    )
+    monkeypatch.setattr(ex, "_confirm_keys", lambda *a: None)
+    outcome = ex.press("ctrl+a", target="Wanted")
+    assert recipients == ["Wanted"] and ("set_focus", wanted.element) in auto.calls and outcome.ok
+
+
+def test_real_keys_refused_when_target_keeps_no_focus(monkeypatch):
+    old = node("Edit", "Old", has_value=True, focused=True)
+    wanted = node("Edit", "Wanted", has_value=True, focused=False)
+    auto = FocusAuto(old.element)  # set_focus sans effet sur la cible : elle ne prend pas le focus
+    ex = executor(make_view(old, wanted), auto)
+    ex.allow_foreground = True
+    monkeypatch.setattr(actions.realinput, "borrowed", lambda *a, **k: __import__("contextlib").nullcontext())
+    monkeypatch.setattr(actions.realinput, "press", lambda combo: pytest.fail("key sent to the wrong element"))
+    monkeypatch.setattr(ex, "_confirm_keys", lambda *a: None)
+    with pytest.raises(actions.ActionError, match="did not take the keyboard focus"):
+        ex.press("ctrl+a", target="Wanted")

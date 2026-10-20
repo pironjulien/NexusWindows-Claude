@@ -303,6 +303,13 @@ class UiaActions(ExecutorBase):
         shortcut = any(set(c.modifiers) - {0x10} for c in combos)
 
         def real() -> None:
+            # Cible désignée : le vrai clavier va à l'élément qui a le focus, donc la cible le reçoit d'abord et c'est
+            # relu ; sinon rien n'est envoyé (relecture de Codex : Ctrl+A visait B et sélectionnait A).
+            if element is not None and not self._refresh(element.node.element).get("focused"):
+                foreground.mark_own_input()
+                self.auto.set_focus(element.node.element)
+                if not self._refresh(element.node.element).get("focused"):
+                    raise ActionError(f"{element.describe()} did not take the keyboard focus: no key was sent.")
             for combo in combos:
                 realinput.press(combo)
 

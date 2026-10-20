@@ -115,7 +115,8 @@ def capture_screen() -> Shot:
     hdc, hbitmap, old, bits = _dib(width, height)
     screen = w.GetDC(None)
     try:
-        if not w.BitBlt(hdc, 0, 0, width, height, screen, left, top, w.SRCCOPY | w.CAPTUREBLT):
+        # Sans CAPTUREBLT (fait clignoter le curseur) : la composition du DWM inclut déjà les fenêtres superposées.
+        if not w.BitBlt(hdc, 0, 0, width, height, screen, left, top, w.SRCCOPY):
             raise CaptureError("Screen copy failed (locked session?).")
         image = _to_image(bits, width, height)
     finally:

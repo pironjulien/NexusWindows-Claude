@@ -143,6 +143,13 @@ with the file name. Scripts, shortcuts and installers are refused.
 at 1568 px and 1.15 MP (2000 px and 3.75 MP with `detail="high"`) so that Claude models do not downscale them, which
 keeps coordinates exact. Coordinates are bound to the window: followed if it moves, refused if it was resized.
 
+### Agent at work
+
+While an action runs (`act`, `launch`, `window`; never the reads), a small logo spins on itself in the bottom-right
+corner of the driven window's screen, like a game loading screen, with a breathing blue halo. It goes away 1.6 s after
+the last action. The overlay is always on top, borderless, click-through, never activated, absent from the taskbar
+and excluded from screen captures (the model never sees it in `look`). `NEXUS_WINDOWS_INDICATOR=0` turns it off.
+
 ### Real mouse and keyboard
 
 Only with `act(foreground=true)`, which the user must approve. The window then stays in front for the whole batch;

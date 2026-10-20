@@ -6,6 +6,35 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-20
+
+### Added
+- "Agent at work" indicator: while an action runs (`act`, `launch`, `window`; never the reads), the logo spins in the
+  bottom-right corner of the driven window's screen with a breathing blue halo, and goes away 1.6 s after the last
+  action. Always on top, borderless, click-through, never activated, not in the taskbar, excluded from screen
+  captures. `NEXUS_WINDOWS_INDICATOR=0` turns it off.
+
+### Changed
+- `launch` asks for confirmation instead of a cosmetic block: interpreters and installers (cmd, PowerShell, msiexec,
+  wscript, rundll32, py…), scripts, installers, shortcuts and links (by extension or by the program associated on the
+  PC: `.py` → `pyw.exe`), and address schemes other than `ms-settings`, `mailto`, `http(s)` and `ms-windows-store`
+  need `confirm=true`, given only on the user's explicit order. An address taken by an already open app: foreground
+  given back, stop if the user touches keyboard or mouse.
+
+### Fixed
+- Whole screen (`look(window="screen")`): every window blocked by the policy (password managers, secure desktop),
+  pop-ups included, is blacked out and its title never shown; areas read before and after the capture, captured
+  again if they differ.
+- Panels (Start, quick settings, notification center): closed only if they still hold the foreground (a user who
+  moved on keeps their choice); a panel the user opened is never closed; a late panel is caught and closed.
+  Shortcuts limited to Win, Win+A, Win+N.
+- Real typing stops at once when the call is abandoned (timeout); real keyboard given to the designated target only
+  (focus read back, otherwise no key).
+- A minimized Store app is told apart from an app never shown.
+- Notifications: codes at the end of a sentence, PINs, confirmation codes, Spanish and Italian wording masked; an
+  account balance no longer is; expired notifications dropped before the read limit.
+- Virtualized lists: search bounded in time (2 s). Screen capture without CAPTUREBLT (cursor flicker).
+
 ## [0.14.1] - 2026-10-20
 
 ### Fixed

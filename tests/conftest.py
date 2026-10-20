@@ -71,3 +71,10 @@ def foreground_watches_finished(monkeypatch):
         if watch._thread is not None:
             watch._thread.join(timeout=5)
             assert not watch._thread.is_alive(), "garde du premier plan toujours active après le test"
+
+
+@pytest.fixture(autouse=True)
+def indicator_off(monkeypatch):
+    """Aucun logo « agent au travail » pendant les tests : rien ne s'affiche à l'écran de Julien (test_indicator
+    l'éprouve lui-même, sans fenêtre)."""
+    monkeypatch.setenv("NEXUS_WINDOWS_INDICATOR", "0")

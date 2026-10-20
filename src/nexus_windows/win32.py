@@ -214,7 +214,7 @@ DeleteObject = _fn(gdi32, "DeleteObject", w.BOOL, w.HGDIOBJ)
 GdiFlush = _fn(gdi32, "GdiFlush", w.BOOL)
 BitBlt = _fn(gdi32, "BitBlt", w.BOOL, w.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, w.HDC,
              ctypes.c_int, ctypes.c_int, w.DWORD)  # fmt: skip
-SRCCOPY, CAPTUREBLT = 0x00CC0020, 0x40000000
+SRCCOPY = 0x00CC0020
 
 GetWindowDpiAwarenessContext = _fn(user32, "GetWindowDpiAwarenessContext", ctypes.c_void_p, w.HWND)
 GetAwarenessFromDpiAwarenessContext = _fn(user32, "GetAwarenessFromDpiAwarenessContext", ctypes.c_int, ctypes.c_void_p)

@@ -18,13 +18,16 @@ from pathlib import Path
 
 DATABASE = Path(os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db"))
 _TEXT = re.compile(r"<text\b[^>]*>(.*?)</text>", re.DOTALL)
-# Un code se masque quand le texte parle de code, de vérification ou de connexion : suites de 4 à 8 chiffres
-# (espacées ou non, « 123 456 », « G-123456 »). Les nombres d'un texte ordinaire (années, montants) restent lisibles.
+# Un code se masque quand la notification parle de code, de vérification ou de connexion (pas de « compte » seul :
+# un solde bancaire était masqué, relecture tour 2) : suites de 4 à
+# 12 chiffres (espacées ou non, « 123 456 », « G-123456 »), ponctuation de fin de phrase comprise (« 123456. »,
+# relecture de Codex). Sans ce contexte, les nombres d'un texte ordinaire (années, montants) restent lisibles.
 _CODE_CONTEXT = re.compile(
-    r"code|otp|v[ée]rif|passcode|mot de passe|password|s[ée]curit|security|2fa|connexion|sign.?in|login|authent",
+    r"code|c[óo]digo|codice|otp|v[ée]rif|passcode|mot de passe|password|contrase|s[ée]curit|security|2fa|connexion"
+    r"|sign.?in|log.?in|authent|\bpin\b|confirm|apple id|identifiant|one.?time|is your",
     re.IGNORECASE,
 )
-_CODE = re.compile(r"(?<![\w.,])(?:[A-Z]-)?\d(?:[ -]?\d){3,7}(?![\w.,]|\d)")
+_CODE = re.compile(r"(?<!\w)(?:[A-Z]-)?\d(?:[ -]?\d){3,11}(?!\w)")
 # Code alphanumérique (« K7F2QX », « ab12-cd34 ») : 5 à 12 signes, au moins un chiffre et une lettre (relecture de Codex).
 _ALNUM_CODE = re.compile(
     r"(?<![\w.-])(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[A-Za-z0-9](?:[A-Za-z0-9-]{3,10})[A-Za-z0-9](?![\w-])"
@@ -42,6 +45,11 @@ class Notification:
     app: str
     arrived: dt.datetime
     texts: list[str]
+
+
+def _filetime(moment: dt.datetime) -> int:
+    """Date en FILETIME (centaines de nanosecondes depuis 1601), le format de la base."""
+    return int((moment - FILETIME_EPOCH).total_seconds() * 10_000_000)
 
 
 def mask_codes(text: str, context: str = "") -> str:
@@ -86,10 +94,13 @@ def read(limit: int = 20, app: str | None = None, database: Path = DATABASE) -> 
         raise NotificationsError(f"Notification database unreadable: {error}") from error
     try:
         rows = connection.execute(
-            "SELECT h.PrimaryId, n.ArrivalTime, n.Payload FROM Notification n "
+            "SELECT h.PrimaryId, n.ArrivalTime, n.Payload, n.ExpiryTime FROM Notification n "
             "JOIN NotificationHandler h ON h.RecordId = n.HandlerId "
-            # Lecture bornée avant de charger les contenus (relecture de Codex) : la base garde des centaines de toasts.
-            f"WHERE n.Type = 'toast' ORDER BY n.ArrivalTime DESC LIMIT {MAX_ROWS}"
+            # Lecture bornée avant de charger les contenus (relecture de Codex), expirées écartées AVANT la borne
+            # (tour 2 : 1 000 toasts expirés cachaient une notification encore active).
+            "WHERE n.Type = 'toast' AND (n.ExpiryTime IS NULL OR n.ExpiryTime = 0 OR n.ExpiryTime >= ?) "
+            f"ORDER BY n.ArrivalTime DESC LIMIT {MAX_ROWS}",
+            (_filetime(dt.datetime.now(dt.UTC)),),
         ).fetchall()
     except sqlite3.Error as error:
         raise NotificationsError(f"Notification database unreadable: {error}") from error
@@ -97,7 +108,7 @@ def read(limit: int = 20, app: str | None = None, database: Path = DATABASE) -> 
         connection.close()
     out: list[Notification] = []
     wanted = (app or "").lower()
-    for primary_id, arrival, payload in rows:
+    for primary_id, arrival, payload, _expiry in rows:
         name = app_name(str(primary_id))
         if wanted and wanted not in name.lower() and wanted not in str(primary_id).lower():
             continue

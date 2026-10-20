@@ -40,6 +40,15 @@ def test_scenario(kind):
 
 
 @pytest.mark.live
+def test_windows_shell():
+    """Windows lui-même (0.14) : Paramètres par adresse et liste virtualisée, barre des tâches, écran, notifications,
+    réglages rapides refermés ; premier plan de l'utilisateur rendu à chaque fois."""
+    rows = asyncio.run(drive.drive_windows_shell())
+    failures = [(label, report) for label, ok, report in rows if not ok]
+    assert not failures, failures
+
+
+@pytest.mark.live
 @pytest.mark.parametrize("kind", ["electron", "edge"])
 def test_devtools_remedy(kind):
     """Lancée avec devtools=true, une application Chromium accepte frappes, raccourcis et <select> sans activation."""

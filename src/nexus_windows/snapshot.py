@@ -240,9 +240,15 @@ def is_hidden_store_window(hwnd: int) -> bool:
     return w.process_name(w.window_pid(hwnd)).lower() not in SHELL_PROCESSES
 
 
+def _minimized_frame(hwnd: int) -> bool:
+    """Cadre UWP réduit : Windows détache alors la CoreWindow de l'application et la masque (relevé le 20/10 sur la
+    Calculatrice, relecture d'un agent neuf), exactement comme pour une application jamais affichée."""
+    return w.class_name(hwnd) == UWP_FRAME_CLASS and bool(w.IsIconic(hwnd)) and is_app_window(hwnd)
+
+
 def _empty_frame_of(hwnd: int, hidden_titles: set[str]) -> bool:
     """Cadre UWP sans contenu dont l'application est la CoreWindow masquée de même titre (listée à sa place)."""
-    if w.class_name(hwnd) != UWP_FRAME_CLASS or w.window_text(hwnd) not in hidden_titles:
+    if w.class_name(hwnd) != UWP_FRAME_CLASS or w.window_text(hwnd) not in hidden_titles or w.IsIconic(hwnd):
         return False
     host = w.window_pid(hwnd)
     return not any(w.window_pid(child) != host for child in w.enum_children(hwnd))
@@ -270,6 +276,10 @@ FLYOUTS = {
     "start": ("win", "startmenuexperiencehost.exe", UWP_CORE_CLASS),
     "démarrer": ("win", "startmenuexperiencehost.exe", UWP_CORE_CLASS),
 }
+
+
+# Processus des panneaux (et de la recherche qui tient le premier plan pour Démarrer).
+PANEL_PROCESSES = {process for _, process, _ in FLYOUTS.values()} | {"searchhost.exe"}
 
 
 def flyout_window(process: str, cls: str) -> int:
@@ -303,7 +313,9 @@ def shell_surfaces() -> list[WindowInfo]:
 def app_windows() -> list[WindowInfo]:
     """Fenêtres d'application (ordre Z), applications Store cachées comprises (marquées hidden)."""
     handles = w.enum_windows()
-    hidden = {h for h in handles if is_hidden_store_window(h)}
+    minimized = {w.window_text(h) for h in handles if _minimized_frame(h)}
+    # Application réduite : son cadre est listé [minimized], sa CoreWindow détachée n'est pas une appli « cachée ».
+    hidden = {h for h in handles if is_hidden_store_window(h) and w.window_text(h) not in minimized}
     titles = {w.window_text(h) for h in hidden}
     out: list[WindowInfo] = []
     for h in handles:

@@ -131,6 +131,17 @@ NOT_WEB = {"menu"}
 # Saisies : la page web émet « nom … » ; les applications de bureau n'émettent rien pour ce champ.
 WEB_EXPECT = {"set Nom": lambda e: e == "nom Julien Piron", "type Nom": lambda e: e == "nom Julien Piron 42"}
 READ_BACK = {"set Nom", "type Nom", "set Notes 2 lignes"} | LONG_TEXT  # « relu ✓ » exigé dans le compte rendu
+DESKTOP_VALUE = {"set Nom": "Julien Piron", "type Nom": "Julien Piron 42"}  # valeur du champ relue à part
+
+
+def field_value(hwnd: int, name: str) -> str:
+    """Valeur d'un champ lue par une instance UI Automation à part (oracle indépendant de l'outil)."""
+    uia.com_init()
+    auto = uia.Automation()
+    node = next((n for n in auto.tree(hwnd).walk() if n.control_type == "Edit" and n.name == name), None)
+    return str(auto.refresh(node.element).get("value") or "") if node is not None else "(champ introuvable)"
+
+
 WIN32_ONLY = {"click onglet Avancé"}  # contrôle d'onglets Win32 : l'action MSAA par défaut y ferait un VRAI clic
 BATCH = [
     {"do": "click", "target": "Valider"},
@@ -370,10 +381,19 @@ async def drive(kind: str) -> list[tuple[str, bool, str]]:
                     report += f"   ⇒ {[e[:60] for e in seen[-3:]]}"
                 if label in READ_BACK:
                     ok = ok and "read back ✓" in report
+                if label in DESKTOP_VALUE and kind not in WEB:
+                    # Oracle externe (relecture de Codex) : la valeur du champ relue par une lecture indépendante,
+                    # pas seulement le « read back ✓ » de l'outil.
+                    value = field_value(app.hwnd, "Nom")
+                    ok = ok and value == DESKTOP_VALUE[label]
+                    report += f"   ⇒ champ « {value} »"
                 if label in LONG_TEXT:  # chaque tranche d'activation brève : premier plan de Julien rendu à 0,5 s
                     ok = ok and holds.longest_ms <= methods.SLICE_S * 1000
                     report += f"   [{holds.summary()}]"
                 stolen = w.foreground() != fg0
+                if stolen and fg0:
+                    ok = False  # premier plan de l'utilisateur non rendu à la fin de l'appel : échec, pas un avertissement
+                    report += "   [foreground NOT given back]"
                 rows.append((label, ok, report))
                 shown = report if label in LONG_TEXT else report[:160]
                 print(f"   {'OK ' if ok else 'NON'} {label:18} {ms:5.0f} ms{' FOCUS !' if stolen else ''}  {shown}")
@@ -451,7 +471,8 @@ async def drive_calc() -> list[tuple[str, bool, str]]:
             steps.append({"do": "click", "target": "Est égal à", "expect": "42"})
             result = await client.call_tool("act", {"steps": steps, "then": "elements"})
             text = text_of(result)
-            ok = "est 42" in text and "✗" not in text.split("\n[")[0]
+            # Premier plan de l'utilisateur rendu exigé (relecture de Codex : imprimé, jamais compté).
+            ok = "est 42" in text and "✗" not in text.split("\n[")[0] and w.foreground() == fg0
             rows.append(("calc 12+30=42", ok, text.splitlines()[-1][:120]))
             print(f"   {'OK ' if ok else 'NON'} 12+30=42           focus intact={w.foreground() == fg0}")
             result = await client.call_tool("act", {"steps": [{"do": "key", "keys": "7"}], "then": "none"})
@@ -488,7 +509,7 @@ async def drive_devtools(kind: str) -> list[tuple[str, bool, str]]:
         fg0 = w.foreground()
         result = await client.call_tool("launch", {"app": str(exe), "args": args, "devtools": True, "then": "elements"})
         text = text_of(result)
-        match = re.search(r"Fenêtre (\d+)", text)
+        match = re.search(r"Window (\d+)", text)  # comptes rendus en anglais depuis 0.10.0
         print(f"== {kind} DevTools : {text.splitlines()[0][:120]}")
         if not match:
             return [("lancement DevTools", False, text[:300])]
@@ -521,6 +542,65 @@ async def drive_devtools(kind: str) -> list[tuple[str, bool, str]]:
             rows.append(("premier plan intact", w.foreground() == fg0, ""))
         finally:
             await client.call_tool("window", {"window": hwnd, "action": "close"})
+    return rows
+
+
+async def drive_windows_shell() -> list[tuple[str, bool, str]]:
+    """Windows lui-même (0.14) : page des Paramètres ouverte par adresse puis pilotée (liste virtualisée), barre des
+    tâches, écran entier, notifications, réglages rapides au premier plan puis refermés. Chaque effet relu à part :
+    premier plan de l'utilisateur rendu, panneau refermé, page atteinte."""
+    apps.require_julien_away()
+    rows: list[tuple[str, bool, str]] = []
+    # Paramètres déjà ouverts par l'utilisateur : jamais fermés par le banc (relecture de Codex, tour 2).
+    settings_before = {
+        h for h in w.enum_windows() if w.process_name(w.window_pid(h)).lower() in ("systemsettings.exe",)
+    } | {h for h in w.enum_windows() if w.window_text(h) in ("Paramètres", "Settings")}
+    async with Client(server_params(), read_timeout_seconds=120) as client:
+        fg0 = w.foreground()
+        result = await client.call_tool("launch", {"app": "ms-settings:about", "then": "elements"})
+        text = text_of(result)
+        match = re.search(r"Window (\d+)", text)
+        settings = int(match.group(1)) if match else 0
+        rows.append(("ms-settings ouvert", bool(settings) and "SystemSettings" in text, text.splitlines()[0][:120]))
+        rows.append(("ms-settings : premier plan rendu", w.foreground() == fg0, ""))
+        try:
+            if settings:
+                # « Activation » est en bas de la liste Système, hors de l'arbre tant qu'on n'a pas défilé.
+                steps = [
+                    {"do": "click", "target": "Système"},
+                    {"do": "wait", "text": "Son", "timeout": 6},
+                    {"do": "click", "target": "Activation"},
+                    {"do": "wait", "text": "Windows 11", "timeout": 6},
+                ]
+                result = await client.call_tool("act", {"window": settings, "steps": steps, "then": "none"})
+                report = text_of(result)
+                # Oracle : l'attente de la page Activation (étape 4) relue ✓, et le nom trouvé dans la longue liste.
+                reached = re.search(r"^4\. ✓", report, re.MULTILINE) is not None
+                rows.append(
+                    ("liste virtualisée", reached and "long list" in report and "✗" not in report, report[:200])
+                )
+                rows.append(("Paramètres : premier plan intact", w.foreground() == fg0, ""))
+        finally:
+            if settings and settings not in settings_before:
+                await client.call_tool("window", {"window": settings, "action": "close"})
+        result = await client.call_tool("look", {"window": "taskbar", "show": "elements"})
+        rows.append(("barre des tâches", "Button" in text_of(result), text_of(result).splitlines()[0][:100]))
+        result = await client.call_tool("look", {"window": "screen"})
+        rows.append(("écran entier", image_of(result) is not None and "Whole screen" in text_of(result), ""))
+        result = await client.call_tool("notifications", {"limit": 3})
+        rows.append(("notifications", not result.is_error, text_of(result).splitlines()[0][:100]))
+        steps = [{"do": "wait", "text": "Bluetooth", "timeout": 3}]
+        result = await client.call_tool(
+            "act", {"window": "quick settings", "foreground": True, "steps": steps, "then": "elements"}
+        )
+        time.sleep(0.4)
+        panel_open = bool(snapshot.flyout_window(*snapshot.FLYOUTS["quick settings"][1:]))
+        quick = text_of(result)
+        read = re.search(r"^1\. ✓", quick, re.MULTILINE) is not None and "Wi-Fi" in quick  # l'étape elle-même ✓
+        rows.append(("réglages rapides lus", read, quick.splitlines()[0][:100]))
+        rows.append(("réglages rapides refermés, premier plan rendu", not panel_open and w.foreground() == fg0, ""))
+    for label, good, report in rows:
+        print(f"   {'OK ' if good else 'NON'} {label:45} {report[:120]}")
     return rows
 
 

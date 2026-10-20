@@ -276,7 +276,10 @@ Question de Julien : « on est SOTA pour nexus windows ? ». Concurrent le plus 
 `cua-driver-rs` 0.36.0, mode « background delivery », release GitHub officielle, somme SHA-256 vérifiée, télémétrie
 coupée, installé hors OneDrive sous `~\.claude\nexus-claude\lab\cua`). Banc `bench/cua_vs_nexus.py` : les deux par leur
 vrai serveur MCP (stdio), même fenêtre du labo, mêmes tâches, Julien absent (0 entrée physique), fenêtre recouverte par
-une fenêtre opaque non activée. Cua piloté comme son guide le demande à un agent : `run_steps` par rôle et nom, mode
+une fenêtre opaque non activée — **portée corrigée le 20/10 (relecture de Codex)** : le relevé JSON montre 11 tâches
+sur 48 (5 WinForms, 3 WPF, 3 Electron) où la cible n'était PAS recouverte au moment de l'action ; le banc enregistre
+l'occultation sans l'exiger et ne la vérifie qu'au centre de la fenêtre. Les comptes ci-dessous valent donc pour « en
+arrière-plan, le plus souvent recouverte », pas « toujours recouverte ». Cua piloté comme son guide le demande à un agent : `run_steps` par rôle et nom, mode
 d'arrière-plan d'abord ; capture d'abord avant un point ; `invoke_menu` puis clics ; « foreground_fallback » seulement
 après son refus. Effet jugé par l'application (événement émis ou valeur relue), jamais par le compte rendu.
 Résultats : `results/2026-10-20_0224-cua-vs-nexus.json` (nexus 0.13.0, après les relectures de Codex et
@@ -362,3 +365,22 @@ de 200 lignes perd son [N], un [N] retiré n'est jamais redonné (compteur par f
 Conclusion mesurée : nexus-windows reste devant sur ce qui compte (effet prouvé 39/48 contre 26/48, 0 faux succès
 contre 3, premier plan pris 1 fois contre 8, curseur jamais touché, actions réussies 4,5 fois plus rapides) ; la lecture
 des seuls changements, seul vrai gain de Cua, est reprise, et l'OCR en secours couvre les fenêtres sans arbre UIA.
+
+## Neuvième passage — « tout Windows » (0.14, 20 octobre)
+Relevés réels sur le poste de Julien (Windows 11 26H2), sans concurrent en face : aucun des outils étudiés (Cua Driver,
+Windows-MCP, UFO²) ne pilote les Paramètres, la barre des tâches ou les panneaux du shell sans passer au premier plan.
+
+| Mesure | Résultat |
+|---|---|
+| Application figée (fenêtre Tk qui dort 120 s) | PrintWindow bloqué > 8 s (avant) ; WM_NULL borné répond en < 1 ms et la capture passe par WGC (après) |
+| Paramètres ouverts par `ms-settings:about` | page lue (27 éléments) ; Windows active le cadre ~1 s après la CoreWindow masquée : premier plan rendu, fenêtre glissée sous celle de l'utilisateur |
+| Paramètres lancés sans activation | CoreWindow masquée lue et pilotée (Système → Son en 0,6 s) |
+| Liste virtualisée (« Activation », bas de la liste Système) | trouvée, créée et cliquée en 0,62 s |
+| Notifications (base SQLite, `mode=ro`) | 20 toasts lus en 6 ms (copie), codes masqués |
+| Réglages rapides / centre de notifications / Démarrer (`foreground=true`) | ouverts, lus (25 / 99 / 63 éléments), refermés, premier plan rendu (centre de notifications : par Échap) |
+| Démarrer | contenu dans StartMenuExperienceHost, invisible à EnumWindows (413 fenêtres par FindWindowEx contre 355) |
+
+Limites relevées : un clic UIA Invoke sur la ligne « Avancé » des Paramètres en arrière-plan fige SystemSettings
+(page atteinte par `ms-settings:developers` sans souci) ; une application Store réduite détache et masque sa
+CoreWindow comme une application jamais affichée (distinguée par son cadre réduit depuis la relecture). Rejouable :
+`pytest -m live tests/test_live.py::test_windows_shell` (Julien absent).

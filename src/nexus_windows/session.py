@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import cdp, log, snapshot, uia
+from . import cdp, indicator, log, snapshot, uia
 from . import win32 as w
 
 # Sonde d'une page DevTools : une page saine répond en quelques millisecondes ; au-delà, elle est occupée.
@@ -89,6 +89,11 @@ class Session:
 
     # --- Fenêtres -----------------------------------------------------------------------------------------------
     def resolve_window(self, spec: int | str | None) -> int:
+        hwnd = self._resolve_window(spec)
+        indicator.target(hwnd)  # l'indicateur « agent au travail » s'affiche sur l'écran de cette fenêtre
+        return hwnd
+
+    def _resolve_window(self, spec: int | str | None) -> int:
         if spec is None or spec == "":
             if self.target and w.IsWindow(self.target):
                 return self.target

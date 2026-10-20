@@ -53,6 +53,7 @@ CHECK_ROLES = {"CheckBox", "RadioButton", "ListItem", "TreeItem", "MenuItem", "B
 EXPAND_ROLES = {"ComboBox", "TreeItem", "MenuItem", "SplitButton", "Group", "DataItem", "Button"}
 SCROLL_ROLES = {"List", "Tree", "Document", "Pane", "DataGrid", "Table", "Group"}
 LIST_ROLES = {"List", "Tree", "DataGrid", "Table"}  # listes qui peuvent être virtualisées (ItemContainer)
+REALIZE_BUDGET_S = 2.0  # recherche d'un nom dans les listes virtualisées d'une fenêtre
 LEAF_ROLES = {
     "Button", "CheckBox", "RadioButton", "Hyperlink", "MenuItem", "TabItem", "ListItem", "TreeItem", "DataItem",
     "SplitButton", "ComboBox", "HeaderItem",
@@ -560,7 +561,12 @@ class ExecutorBase:
         root = self.view.roots.get(self.hwnd)
         name = snapshot.norm(snapshot._split_role(spec)[1]).strip("«»\"' ")
         containers = [n for n in root.walk() if n.control_type in LIST_ROLES] if root is not None and name else []
+        # Borné en temps, pas en nombre (tour 2 : la bonne liste pouvait être la 9e) : un nom vraiment absent ne
+        # parcourt pas indéfiniment l'Explorateur.
+        budget = time.monotonic() + REALIZE_BUDGET_S
         for node in containers:
+            if time.monotonic() > budget:
+                break
             worker.check_cancelled()
             if not self.auto.realize_named(node.element, name):
                 continue
