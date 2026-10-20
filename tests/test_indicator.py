@@ -110,3 +110,16 @@ def test_frames_render_logo_and_halo():
 
 def test_logo_asset_shipped():
     assert indicator.LOGO.is_file()
+
+
+def test_imports_off_windows():
+    """Démarrage hors Windows (conteneur Linux des annuaires) : ni WINFUNCTYPE ni WinDLL, le module se charge quand même."""
+    import subprocess
+    import sys
+
+    code = (
+        "import ctypes, os; del ctypes.WINFUNCTYPE; del ctypes.WinDLL; os.name = 'posix'; "
+        "from nexus_windows import indicator; assert not indicator.enabled()"
+    )
+    run = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr

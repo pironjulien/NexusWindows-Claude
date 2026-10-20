@@ -6,6 +6,29 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-10-20
+
+### Fixed
+- The "agent at work" indicator module also loads outside Windows (no `ctypes.WINFUNCTYPE` there): 0.15.0 failed the
+  Linux startup check of the PyPI release, so 0.15.0 and 0.15.1 never reached PyPI. Test added.
+
+## [0.15.1] - 2026-10-20
+
+### Changed
+- `launch` is free again, as the shared policy says (consoles, interpreters and scripts allowed): the 0.15.0 list of
+  programs and documents "to confirm" was cosmetic (npx, winget, java, Store apps with arguments went through). Only
+  addresses that call or write to someone (`tel:`, `sms:`, `callto:`, `skype:`, `msteams:`…) need `confirm=true`.
+
+### Fixed
+- Address taken by an already open app: a dialog of one of the user's windows (owner chain) is no longer sent behind.
+- Panels: a panel the user opens while we wait for their pause is read again just before the shortcut (the shortcut
+  would have closed it); for a late panel, only the requested panel is closed, never another one the user opened; a
+  short-lived toast (same process and class, ~100 px) is no longer taken for the notification center.
+- Keys sent as messages follow the same rule as the real keyboard: the designated target must have the focus, read
+  back; real typing by click reads the field's focus back before Ctrl+A and Delete.
+- Virtualized lists: an ordinary list (without ItemContainer) no longer stops the search.
+- Notifications: access codes ("access", "do not share"…) masked.
+
 ## [0.15.0] - 2026-10-20
 
 ### Added

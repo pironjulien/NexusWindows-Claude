@@ -156,7 +156,8 @@ if os.name == "nt":
         _shcore = None
 
 LRESULT = ctypes.c_ssize_t
-WNDPROC = ctypes.WINFUNCTYPE(LRESULT, w.HWND, w.UINT, w.WPARAM, w.LPARAM)
+# Hors Windows (conteneur Linux des annuaires), le module se charge sans rien dessiner : enabled() est faux.
+WNDPROC = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)(LRESULT, w.HWND, w.UINT, w.WPARAM, w.LPARAM)
 
 
 class _WNDCLASSEXW(ctypes.Structure):

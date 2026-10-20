@@ -282,14 +282,24 @@ FLYOUTS = {
 PANEL_PROCESSES = {process for _, process, _ in FLYOUTS.values()} | {"searchhost.exe"}
 
 
+PANEL_MIN_HEIGHT = 400  # panneaux ouverts : toute la hauteur (≥ 1 000 px relevés) ; une notification éphémère : ~100 px
+
+
 def flyout_window(process: str, cls: str) -> int:
-    """Fenêtre ouverte d'un panneau de Windows (affichée, non masquée), bandes du shell comprises ; 0 sinon."""
+    """Fenêtre ouverte d'un panneau de Windows (affichée, non masquée), bandes du shell comprises ; 0 sinon. Une
+    notification éphémère (« Nouvelle notification », même processus et même classe que le centre de notifications :
+    relecture tour 3) n'est jamais prise pour le panneau : trop basse."""
     for hwnd in w.all_top_windows():
         if w.class_name(hwnd) != cls or not w.IsWindowVisible(hwnd) or w.is_cloaked(hwnd):
             continue
-        if w.process_name(w.window_pid(hwnd)).lower() == process:
+        if w.process_name(w.window_pid(hwnd)).lower() == process and w.frame_rect(hwnd).height >= PANEL_MIN_HEIGHT:
             return hwnd
     return 0
+
+
+def panel_processes(process: str) -> set[str]:
+    """Processus des fenêtres d'UN panneau : le sien, plus la recherche qui tient le premier plan pour Démarrer."""
+    return {process, "searchhost.exe"} if process == "startmenuexperiencehost.exe" else {process}
 
 
 def surface_window(name: str) -> int:

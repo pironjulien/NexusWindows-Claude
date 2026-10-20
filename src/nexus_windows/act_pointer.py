@@ -163,6 +163,14 @@ class PointerActions(ExecutorBase):
     def _real_write(self, e: snapshot.Element, text: str, replace: bool) -> None:
         realinput.click(*self._point_of(e))
         time.sleep(0.05)
+        # Le clic a-t-il donné le focus à CE champ ? (Tour 3 : un élément déplacé ou une surgissante, et Ctrl+A puis
+        # Suppr vidaient un autre champ.) Champ qui publie son focus et ne l'a pas : rien n'est tapé.
+        try:
+            focused = self._refresh(e.node.element).get("focused") if e.node is not None else None
+        except EXPECTED:
+            focused = None
+        if focused is False:
+            raise ActionError(f"{e.describe()} did not take the focus after the click: nothing was typed.")
         if replace:
             realinput.press(keys.parse("ctrl+a"))
             realinput.press(keys.parse("delete"))

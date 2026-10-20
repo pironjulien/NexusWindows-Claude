@@ -24,7 +24,8 @@ _TEXT = re.compile(r"<text\b[^>]*>(.*?)</text>", re.DOTALL)
 # relecture de Codex). Sans ce contexte, les nombres d'un texte ordinaire (années, montants) restent lisibles.
 _CODE_CONTEXT = re.compile(
     r"code|c[óo]digo|codice|otp|v[ée]rif|passcode|mot de passe|password|contrase|s[ée]curit|security|2fa|connexion"
-    r"|sign.?in|log.?in|authent|\bpin\b|confirm|apple id|identifiant|one.?time|is your",
+    r"|sign.?in|log.?in|authent|\bpin\b|confirm|apple id|identifiant|one.?time|is your|acc[eè]s|access|do not share"
+    r"|ne (?:le )?partagez",
     re.IGNORECASE,
 )
 _CODE = re.compile(r"(?<!\w)(?:[A-Z]-)?\d(?:[ -]?\d){3,11}(?!\w)")

@@ -457,11 +457,12 @@ SCREEN_NAMES = {"screen", "écran", "ecran"}
 FLYOUT_OPEN_S = 3.0  # Démarrer, première ouverture : plus de 2 s relevées
 
 
-def _panel_front() -> int:
-    """Fenêtre au premier plan si elle appartient à un panneau du shell (Démarrer, recherche, réglages rapides,
-    centre de notifications), 0 sinon."""
+def _panel_front(processes: set[str] | None = None) -> int:
+    """Fenêtre au premier plan si elle appartient à un panneau du shell (ceux de `processes`, tous par défaut), 0
+    sinon."""
     fg = w.root(w.foreground())
-    return fg if fg and w.process_name(w.window_pid(fg)).lower() in snapshot.PANEL_PROCESSES else 0
+    wanted = processes if processes is not None else snapshot.PANEL_PROCESSES
+    return fg if fg and w.process_name(w.window_pid(fg)).lower() in wanted else 0
 
 
 FLYOUT_LATE_S = 1.0  # après le délai d'ouverture, un panneau tardif est encore guetté puis refermé
@@ -480,14 +481,20 @@ def _open_flyout(name: str, flyout: tuple[str, str, str], allowed: bool) -> tupl
             "steps=[…]) with the user's consent; it closes when the foreground is given back. Without disturbing the "
             'user: notifications tool, launch("ms-settings:…") for settings, launch(app) instead of Start.'
         )
+    own = snapshot.panel_processes(process)  # seules les fenêtres de CE panneau lui appartiennent (tour 3)
     hwnd = snapshot.flyout_window(process, cls)
     if hwnd:
-        return hwnd, {hwnd} | ({_panel_front()} - {0}), 0, False  # ouvert par l'utilisateur : il reste à lui
+        return hwnd, {hwnd} | ({_panel_front(own)} - {0}), 0, False  # ouvert par l'utilisateur : il reste à lui
     with foreground.agent_token("Windows panel opened"):
         if not foreground.wait_typing_pause():
             raise foreground.BusyUser("The user is using the mouse or keyboard: panel not opened, nothing was done.")
         worker.check_cancelled()
-        user_front = w.foreground()  # après la pause : la fenêtre que l'utilisateur a vraiment devant lui (tour 2)
+        # Après la pause, tout est relu (tour 3) : le panneau a pu être ouvert par l'utilisateur pendant l'attente (le
+        # raccourci le refermerait), et la fenêtre devant lui est celle d'avant le lot.
+        hwnd = snapshot.flyout_window(process, cls)
+        if hwnd:
+            return hwnd, {hwnd} | ({_panel_front(own)} - {0}), 0, False
+        user_front = w.foreground()
         with foreground.suspended():
             realinput.shell_shortcut(keys.parse(combo))
             deadline = time.monotonic() + FLYOUT_OPEN_S
@@ -495,17 +502,17 @@ def _open_flyout(name: str, flyout: tuple[str, str, str], allowed: bool) -> tupl
                 time.sleep(0.05)
             if not hwnd:
                 # Raccourci parti, panneau pas vu à temps : il peut encore s'ouvrir ; guetté un moment, il est refermé
-                # dès qu'il apparaît (relectures : sinon il restait devant l'utilisateur et recevait ses frappes).
+                # dès qu'il apparaît — CE panneau seulement, jamais un autre que l'utilisateur ouvrirait (tour 3).
                 late = time.monotonic() + FLYOUT_LATE_S
                 while time.monotonic() < late:
-                    opened = snapshot.flyout_window(process, cls) or _panel_front()
+                    opened = snapshot.flyout_window(process, cls)
                     if opened:
-                        _close_flyout(user_front, {opened} | ({_panel_front()} - {0}))
+                        _close_flyout(user_front, {opened} | ({_panel_front(own)} - {0}))
                         break
                     time.sleep(0.05)
                 raise WindowError(f'"{name}" did not open within {FLYOUT_OPEN_S:.0f} s (shortcut {combo}): closed.')
             foreground.adopt_foreground()
-    return hwnd, {hwnd} | ({_panel_front()} - {0}), user_front, True
+    return hwnd, {hwnd} | ({_panel_front(own)} - {0}), user_front, True
 
 
 def _close_flyout(user_front: int, panel: set[int]) -> None:
@@ -1160,8 +1167,8 @@ async def launch(
     verified (displayed folder read back, or title carrying the file name).
     app = ADDRESS: ms-settings: opens that Settings page behind the user's window (Windows flashes it ~1 s;
     foreground given back); mailto:, http(s):, ms-windows-store: by the app of their scheme.
-    confirm=true, only on the user's explicit order for THIS launch: anything that runs or installs (cmd, PowerShell,
-    msiexec…, scripts, installers, shortcuts, links, other address schemes such as tel: or steam:); refused otherwise.
+    confirm=true, only on the user's explicit order for THIS launch: addresses that call or message someone (tel:,
+    sms:, callto:, skype:, msteams:…); refused otherwise.
     devtools=true (Chromium/Electron/Edge only, application not already open): opens a local DevTools port for more
     reliable clicks, typing and shortcuts. The window becomes the current window.
     Steam: always launched readable even when covered; devtools=true opens its DevTools port (127.0.0.1:8080, its own

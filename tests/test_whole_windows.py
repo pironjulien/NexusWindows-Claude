@@ -25,17 +25,9 @@ def test_uri_scheme():
     assert launcher.uri_scheme("cmd /c start x:y") == ""
 
 
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "file:///C:/x.exe", "ms-msdt:/id", "search-ms:query=x", "ms-appinstaller:?source=x",
-        # Relecture d'un agent neuf : passaient la liste noire
-        "steam://run/730", "ms-word:ofe|u|https://example.com/x.docx", "shell:startup", "tel:+33600000000",
-        "callto:alice",
-    ],
-)  # fmt: skip
-def test_other_addresses_need_confirmation(monkeypatch, uri):
-    """Garde-fou par confirmation, pas par blocage : sans confirm=true, rien n'est ouvert."""
+@pytest.mark.parametrize("uri", ["tel:+33600000000", "callto:alice", "sms:+33600000000", "msteams:/l/call/0/0"])
+def test_outward_addresses_need_confirmation(monkeypatch, uri):
+    """Seul ce qui appelle ou écrit à quelqu'un demande confirm=true (geste sortant), comme partout dans l'outil."""
     monkeypatch.setattr(launcher, "shell_open", lambda target: pytest.fail("opened"))
     with pytest.raises(launcher.LaunchError, match="Needs confirm=true"):
         launcher.launch(uri)
@@ -47,35 +39,20 @@ def test_confirmed_address_is_opened(monkeypatch):
     assert launcher.launch("tel:+33600000000", confirm=True) == "ok" and opened == ["tel:+33600000000"]
 
 
-@pytest.mark.parametrize(
-    "name", ["run.bat", "page.hta", "setup.msi", "go.url", "app.lnk", "x.ps1", "t.reg", "s.py", "s.pyw", "u.msu"]
-)
-def test_runnable_documents_need_confirmation(monkeypatch, tmp_path, name):
-    doc = tmp_path / name
-    doc.write_text("[InternetShortcut]\nURL=ms-msdt:/id\n", encoding="utf-8")
-    monkeypatch.setattr(launcher, "open_path", lambda *a, **k: pytest.fail("opened"))
-    with pytest.raises(launcher.LaunchError, match="Needs confirm=true"):
-        launcher.launch(str(doc))
+@pytest.mark.parametrize("uri", ["steam://run/730", "ms-settings:about", "https://example.com", "shell:startup"])
+def test_launch_is_free_otherwise(monkeypatch, uri):
+    """Tour 3 (agent neuf) : lancer est libre (politique commune du 18/10 : consoles, interpréteurs, scripts libres) ;
+    une liste « à confirmer » était une façade contournable."""
+    opened: list[str] = []
+    monkeypatch.setattr(launcher, "open_uri", lambda uri, scheme, *a: opened.append(uri) or "ok")
+    assert launcher.launch(uri) == "ok" and opened == [uri]
+
+
+def test_scripts_and_installers_open_freely(monkeypatch, tmp_path):
+    doc = tmp_path / "run.bat"
+    doc.write_text("echo ok\n", encoding="utf-8")
     monkeypatch.setattr(launcher, "open_path", lambda *a, **k: "opened")
-    assert launcher.launch(str(doc), confirm=True) == "opened"  # sur l'ordre explicite de l'utilisateur
-
-
-def test_runner_by_association(monkeypatch):
-    """Tour 2 : le programme associé décide aussi (.xyz ouvert par pyw.exe s'exécute)."""
-    monkeypatch.setattr(launcher, "associated_program", lambda suffix: r"C:\WINDOWS\pyw.exe")
-    assert "runs them" in launcher.document_reason(__import__("pathlib").Path("x.xyz"))
-    monkeypatch.setattr(launcher, "associated_program", lambda suffix: r"C:\Program Files\App\viewer.exe")
-    assert launcher.document_reason(__import__("pathlib").Path("x.pdf")) == ""
-
-
-def test_runners_need_confirmation():
-    assert launcher.runner_reason(r"C:\Windows\System32\cmd.exe", "/c x.bat")
-    assert launcher.runner_reason("powershell.exe")
-    assert launcher.runner_reason(
-        "explorer.exe", "ms-msdt:/id"
-    )  # explorer avec argument : il exécute ce qu'on lui passe
-    assert not launcher.runner_reason("explorer.exe")
-    assert not launcher.runner_reason("notepad.exe", "notes.txt")
+    assert launcher.launch(str(doc)) == "opened"
 
 
 def test_mask_codes():
@@ -314,7 +291,7 @@ def test_panel_already_open_is_left_to_the_user(monkeypatch):
     from nexus_windows import server
 
     monkeypatch.setattr(snapshot, "flyout_window", lambda process, cls: 20)
-    monkeypatch.setattr(server, "_panel_front", lambda: 20)
+    monkeypatch.setattr(server, "_panel_front", lambda processes=None: 20)
     hwnd, panel, user_front, opened = server._open_flyout("start", snapshot.FLYOUTS["start"], True)
     assert (hwnd, opened) == (20, False)
 
@@ -355,3 +332,60 @@ def test_screen_overview_blacks_out_protected_windows(monkeypatch):
     assert "Bitwarden — coffre" not in text and "protected window" in text
     shot = Image.open(__import__("io").BytesIO(image.data))
     assert shot.getpixel((30, 30)) == (0, 0, 0) and shot.getpixel((150, 80)) == (255, 255, 255)
+
+
+def test_dialog_of_user_window_not_taken_back(monkeypatch):
+    """Tour 3 (Codex) : boîte de dialogue 20 possédée par la fenêtre 10 de l'utilisateur : elle reste devant."""
+    from nexus_windows import foreground
+
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "foreground", lambda: 20)
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "owner", lambda h: {20: 10}.get(h, 0))
+    monkeypatch.setattr(foreground, "user_input_since", lambda *a: False)
+    monkeypatch.setattr(foreground, "user_is_switching", lambda: False)
+    monkeypatch.setattr(foreground, "system_foreground", lambda: "")
+    monkeypatch.setattr(foreground, "give_back", lambda *a, **k: pytest.fail("dialog taken back"))
+    import time as clock
+
+    assert launcher._give_back_while(10, clock.monotonic() + 0.2) is False
+
+
+def test_notification_toast_is_not_the_panel(monkeypatch):
+    """Tour 3 (agent neuf) : la notification éphémère (même processus, même classe) n'est pas le centre."""
+    monkeypatch.setattr(w, "all_top_windows", lambda: [1, 2])
+    monkeypatch.setattr(w, "class_name", lambda h: snapshot.UWP_CORE_CLASS)
+    monkeypatch.setattr(w, "IsWindowVisible", lambda h: True)
+    monkeypatch.setattr(w, "is_cloaked", lambda h: False)
+    monkeypatch.setattr(w, "window_pid", lambda h: h)
+    monkeypatch.setattr(w, "process_name", lambda pid: "ShellExperienceHost.exe")
+    monkeypatch.setattr(w, "frame_rect", lambda h: w.Rect(0, 0, 400, 110 if h == 1 else 1380))
+    assert snapshot.flyout_window("shellexperiencehost.exe", snapshot.UWP_CORE_CLASS) == 2
+
+
+def test_panel_opened_by_user_during_pause_is_not_toggled(monkeypatch):
+    """Tour 3 (Codex) : Démarrer ouvert par l'utilisateur pendant l'attente de sa pause : le raccourci ne part pas."""
+    from nexus_windows import foreground, server
+
+    seen = iter([0, 20])
+    monkeypatch.setattr(snapshot, "flyout_window", lambda process, cls: next(seen))
+    monkeypatch.setattr(foreground, "wait_typing_pause", lambda: True)
+    monkeypatch.setattr(server, "_panel_front", lambda processes=None: 20)
+    monkeypatch.setattr(realinput, "shell_shortcut", lambda combo: pytest.fail("shortcut sent"))
+    hwnd, _, _, opened = server._open_flyout("start", snapshot.FLYOUTS["start"], True)
+    assert (hwnd, opened) == (20, False)
+
+
+def test_realize_skips_ordinary_lists():
+    """Tour 3 (Codex) : une liste sans ItemContainer ne coupe plus la recherche."""
+    from nexus_windows import uia
+
+    auto = uia.Automation.__new__(uia.Automation)
+    auto.pattern = lambda element, name: (_ for _ in ()).throw(uia.UIAError("Pattern item_container not supported"))
+    assert auto.realize_named(object(), "Activation") is False
+
+
+def test_access_codes_masked():
+    assert "482913" not in notifications.mask_codes(
+        "Use 482913 to access your Microsoft account. Do not share this number."
+    )

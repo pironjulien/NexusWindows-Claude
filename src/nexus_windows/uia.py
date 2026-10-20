@@ -332,7 +332,7 @@ class Automation:
         (VirtualizedItem.Realize) puis amené à l'écran. Faux si la liste ne le contient pas."""
         try:
             found = self.pattern(container, "item_container").FindItemByProperty(None, U.UIA_NamePropertyId, name)
-        except comtypes.COMError:
+        except UIAError, comtypes.COMError:  # liste ordinaire sans ItemContainer : la suivante est consultée (tour 3)
             return False
         if not found:
             return False

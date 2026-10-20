@@ -354,6 +354,10 @@ class UiaActions(ExecutorBase):
             if element is not None and (fw == "Chromium" or not self._refresh(element.node.element).get("focused")):
                 foreground.mark_own_input()
                 self.auto.set_focus(element.node.element)
+                # Même invariant que le vrai clavier (tour 3, Codex) : les messages vont à la fenêtre qui a le focus ;
+                # cible désignée sans focus relu → rien n'est envoyé, jamais Suppr dans un autre champ.
+                if fw != "Chromium" and not self._refresh(element.node.element).get("focused"):
+                    raise ActionError(f"{element.describe()} did not take the keyboard focus: no key was sent.")
             if fw == "Chromium":
                 if element is None:
                     self._focus_web_content()
