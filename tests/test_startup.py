@@ -14,7 +14,7 @@ from mcp.client.stdio import stdio_client
 
 from nexus_windows import __version__
 
-TOOLS = {"windows", "look", "act", "launch", "window", "logs"}
+TOOLS = {"windows", "look", "act", "launch", "window", "notifications", "logs"}
 
 
 def test_initialize_and_list_tools(tmp_path):

@@ -160,6 +160,8 @@ class WindowInfo:
     maximized: bool
     foreground: bool
     framework: str
+    hidden: bool = False  # application Store jamais affichée par Windows (lancée sans activation), pilotable quand même
+    surface: str = ""  # surface de Windows (« taskbar », « desktop »…) plutôt qu'une application
 
     def label(self) -> str:
         return f'"{clip(self.title, 80)}" ({self.process}, {self.framework})'
@@ -216,8 +218,102 @@ def is_app_window(hwnd: int) -> bool:
     return w.IsIconic(hwnd) or (rect.width > 1 and rect.height > 1)
 
 
+UWP_CORE_CLASS = "Windows.UI.Core.CoreWindow"
+UWP_FRAME_CLASS = "ApplicationFrameWindow"
+# Processus du shell dont les CoreWindow masquées sont des panneaux de Windows (Démarrer, notifications, clavier
+# tactile…), jamais des applications : ils ne sont listés que comme surfaces, ouverts.
+SHELL_PROCESSES = {
+    "textinputhost.exe", "searchhost.exe", "shellexperiencehost.exe", "startmenuexperiencehost.exe", "shellhost.exe",
+    "lockapp.exe", "explorer.exe", "tabtip.exe", "widgets.exe", "screenclippinghost.exe",
+}  # fmt: skip
+
+
+def is_hidden_store_window(hwnd: int) -> bool:
+    """Application Store lancée sans activation : Windows ne l'affiche jamais (cadre et CoreWindow masqués par le
+    shell), mais sa CoreWindow de premier niveau se lit et se pilote en arrière-plan (relevé le 20/10 sur Paramètres :
+    contenu complet, navigation de page en page, Julien ne voit rien)."""
+    if w.class_name(hwnd) != UWP_CORE_CLASS or not w.IsWindowVisible(hwnd) or not w.is_cloaked(hwnd):
+        return False
+    title = w.window_text(hwnd)
+    if not title or title == "DesktopWindowXamlSource":
+        return False
+    return w.process_name(w.window_pid(hwnd)).lower() not in SHELL_PROCESSES
+
+
+def _empty_frame_of(hwnd: int, hidden_titles: set[str]) -> bool:
+    """Cadre UWP sans contenu dont l'application est la CoreWindow masquée de même titre (listée à sa place)."""
+    if w.class_name(hwnd) != UWP_FRAME_CLASS or w.window_text(hwnd) not in hidden_titles:
+        return False
+    host = w.window_pid(hwnd)
+    return not any(w.window_pid(child) != host for child in w.enum_children(hwnd))
+
+
+# Surfaces de Windows lui-même, nommées (français et anglais) : barre des tâches et bureau, toujours là.
+SURFACES = {
+    "taskbar": ("Shell_TrayWnd", "Taskbar"),
+    "barre des tâches": ("Shell_TrayWnd", "Taskbar"),
+    "desktop": ("Progman", "Desktop"),
+    "bureau": ("Progman", "Desktop"),
+}
+
+
+# Panneaux de Windows qui ne vivent qu'au premier plan (refermés dès qu'on rend la main) : raccourci qui les ouvre,
+# processus et classe de leur fenêtre (relevés le 20/10, Windows 11 26H2).
+FLYOUTS = {
+    "quick settings": ("win+a", "shellhost.exe", "ControlCenterWindow"),
+    "réglages rapides": ("win+a", "shellhost.exe", "ControlCenterWindow"),
+    "notifications": ("win+n", "shellexperiencehost.exe", UWP_CORE_CLASS),
+    "notification center": ("win+n", "shellexperiencehost.exe", UWP_CORE_CLASS),
+    "centre de notifications": ("win+n", "shellexperiencehost.exe", UWP_CORE_CLASS),
+    # Démarrer : contenu (épinglés, recommandations) dans StartMenuExperienceHost ; la recherche, au premier plan,
+    # est une autre fenêtre (SearchHost) qui n'en montre que la zone de saisie.
+    "start": ("win", "startmenuexperiencehost.exe", UWP_CORE_CLASS),
+    "démarrer": ("win", "startmenuexperiencehost.exe", UWP_CORE_CLASS),
+}
+
+
+def flyout_window(process: str, cls: str) -> int:
+    """Fenêtre ouverte d'un panneau de Windows (affichée, non masquée), bandes du shell comprises ; 0 sinon."""
+    for hwnd in w.all_top_windows():
+        if w.class_name(hwnd) != cls or not w.IsWindowVisible(hwnd) or w.is_cloaked(hwnd):
+            continue
+        if w.process_name(w.window_pid(hwnd)).lower() == process:
+            return hwnd
+    return 0
+
+
+def surface_window(name: str) -> int:
+    """Fenêtre d'une surface nommée de Windows (« taskbar », « desktop »…), 0 si inconnue ou absente."""
+    entry = SURFACES.get(name.strip().lower())
+    return int(w.FindWindowW(entry[0], None) or 0) if entry else 0
+
+
+def shell_surfaces() -> list[WindowInfo]:
+    """Barre des tâches et bureau, nommés (surface)."""
+    out: list[WindowInfo] = []
+    for cls, label in dict(SURFACES.values()).items():
+        hwnd = int(w.FindWindowW(cls, None) or 0)
+        if hwnd:
+            info = window_info(hwnd)
+            info.surface = label
+            out.append(info)
+    return out
+
+
 def app_windows() -> list[WindowInfo]:
-    return [window_info(h) for h in w.enum_windows() if is_app_window(h)]
+    """Fenêtres d'application (ordre Z), applications Store cachées comprises (marquées hidden)."""
+    handles = w.enum_windows()
+    hidden = {h for h in handles if is_hidden_store_window(h)}
+    titles = {w.window_text(h) for h in hidden}
+    out: list[WindowInfo] = []
+    for h in handles:
+        if h in hidden:
+            info = window_info(h)
+            info.hidden = True
+            out.append(info)
+        elif is_app_window(h) and not (titles and _empty_frame_of(h, titles)):
+            out.append(window_info(h))
+    return out
 
 
 SHELL_CLASSES = {
@@ -450,6 +546,12 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     roots: dict[int, uia.Node] = {}
     popups = set(windows[1:])
     chromium = info.framework == "Chromium"
+    if w.IsWindow(hwnd) and not w.responsive(hwnd):
+        notes.append(
+            "Application not responding (frozen or suspended): image from the screen composition, list may be empty"
+        )
+        windows = [hwnd]  # ni lecture des surgissantes ni rafraîchissement web : chaque appel attendrait son délai
+        chromium = False
     if chromium:
         flush_web(auto, hwnd)  # documents de la lecture précédente ; oubliés s'ils ont disparu
     for win in windows:

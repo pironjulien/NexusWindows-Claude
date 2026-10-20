@@ -130,6 +130,8 @@ _hdesk_default: int | None = None  # bureau interactif « Default », ouvert une
 EnumWindows = _fn(user32, "EnumWindows", w.BOOL, WNDENUMPROC, w.LPARAM)
 EnumChildWindows = _fn(user32, "EnumChildWindows", w.BOOL, w.HWND, WNDENUMPROC, w.LPARAM)
 IsWindow = _fn(user32, "IsWindow", w.BOOL, w.HWND)
+FindWindowW = _fn(user32, "FindWindowW", w.HWND, w.LPCWSTR, w.LPCWSTR)
+FindWindowExW = _fn(user32, "FindWindowExW", w.HWND, w.HWND, w.HWND, w.LPCWSTR, w.LPCWSTR)
 IsWindowVisible = _fn(user32, "IsWindowVisible", w.BOOL, w.HWND)
 IsWindowEnabled = _fn(user32, "IsWindowEnabled", w.BOOL, w.HWND)
 IsIconic = _fn(user32, "IsIconic", w.BOOL, w.HWND)
@@ -210,6 +212,9 @@ CreateDIBSection = _fn(
 SelectObject = _fn(gdi32, "SelectObject", w.HGDIOBJ, w.HDC, w.HGDIOBJ)
 DeleteObject = _fn(gdi32, "DeleteObject", w.BOOL, w.HGDIOBJ)
 GdiFlush = _fn(gdi32, "GdiFlush", w.BOOL)
+BitBlt = _fn(gdi32, "BitBlt", w.BOOL, w.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, w.HDC,
+             ctypes.c_int, ctypes.c_int, w.DWORD)  # fmt: skip
+SRCCOPY, CAPTUREBLT = 0x00CC0020, 0x40000000
 
 GetWindowDpiAwarenessContext = _fn(user32, "GetWindowDpiAwarenessContext", ctypes.c_void_p, w.HWND)
 GetAwarenessFromDpiAwarenessContext = _fn(user32, "GetAwarenessFromDpiAwarenessContext", ctypes.c_int, ctypes.c_void_p)
@@ -536,6 +541,17 @@ def enum_windows() -> list[int]:
     return out
 
 
+def all_top_windows() -> list[int]:
+    """Toutes les fenêtres de premier niveau, panneaux du shell compris : EnumWindows saute les bandes immersives
+    (menu Démarrer de StartMenuExperienceHost, relevé le 20/10 : 413 fenêtres par FindWindowEx contre 355)."""
+    ensure_default_desktop()
+    out: list[int] = []
+    hwnd = 0
+    while hwnd := handle(FindWindowExW(None, hwnd or None, None, None)):
+        out.append(hwnd)
+    return out
+
+
 def enum_children(hwnd: int) -> list[int]:
     out: list[int] = []
 
@@ -577,6 +593,12 @@ def send_message(hwnd: int, msg: int, wparam: int = 0, lparam: int = 0, timeout_
     if not ok:
         return None
     return result.value
+
+
+def responsive(hwnd: int, timeout_ms: int = 300) -> bool:
+    """La fenêtre traite-t-elle ses messages ? (WM_NULL borné.) Avant tout appel Windows sans délai qui attend
+    l'application (PrintWindow) : sur une application figée il bloquerait sans fin (mesuré : > 8 s, figée 2 min)."""
+    return send_message(hwnd, WM_NULL, 0, 0, timeout_ms) is not None
 
 
 def get_text_message(hwnd: int, timeout_ms: int = 1000) -> str | None:

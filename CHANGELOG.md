@@ -6,6 +6,31 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-20
+
+### Added
+- Store apps launched in the background (Settings, Calculator…) that Windows never shows are listed by `windows` as
+  `[hidden]` and read and driven through their hidden CoreWindow: the whole Settings app, page after page, with
+  nothing on screen. An empty UWP frame found at launch is replaced by that CoreWindow.
+- `launch` opens addresses: `ms-settings:<page>` (that Settings page; foreground given back at once, window slid
+  under the user's), `mailto:`, `https:`… Schemes that run, install or fetch something are refused (`file:`,
+  `ms-msdt:`, `search-ms:`, `ms-appinstaller:`…).
+- Windows itself: `window="taskbar"` (buttons, tray, clock) and `window="desktop"`, listed by `windows`;
+  `look(window="screen")` shows the whole screen as the user sees it, with each window's place (overview only).
+- `notifications` tool: Windows notifications read from their database (read-only), nothing opened on screen;
+  security codes masked when the notification talks about a code or a sign-in (title included).
+- Panels that only exist in the foreground: `act(window="quick settings" | "notifications" | "start",
+  foreground=true)` opens them by their shortcut, keeps them open until the final render, then gives the foreground
+  back (Escape when a panel refuses to give it up). Start is read in StartMenuExperienceHost, which `EnumWindows`
+  does not list (immersive band).
+- Virtualized lists (Settings, long lists): an exact name missing from the tree is found through ItemContainer,
+  realized and scrolled into view.
+
+### Fixed
+- A frozen application no longer blocks the server: PrintWindow waits forever on a hung window (measured: more than
+  8 s, then 180 s on a frozen Settings). Capture first checks that the window answers (bounded WM_NULL) and falls back
+  to the screen-composition capture; `look` reports it.
+
 ## [0.13.4] - 2026-10-20
 
 ### Fixed

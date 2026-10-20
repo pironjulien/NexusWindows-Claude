@@ -9,6 +9,7 @@ Réglages clés :
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -82,6 +83,8 @@ PATTERNS = {
     "text": (U.UIA_TextPatternId, U.IUIAutomationTextPattern),
     "legacy": (U.UIA_LegacyIAccessiblePatternId, U.IUIAutomationLegacyIAccessiblePattern),
     "window": (U.UIA_WindowPatternId, U.IUIAutomationWindowPattern),
+    "item_container": (U.UIA_ItemContainerPatternId, U.IUIAutomationItemContainerPattern),
+    "virtualized_item": (U.UIA_VirtualizedItemPatternId, U.IUIAutomationVirtualizedItemPattern),
 }
 
 
@@ -323,6 +326,21 @@ class Automation:
 
     def scroll_into_view(self, element) -> None:
         self.pattern(element, "scroll_item").ScrollIntoView()
+
+    def realize_named(self, container, name: str) -> bool:
+        """Élément de ce nom exact dans une liste virtualisée (ItemContainer) : créé s'il ne l'était pas encore
+        (VirtualizedItem.Realize) puis amené à l'écran. Faux si la liste ne le contient pas."""
+        try:
+            found = self.pattern(container, "item_container").FindItemByProperty(None, U.UIA_NamePropertyId, name)
+        except comtypes.COMError:
+            return False
+        if not found:
+            return False
+        with contextlib.suppress(UIAError, comtypes.COMError):
+            self.pattern(found, "virtualized_item").Realize()
+        with contextlib.suppress(UIAError, comtypes.COMError):
+            self.scroll_into_view(found)
+        return True
 
     def scroll(self, element, horizontal: int, vertical: int) -> None:
         """horizontal/vertical : ScrollAmount (0 grand recul, 1 petit recul, 2 rien, 3 grande avance, 4 petite avance)."""

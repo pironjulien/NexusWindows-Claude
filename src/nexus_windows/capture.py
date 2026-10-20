@@ -81,6 +81,10 @@ def capture_printwindow(hwnd: int) -> Shot:
     frame = w.frame_rect(hwnd)
     if win.empty:
         raise CaptureError("Window has zero size.")
+    if not w.responsive(hwnd):
+        # PrintWindow attend que l'application se dessine : figée, il bloquerait le worker sans fin. Capture WGC
+        # (composition du DWM, sans message à l'application) en secours dans snapshot.capture_view.
+        raise CaptureError("Window not responding: PrintWindow would block.")
     scale = w.window_dpi_scale(hwnd)
     width, height = win.width, win.height
     if scale != 1.0:
@@ -98,6 +102,26 @@ def capture_printwindow(hwnd: int) -> Shot:
     image = image.crop((crop.left - win.left, crop.top - win.top, crop.right - win.left, crop.bottom - win.top))
     method = "printwindow" if scale == 1.0 else f"printwindow ×{scale:.2f} (application not DPI-aware)"
     return Shot(image, (crop.left, crop.top), method, (time.perf_counter() - start) * 1000)
+
+
+def capture_screen() -> Shot:
+    """Écran entier tel que l'utilisateur le voit (tous les moniteurs, bureau virtuel), copie de l'écran sans message à
+    aucune application : vue d'ensemble, jamais une cible d'action."""
+    start = time.perf_counter()
+    left, top = w.GetSystemMetrics(w.SM_XVIRTUALSCREEN), w.GetSystemMetrics(w.SM_YVIRTUALSCREEN)
+    width, height = w.GetSystemMetrics(w.SM_CXVIRTUALSCREEN), w.GetSystemMetrics(w.SM_CYVIRTUALSCREEN)
+    if width <= 0 or height <= 0:
+        raise CaptureError("Screen size unreadable.")
+    hdc, hbitmap, old, bits = _dib(width, height)
+    screen = w.GetDC(None)
+    try:
+        if not w.BitBlt(hdc, 0, 0, width, height, screen, left, top, w.SRCCOPY | w.CAPTUREBLT):
+            raise CaptureError("Screen copy failed (locked session?).")
+        image = _to_image(bits, width, height)
+    finally:
+        w.ReleaseDC(None, screen)
+        _free(hdc, hbitmap, old)
+    return Shot(image, (left, top), "screen", (time.perf_counter() - start) * 1000)
 
 
 # Fin du fil de capture une fois l'arrêt demandé par le rappel : quelques millisecondes mesurées ; au-delà, il est

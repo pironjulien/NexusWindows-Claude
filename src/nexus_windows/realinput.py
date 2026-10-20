@@ -187,7 +187,9 @@ def _held(hwnd: int, windows: set[int] | None):
     hold = Hold(hwnd, allowed, previous, w.cursor_pos())
     _LAST_MOVE = None
     with foreground.suspended():
-        if not bring_to_front(hwnd):
+        # Déjà devant par une de ses fenêtres (panneau de Windows ouvert par son raccourci : la recherche de Démarrer
+        # tient le premier plan pour lui) : rien à activer.
+        if w.root(w.foreground()) not in allowed and not bring_to_front(hwnd):
             raise ForegroundError(f"Windows refuses to bring the window to the front ({_holder()}): nothing was done.")
         foreground.adopt_foreground()
     _HOLD = hold
@@ -307,6 +309,28 @@ def type_text(text: str) -> None:
         ]:
             _send(_key(0, scan=unit, unicode=True), _key(0, up=True, scan=unit, unicode=True))
         time.sleep(0.002)
+
+
+def shell_shortcut(combo: keys.Combo) -> None:
+    """Raccourci Windows (touche Windows seule ou avec une lettre) : il va au shell, jamais dans la fenêtre de
+    l'utilisateur ; sert à ouvrir un panneau de Windows dans un lot foreground=true accordé. Arrêt d'urgence respecté."""
+    if 0x5B not in (*combo.modifiers, combo.key) or (combo.modifiers and set(combo.modifiers) != {0x5B}):
+        raise ForegroundError("Only Windows-key shortcuts (win, win+letter) go to the shell.")
+    if stop.remaining_s() > 0:
+        raise ForegroundError(stop.message())
+    downs = [_key(vk) for vk in combo.modifiers] + [_key(combo.key)]
+    ups = [_key(combo.key, up=True)] + [_key(vk, up=True) for vk in reversed(combo.modifiers)]
+    _send(*downs, *ups)
+
+
+def escape_to(hwnd: int) -> None:
+    """Échap au clavier réel, seulement si `hwnd` (un panneau de Windows ouvert par nous) tient le premier plan :
+    il se referme, rien n'arrive dans une fenêtre de l'utilisateur."""
+    if stop.remaining_s() > 0:
+        raise ForegroundError(stop.message())
+    if w.root(w.foreground()) != hwnd:
+        return
+    _send(_key(0x1B), _key(0x1B, up=True))
 
 
 def press(combo: keys.Combo) -> None:

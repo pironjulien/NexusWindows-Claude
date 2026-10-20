@@ -100,6 +100,10 @@ class Session:
             self.target = hwnd
             return hwnd
         text = str(spec).strip().lower()
+        surface = snapshot.surface_window(text)
+        if surface:
+            self.target = surface
+            return surface
         candidates = snapshot.app_windows()
         exact = [c for c in candidates if c.title.lower() == text]
         by_process = [c for c in candidates if c.process.lower() in (text, text + ".exe")]

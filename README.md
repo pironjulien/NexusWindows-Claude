@@ -49,11 +49,12 @@ only falls back to the real mouse or keyboard when the user explicitly allows it
 
 | Tool | Purpose |
 |---|---|
-| `windows(filter)` | Application windows, front to back: hwnd, title, process, UI family, size |
-| `look(window, show, query, region, detail, marks)` | Numbered `[N]` elements (role, name, value, state, position) plus an image, without bringing the window forward |
-| `act(steps, window, then, foreground, remember, routine, params)` | Several steps in one call, each read back, then the updated state |
-| `launch(app, args, devtools, restart)` | Start an application (Start menu name, Store app, executable), a folder or a document without giving it focus; the opening is verified |
+| `windows(filter)` | Application windows, front to back: hwnd, title, process, UI family, size; `[hidden]` Store apps launched in the background (never shown, still drivable); then the taskbar and the desktop |
+| `look(window, show, query, region, detail, marks)` | Numbered `[N]` elements (role, name, value, state, position) plus an image, without bringing the window forward; also `window="taskbar"`, `"desktop"`, and `"screen"` (the whole screen with each window's place) |
+| `act(steps, window, then, foreground, remember, routine, params)` | Several steps in one call, each read back, then the updated state; Windows panels `"quick settings"`, `"notifications"`, `"start"` with `foreground=true` |
+| `launch(app, args, devtools, restart)` | Start an application (Start menu name, Store app, executable), a folder, a document or an address (`ms-settings:<page>`, `mailto:`, `https:`) without giving it focus; the opening is verified |
 | `window(action, ...)` | Restore behind, minimize, maximize, close, move, resize |
+| `notifications(limit, app)` | Windows notifications read from their database (read-only), nothing opened on screen; security codes masked |
 | `logs(count, errors_only)` | Debug log: techniques tried, durations, errors, server state |
 
 Step actions: `click`, `double_click`, `right_click`, `type`, `set`, `clear`, `key`, `select`, `check`, `uncheck`,
@@ -416,7 +417,9 @@ requests of its own (DevTools connections stay on `127.0.0.1`).
 - **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
   only when a tool is called. Password managers and the secure desktop are never inspected
   (`look`) nor driven (`act`); `windows` still lists their window titles, like the taskbar does. The OCR fallback
-  uses the Windows built-in engine on the PC; no image leaves it for OCR.
+  uses the Windows built-in engine on the PC; no image leaves it for OCR. `look(window="screen")` reads the whole
+  screen as you see it, every visible window included. The `notifications` tool reads the Windows notification
+  database read-only (app, time, texts; never modified), masking security codes.
 - **Where it goes**: tool results are returned to Claude Desktop or Claude Code, which send them to Anthropic under
   Anthropic's own privacy policy; this server sends nothing anywhere else.
 - **What it stores**, under `%USERPROFILE%\.claude\nexus-claude\` (or `NEXUS_WINDOWS_HOME`): a JSONL debug log kept

@@ -247,7 +247,7 @@ def _new_window(
         ):
             took_back = foreground.give_back(user_front, exclude={fg}) or took_back
         for hwnd in w.enum_windows():
-            if hwnd in before or not snapshot.is_app_window(hwnd):
+            if hwnd in before or not (snapshot.is_app_window(hwnd) or snapshot.is_hidden_store_window(hwnd)):
                 continue
             if _related(hwnd, pids, hint, stem, strict):
                 return hwnd, took_back
@@ -551,6 +551,12 @@ def uwp_unshown(hwnd: int) -> bool:
     )
 
 
+def hidden_core_of(frame: int) -> int:
+    """CoreWindow masquée de même titre que ce cadre UWP vide (l'application elle-même), 0 sinon."""
+    title = w.window_text(frame)
+    return next((h for h in w.enum_windows() if snapshot.is_hidden_store_window(h) and w.window_text(h) == title), 0)
+
+
 def _holds_front(hwnd: int) -> bool:
     """La fenêtre lancée (ou une de ses fenêtres) tient-elle le premier plan ? Par fenêtre seulement."""
     fg = w.foreground()
@@ -639,7 +645,87 @@ def openable(candidate: str) -> Path | None:
     return path.resolve()
 
 
-def shell_open(path: Path) -> int:
+URI = re.compile(r"^([a-z][a-z0-9+.-]+):", re.IGNORECASE)  # deux lettres au moins : « C: » reste un chemin
+# Schémas qui exécutent ou installent quelque chose, ou ouvrent un fichier distant : jamais par launch.
+REFUSED_SCHEMES = {
+    "file", "ms-msdt", "search-ms", "search", "ms-officecmd", "javascript", "vbscript", "ms-appinstaller",
+    "ms-cxh", "ms-cxh-full", "mk", "its", "ms-its", "hcp", "res", "ldap",
+}  # fmt: skip
+SETTINGS_PROCESS = "systemsettings.exe"
+URI_WINDOW_S = 5.0  # attente de la fenêtre d'une adresse ; au-delà, la note renvoie à windows
+SETTINGS_SETTLE_S = 1.6  # Paramètres : fenêtre stable depuis ce délai (le cadre s'affiche 1 à 2 s après la CoreWindow)
+
+
+def uri_scheme(candidate: str) -> str:
+    """Schéma d'une adresse (« ms-settings », « mailto », « https »), « » si ce n'en est pas une."""
+    match = URI.match(candidate)
+    return match.group(1).lower() if match and " " not in candidate else ""
+
+
+def _is_settings(hwnd: int) -> bool:
+    """Fenêtre des Paramètres : leur CoreWindow, ou le cadre UWP qui la contient."""
+    return SETTINGS_PROCESS in {w.process_name(p).lower() for p in packages.app_pids(hwnd)}
+
+
+def _settings_window() -> int:
+    """Fenêtre des Paramètres : le cadre affiché d'abord, sinon la CoreWindow masquée (ouverture sans activation)."""
+    handles = w.enum_windows()
+    shown = next((h for h in handles if snapshot.is_app_window(h) and _is_settings(h)), 0)
+    return shown or next((h for h in handles if snapshot.is_hidden_store_window(h) and _is_settings(h)), 0)
+
+
+def _settings_behind(user_front: int, deadline: float) -> tuple[int, bool]:
+    """Ouverture d'une page des Paramètres : Windows les active et les montre (relevé le 20/10 : cadre au premier plan
+    1 à 2 s après une CoreWindow masquée). Tant qu'ils se posent : premier plan rendu à l'utilisateur dès qu'ils le
+    prennent, fenêtre glissée juste sous la sienne. Rend (fenêtre, premier plan repris)."""
+    took_back = False
+    found_at = 0.0
+    hwnd = 0
+    while time.monotonic() < deadline:
+        fg = w.foreground()
+        if user_front and fg and fg != user_front and _is_settings(w.root(fg)) and not foreground.user_is_switching():
+            took_back = foreground.give_back(user_front, exclude={w.root(fg)}) or took_back
+        current = _settings_window()
+        if current and current != hwnd:
+            hwnd, found_at = current, time.monotonic()  # le cadre affiché remplace la CoreWindow masquée
+        if hwnd and time.monotonic() - found_at >= SETTINGS_SETTLE_S:
+            break
+        time.sleep(0.05)
+    if hwnd and user_front and w.IsWindow(user_front) and not w.is_cloaked(hwnd):
+        w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+    return hwnd, took_back
+
+
+def open_uri(uri: str, scheme: str, wait_s: float, user_front: int, before: set[int]) -> Launched:
+    """Adresse ouverte par l'application qui gère son schéma (ms-settings: → page des Paramètres, mailto:…), sans
+    activation demandée ; fenêtre retrouvée : la nouvelle, ou celle des Paramètres pour ms-settings (réutilisée)."""
+    if scheme in REFUSED_SCHEMES:
+        raise LaunchError(f'"{scheme}:" addresses are refused (they run, install or fetch something): nothing opened.')
+    notes: list[str] = []
+    pid = shell_open(uri)
+    deadline = time.monotonic() + min(max(1.0, wait_s), URI_WINDOW_S)
+    took_back = False
+    hwnd = 0
+    if scheme == "ms-settings":
+        hwnd, took_back = _settings_behind(user_front, deadline)
+    elif pid:
+        hwnd, took_back = _new_window(before, pid, "", "", deadline, user_front, fallback=False)
+    if hwnd:
+        notes.append(f'opened by "{w.process_name(foreground.app_pid(hwnd))}"')
+    else:
+        notes.append("opened; no window found (the app may run in the background or reuse a window: windows)")
+    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
+    if hwnd and not returned:
+        took_back = foreground.give_back(user_front, exclude=foreground.target_windows(hwnd)) or took_back
+        returned = not _holds_front(hwnd)
+    if took_back:
+        notes.append("the app came to the front: foreground given back to the user at once")
+    log.event("open", {"via": "address", "scheme": scheme, "found": bool(hwnd)})
+    app_pid = foreground.app_pid(hwnd) if hwnd else pid
+    return Launched(hwnd, app_pid, 0, "address", notes, None, user_front, returned)
+
+
+def shell_open(path: Path | str) -> int:
     """ShellExecuteEx « open » sans activation demandée ; pid du processus qui l'ouvre (0 : application déjà ouverte
     qui l'a pris en charge, ou Explorateur)."""
     info = SHELLEXECUTEINFOW()
@@ -824,6 +910,11 @@ def launch(
         if args.strip() or devtools or restart:
             raise LaunchError("Opening a folder or a document: no args, no devtools, no restart.")
         return open_path(document, wait_s, user_front, before)
+    scheme = uri_scheme(candidate)
+    if scheme and not Path(candidate).exists():
+        if args.strip() or devtools or restart:
+            raise LaunchError("Opening an address: no args, no devtools, no restart.")
+        return open_uri(candidate, scheme, wait_s, user_front, before)
     exe = None
     if Path(os.path.expandvars(candidate)).exists():
         exe = os.path.expandvars(candidate)
@@ -907,6 +998,9 @@ def launch(
         before, pid, title_hint, stem, time.monotonic() + max(1.0, wait_s), user_front,
         fallback=not (devtools or browser), running=running,
     )  # fmt: skip
+    if hwnd and uwp_unshown(hwnd):
+        # Cadre vide : l'application est sa CoreWindow masquée de même titre, lisible et pilotable telle quelle.
+        hwnd = hidden_core_of(hwnd) or hwnd
     pids = descendants(pid) if pid else set()
     if devtools and (not hwnd or w.window_pid(hwnd) not in pids):
         kill_tree(pid)

@@ -589,7 +589,7 @@ def test_invalid_devtools_list_is_a_cdp_error(devtools):
 
 def test_devtools_dead_code_removed():
     assert not hasattr(cdp.Page, "screenshot_png") and not hasattr(cdp.Page, "viewport")
-    assert not hasattr(capture, "capture_screen") and not hasattr(capture, "fit")
+    assert not hasattr(capture, "fit")  # capture_screen revenue en 0.14.0 : look(window="screen")
 
 
 # --- must_fix 19 : fin de capture WGC sans fuite --------------------------------------------------------------------

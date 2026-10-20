@@ -52,6 +52,7 @@ CHOICE_ROLES = {
 CHECK_ROLES = {"CheckBox", "RadioButton", "ListItem", "TreeItem", "MenuItem", "Button"}
 EXPAND_ROLES = {"ComboBox", "TreeItem", "MenuItem", "SplitButton", "Group", "DataItem", "Button"}
 SCROLL_ROLES = {"List", "Tree", "Document", "Pane", "DataGrid", "Table", "Group"}
+LIST_ROLES = {"List", "Tree", "DataGrid", "Table"}  # listes qui peuvent être virtualisées (ItemContainer)
 LEAF_ROLES = {
     "Button", "CheckBox", "RadioButton", "Hyperlink", "MenuItem", "TabItem", "ListItem", "TreeItem", "DataItem",
     "SplitButton", "ComboBox", "HeaderItem",
@@ -533,7 +534,7 @@ class ExecutorBase:
         except snapshot.AmbiguousTarget as error:
             raise ActionError(f"{error} (out of view)") from None
         except snapshot.TargetError:
-            raise ActionError(str(missing)) from None
+            return self._realize_named(spec, prefer, missing)
         if partial:  # seulement un nom exact : jamais faire défiler la page vers un homonyme approximatif
             raise ActionError(str(missing))
         rid = uia.runtime_id(element.props)
@@ -549,6 +550,30 @@ class ExecutorBase:
                 if rid and uia.runtime_id(other.props) == rid:
                     return other, f"{self._shown_id(other).describe()} out of view: brought on screen (ScrollIntoView)"
         raise ActionError(f"{element.describe()} brought on screen but still out of view: run look again.")
+
+    def _realize_named(
+        self, spec: str, prefer: set[str] | None, missing: snapshot.TargetError
+    ) -> tuple[snapshot.Element, str]:
+        """Nom absent de l'arbre : liste virtualisée (Paramètres, Explorateur, grandes listes) qui ne crée que ses
+        éléments visibles. Chaque liste de la fenêtre cherche ce nom exact (ItemContainer), le crée et l'amène à l'écran
+        comme un défilement de l'utilisateur ; il est ensuite relu dans un instantané frais."""
+        root = self.view.roots.get(self.hwnd)
+        name = snapshot.norm(snapshot._split_role(spec)[1]).strip("«»\"' ")
+        containers = [n for n in root.walk() if n.control_type in LIST_ROLES] if root is not None and name else []
+        for node in containers:
+            worker.check_cancelled()
+            if not self.auto.realize_named(node.element, name):
+                continue
+            for _ in range(10):
+                time.sleep(0.05)
+                try:
+                    element, _ = snapshot.pick(self._rebuild(), spec, prefer)
+                except snapshot.AmbiguousTarget as error:
+                    raise ActionError(f"{error} (brought into view from a long list)") from None
+                except snapshot.TargetError:
+                    continue
+                return element, f"{element.describe()} out of view in a long list: brought on screen"
+        raise ActionError(str(missing)) from None
 
     def _web_documents(self) -> list[uia.Node]:
         """Documents web de premier niveau de la fenêtre principale (cadres internes exclus)."""
