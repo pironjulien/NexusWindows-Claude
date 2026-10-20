@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import comtypes
@@ -335,14 +335,25 @@ class ChromiumActions(ExecutorBase):
         window = e.window if e is not None and e.window in self.windows else self.hwnd
         return w.root(window) or self.hwnd
 
-    def _sim_activation(
-        self, e: snapshot.Element | None = None
-    ) -> contextlib.AbstractContextManager[methods.SimulatedActivation]:
-        return methods.simulated_activation(self._sim_top(e), self.windows)
+    @contextlib.contextmanager
+    def _sim_activation(self, e: snapshot.Element | None = None) -> Iterator[methods.SimulatedActivation]:
+        with methods.simulated_activation(self._sim_top(e), self.windows) as sim:
+            previous, self._sim_current = self._sim_current, sim
+            try:
+                yield sim
+            finally:
+                self._sim_current = previous
 
     def _take_focus(self, e: snapshot.Element, timeout_s: float = 0.5) -> None:
         """Focus DOM de l'élément sans activer la fenêtre (accSelect), RELU : sans focus prouvé, rien n'est tapé (les
-        caractères iraient à l'élément qui avait le focus avant)."""
+        caractères iraient à l'élément qui avait le focus avant). Première fois pour ce processus, en activation
+        simulée : activation renvoyée et focus repris si son droit de premier plan de lancement a servi
+        (SimulatedActivation.settle_first)."""
+        self._take_focus_once(e, timeout_s)
+        if self._sim_current is not None and self._sim_current.settle_first():
+            self._take_focus_once(e, timeout_s)
+
+    def _take_focus_once(self, e: snapshot.Element, timeout_s: float) -> None:
         try:
             self.auto.take_focus(e.node.element)
         except EXPECTED as error:

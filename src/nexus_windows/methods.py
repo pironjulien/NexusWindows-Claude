@@ -441,16 +441,44 @@ SIM_SLICE_S = 0.5  # = SLICE_S
 SIM_MODIFIERS_HOLD_S = 0.5  # Ctrl/Alt simulés tenus le temps que Chromium traite la touche (occulté : lent)
 SIM_SETTLE_S = 0.03  # après la désactivation postée : traitée avant toute nouvelle activation (envoyée, prioritaire)
 _PRIMED: set[int] = set()  # processus déjà passés par une activation simulée (droit de premier plan consommé)
+FIRST_FOCUS_SETTLE_S = 0.1  # première prise de focus : délai laissé à un éventuel usage du droit de premier plan
+FIRST_FOCUS_MAX_S = 0.6  # ... et à sa restitution par la garde
 
 
 class SimulatedActivation:
     """Activation simulée en cours. Les touches de l'utilisateur vont à SA fenêtre, jamais à la cible : rien à interrompre,
     sauf s'il a lui-même mis la cible au premier plan pendant la frappe (ses touches s'y mêleraient)."""
 
-    def __init__(self, top: int, windows: set[int]) -> None:
+    def __init__(self, top: int, windows: set[int], first: bool = False) -> None:
         self.top = top
         self.windows = windows
         self.started = time.monotonic()
+        self.first = first  # première activation simulée de ce processus : droit de premier plan peut-être pas consommé
+
+    def settle_first(self) -> bool:
+        """Après la première prise de focus de ce processus : son droit de premier plan de lancement a pu servir
+        (premier plan pris, rendu en ≈10 ms par la garde). Chromium a alors reçu une VRAIE désactivation et jette le
+        clavier qui suit (mesuré le 20/10 : « 0/30 relus », à chaque première frappe d'une application lancée depuis
+        le programme au premier plan). On attend que le premier plan soit rendu, puis l'activation simulée est
+        renvoyée ; rien n'a encore été tapé. Vrai si elle l'a été (le focus est alors à reprendre)."""
+        if not self.first:
+            return False
+        self.first = False
+        begun = time.monotonic()
+        while True:
+            held = w.root(w.foreground()) in self.windows
+            elapsed = time.monotonic() - begun
+            if (elapsed >= FIRST_FOCUS_SETTLE_S and not held) or elapsed >= FIRST_FOCUS_MAX_S:
+                break
+            time.sleep(0.005)
+        if held:
+            return False  # tenu par la cible (l'utilisateur l'a choisie) : la frappe ordinaire s'en charge
+        if (
+            w.send_message(self.top, WM_NCACTIVATE, 1, 0) is None
+            or w.send_message(self.top, WM_ACTIVATE, WA_ACTIVE, 0) is None
+        ):
+            raise MethodError("the window does not respond to activation messages")
+        return True
 
     def _user_in_target(self) -> bool:
         return w.root(w.foreground()) in self.windows and physical.available() and physical.since(self.started)
@@ -476,8 +504,9 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
     if w.root(w.foreground()) in windows:
         raise MethodError("the window is in the foreground: simulated activation not needed")
     pid = w.window_pid(top)
+    first = pid not in _PRIMED
     with contextlib.ExitStack() as stack:
-        if pid not in _PRIMED:
+        if first:
             stack.enter_context(foreground.agent_token("simulated activation (first time)"))
             if not foreground.wait_typing_pause():
                 raise foreground.BusyUser(
@@ -488,7 +517,7 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
             raise MethodError("the window does not respond to activation messages")
         _PRIMED.add(pid)
         try:
-            yield SimulatedActivation(top, windows)
+            yield SimulatedActivation(top, windows, first)
         finally:
             if w.root(w.foreground()) not in windows:  # Julien ne l'a pas choisie entre-temps : état d'origine
                 with contextlib.suppress(MethodError):

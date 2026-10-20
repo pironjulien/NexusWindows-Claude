@@ -255,6 +255,7 @@ class ExecutorBase:
         # Document web visé quand la fenêtre en porte plusieurs (Steam : cadre « Steam » et magasin) : sa page
         # DevTools et sa zone de rendu, pas celles du titre de la fenêtre.
         self.document: uia.Node | None = None
+        self._sim_current: methods.SimulatedActivation | None = None  # activation simulée en cours (act_chromium)
         # confirm=true de l'étape en cours (ordre explicite ou oui de Julien) : lève la confirmation de act_confirm.
         self.confirm = False
         # Geste SORTANT (envoyer, payer, publier…) : en plus de confirm, le jeton d'accord lié à l'action exacte

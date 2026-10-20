@@ -187,3 +187,31 @@ def test_printwindow_that_hangs_is_abandoned_without_freeing_its_bitmap(monkeypa
 def test_sign_in_code_without_the_word_code_is_masked():
     assert "739201" not in notifications.mask_codes("Entrez 739201 pour vous connecter")
     assert "482913" not in notifications.mask_codes("Enter 482913 to continue")
+
+
+# --- Première activation simulée d'une application lancée à l'instant (essai réel du 20/10) -----------------------
+def test_first_simulated_focus_reasserts_activation_after_launch_right_used(monkeypatch):
+    """Le droit de premier plan de lancement a servi (cible au premier plan, puis rendue par la garde) : activation
+    simulée renvoyée avant toute frappe, une seule fois par processus."""
+    from nexus_windows import methods
+
+    fronts = iter([10, 10, 99])  # la cible (10) a pris le premier plan, puis la garde le rend à l'utilisateur (99)
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 99))
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(methods, "FIRST_FOCUS_SETTLE_S", 0.0)
+    sent: list[int] = []
+    monkeypatch.setattr(w, "send_message", lambda h, msg, *a, **k: sent.append(msg) or 0)
+    sim = methods.SimulatedActivation(10, {10}, first=True)
+    assert sim.settle_first() is True and sent == [methods.WM_NCACTIVATE, methods.WM_ACTIVATE]
+    assert sim.settle_first() is False and len(sent) == 2  # une seule fois
+    assert methods.SimulatedActivation(10, {10}).settle_first() is False  # processus déjà passé par là
+
+
+def test_take_focus_is_taken_again_when_activation_was_reasserted(monkeypatch):
+    calls: list[str] = []
+    fake = SimpleNamespace(
+        _take_focus_once=lambda e, t: calls.append("focus"),
+        _sim_current=SimpleNamespace(settle_first=lambda: calls.append("settle") or True),
+    )
+    act_chromium.ChromiumActions._take_focus(fake, object())  # type: ignore[arg-type]
+    assert calls == ["focus", "settle", "focus"]

@@ -6,6 +6,16 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.8] - 2026-10-20
+
+### Fixed
+- Chromium/Electron without DevTools: the first background typing in an app launched a moment ago from the foreground
+  program was lost ("0/30 read back") or a dropdown choice was not read back. Its first focus request uses the
+  one-time foreground right Windows gives a freshly launched process; the guard hands the foreground back within
+  ~10 ms, but Chromium then gets a real deactivation and drops the keys that follow. Now, the first time per process,
+  the tool waits for that hand-back, sends the simulated activation again and takes the focus again before any
+  character. Live suite: 14/14.
+
 ### Changed
 - Side-by-side bench redone: nexus-windows 0.15.7 against Cua Driver 0.37.0, target covered before and after each
   attempt (38 tasks each): effect proven 29 against 17, false successes 0 against 3, foreground taken 1 against 7,
