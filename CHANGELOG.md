@@ -6,7 +6,14 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
-## [0.13.3] - 2026-10-20
+## [0.13.4] - 2026-10-20
+
+### Fixed
+- The server starts again outside Windows (the Linux startup check of MCP directories and of the release build): the
+  UI Automation `Text` type of OCR elements is the documented constant 50020 instead of a lookup in a table that is
+  empty outside Windows. 0.13.3 never reached PyPI; 0.13.4 ships its changes below.
+
+## [0.13.3] - 2026-10-20 (not on PyPI)
 
 Versions 0.11.0 to 0.13.2 were not published separately; 0.13.3 ships all of them. Every fix below comes from a
 review by another AI (Codex or Antigravity) that reproduced the defect first; each reproduction is kept as a test.
