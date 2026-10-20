@@ -704,6 +704,28 @@ def test_scroll_without_container_at_center_takes_the_largest(monkeypatch):
     assert 'List "Messages"' in outcome.line and auto.calls == [("scroll", large.element)]
 
 
+class AtEndAuto(FakeAuto):
+    def scroll(self, element: FakeEl, h: int, v: int) -> None:
+        self.calls.append(("scroll", element))
+
+    def scroll_percent(self, element: FakeEl):
+        return 0.0, 100.0  # déjà tout en bas : rien ne bouge
+
+
+def test_scroll_at_a_point_on_a_container_already_at_the_end_is_not_a_success(monkeypatch):
+    """Banc du 20/10 (Edge, Electron) : molette sur un canevas, page déjà en bas → « ✓ » alors que le canevas n'avait
+    rien reçu. Point visé par le modèle : issue inconnue, dite ; sans cible, « déjà en bas » reste vrai."""
+    monkeypatch.setattr(actions.w, "window_at", lambda x, y: 999)
+    page = node("Document", "Page", has_scroll=True, rect=(0, 0, 400, 300))
+    ex = executor(make_view(page), AtEndAuto())
+    ex._windows, ex.acted = {HWND}, False
+    monkeypatch.setattr(ex, "resolve", lambda spec, prefer=None: ("point", (50, 50)))
+    aimed = ex.scroll("50,50", "down", 1)
+    assert aimed.ok and aimed.verified is None and "received no wheel event" in aimed.line
+    whole = ex.scroll(None, "down", 1)
+    assert whole.verified and "already at the end" in whole.line
+
+
 # --- 26. Code mort retiré ; recherche par nom portée sur snapshot.pick -----------------------------------------------
 def test_dead_code_is_gone():
     assert not hasattr(snapshot, "find_elements")

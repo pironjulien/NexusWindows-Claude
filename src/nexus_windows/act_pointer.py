@@ -234,6 +234,7 @@ class PointerActions(ExecutorBase):
                 f"{element.describe()} brought into view",
             )
         container = None
+        aimed = point is not None  # point "x,y" donné par le modèle (pas le centre de la fenêtre choisi ci-dessous)
         if element is not None:
             probe: uia.Node | None = element.node
             while probe is not None and container is None:
@@ -282,6 +283,13 @@ class PointerActions(ExecutorBase):
                 if after != before:
                     return f"read back ✓ position {after[axis]:.0f} %"
                 at_end = after[axis] >= 99.9 if direction in ("down", "right") else after[axis] <= 0.1
+                if at_end and aimed:
+                    # Point visé par le modèle (canevas, carte…) : rien n'a bougé et l'élément sous le point n'a reçu
+                    # aucune molette (banc du 20/10 : un « ✓ » ici était un faux succès). Issue inconnue, dite.
+                    return (
+                        f"container already at the end ({after[axis]:.0f} %), nothing moved; what is under the point "
+                        "received no wheel event: check the image"
+                    )
                 if at_end:
                     return f"read back ✓ already at the end ({after[axis]:.0f} %)"
                 # Défilement transmis sans effet relu : aucune autre technique par-dessus (double défilement possible).

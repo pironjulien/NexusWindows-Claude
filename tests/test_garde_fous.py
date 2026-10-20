@@ -14,7 +14,7 @@ from nexus_windows import actions, foreground, policy, routines, server, uia
 from nexus_windows import win32 as w
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_contract import HWND, FakeAuto, as_call, executor, make_view, node  # noqa: E402
+from test_contract import HWND, FakeAuto, accorded, as_call, executor, make_view, node, token_of  # noqa: E402
 
 
 def _group(*children: uia.Node) -> uia.Node:
@@ -44,7 +44,11 @@ def test_click_on_send_refused_then_allowed_with_confirm():
     with pytest.raises(actions.ConfirmationRequired, match="confirm=true"):
         ex.click("Envoyer")
     assert auto.calls == []  # rien n'a été fait
-    ex.confirm = True
+    ex.confirm = True  # geste sortant : confirm=true seul ne suffit plus (accord du 19/10)
+    with pytest.raises(actions.ConfirmationRequired, match="confirm=true alone is not enough"):
+        ex.click("Envoyer")
+    assert auto.calls == []
+    accorded(ex, lambda: ex.click("Envoyer"))
     ex.click("Envoyer")
     assert [c[0] for c in auto.calls] == ["invoke"]
 
@@ -129,7 +133,7 @@ def test_click_by_coordinates_cannot_bypass(monkeypatch):
     with pytest.raises(actions.ConfirmationRequired, match="coordinates"):
         ex._confirm_point(115, 110)  # sur l'icône du bouton
     ex._confirm_point(115, 110, button="right")
-    ex.confirm = True
+    accorded(ex, lambda: ex._confirm_point(115, 110))
     ex._confirm_point(115, 110)
 
 
@@ -211,15 +215,18 @@ def test_step_confirm_flag_reaches_the_executor():
     report, failed = server._run_steps(ex, [server.Step(do="click", target="Envoyer")], HWND, as_call())
     assert failed and "confirm=true" in report[0] and auto.calls == []
     report, failed = server._run_steps(ex, [server.Step(do="click", target="Envoyer", confirm=True)], HWND, as_call())
+    assert failed and "confirm=true alone is not enough" in report[0] and auto.calls == []
+    step = server.Step(do="click", target="Envoyer", confirm=True, accord=token_of(report[0]))
+    report, failed = server._run_steps(ex, [step], HWND, as_call())
     assert not failed and [c[0] for c in auto.calls] == ["invoke"]
 
 
 def test_routine_never_keeps_confirm(monkeypatch):
     saved: list = []
     monkeypatch.setattr(routines, "remember", lambda app, name, steps, fp, title: saved.append(steps))
-    steps = [server.Step(do="click", target="Envoyer", confirm=True)]
+    steps = [server.Step(do="click", target="Envoyer", confirm=True, accord="0123abcd")]
     server._remember("app", {}, "t", "envoi", steps, ["✓"], False)
-    assert saved and "confirm" not in saved[0][0]
+    assert saved and "confirm" not in saved[0][0] and "accord" not in saved[0][0]
 
 
 def test_hard_block_also_refuses_reading(monkeypatch):

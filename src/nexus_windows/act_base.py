@@ -120,6 +120,10 @@ def _short(error: BaseException) -> str:
 
 
 def framework_of(e: snapshot.Element, view: snapshot.View) -> str:
+    if view.framework == "Tk":
+        # Les boutons Tk se publient en « Button » Win32 par le proxy MSAA, mais Tk ignore BN_CLICKED et les messages
+        # postés (banc du 20/10 : « ~ » sans effet, même avec foreground=true) : toute la fenêtre est Tk.
+        return "Tk"
     raw = str(e.props.get("framework") or "").lower()
     return snapshot.FRAMEWORK_BY_UIA.get(raw) or view.framework or "Win32"
 
@@ -247,6 +251,13 @@ class ExecutorBase:
         self.document: uia.Node | None = None
         # confirm=true de l'étape en cours (ordre explicite ou oui de Julien) : lève la confirmation de act_confirm.
         self.confirm = False
+        # Geste SORTANT (envoyer, payer, publier…) : en plus de confirm, le jeton d'accord lié à l'action exacte
+        # (garde_fous.Accords) ; gesture et step_text la décrivent, approved garde les actions déjà accordées
+        # dans l'étape en cours (un même geste contrôlé deux fois ne consomme pas deux jetons).
+        self.accord = ""
+        self.gesture = ""
+        self.step_text = ""
+        self.approved: set[str] = set()
 
     if TYPE_CHECKING:
         # Méthodes que les familles (act_*) s'empruntent entre elles, réunies dans actions.Executor : déclarées ici
@@ -256,6 +267,7 @@ class ExecutorBase:
         def _confirm_point(self, x: int, y: int, button: str = "left") -> None: ...
         def _confirm_keys(self, combos: list[keys.Combo], spec: str, element: snapshot.Element | None) -> None: ...
         def _confirm_text(self, element: snapshot.Element | None, text: str) -> None: ...
+        def _confirm_menu(self, path: str) -> None: ...
         def _focused_target_element(self) -> snapshot.Element | None: ...
         # act_pointer
         def _point_of(self, e: snapshot.Element) -> tuple[int, int]: ...
@@ -404,6 +416,9 @@ class ExecutorBase:
                     f'{e.describe()} has changed (now "{snapshot.clip(snapshot.norm(live.get("name")), 40)}"): '
                     "run look again."
                 )
+            # Mise à jour EN PLACE : parents, frères et ancêtres se retrouvent par identité du nœud (rang dans une
+            # liste Win32, onglet TCM_SETCURFOCUS…). La base de then="changes" n'en dépend pas : elle est figée
+            # au moment où la liste est montrée (View.frozen, relectures de Codex sur 0.13.1 et 0.13.2).
             e.node.props.update(live)
             return self._shown_id(e)
         rid = uia.runtime_id(e.props)
@@ -446,6 +461,8 @@ class ExecutorBase:
             element = shown.by_id.get(ident)
             if element is None or ident not in shown.displayed:
                 raise ActionError(f"[{ident}] was not shown in the last look: run look again (or query=…).")
+            if element.props.get("ocr"):
+                return self._ocr_point(element)
             target = self.fresh(element, expected=shown.displayed[ident])
             self._aim(element.node)
             return "element", target
@@ -459,12 +476,51 @@ class ExecutorBase:
             try:
                 element, note = snapshot.pick(self._rebuild(), str(spec), prefer)
             except snapshot.TargetError as error:
+                ocr_text = self._ocr_named(str(spec))
+                if ocr_text is not None:
+                    return self._ocr_point(ocr_text)
                 element, note = self._scroll_to_named(str(spec), prefer, error)
         if note:
             self.notes.append(note)
         target = self.fresh(element)
         self._aim(element.node)
         return "element", target
+
+    def _ocr_named(self, spec: str) -> snapshot.Element | None:
+        """Texte lu par OCR dans la dernière liste montrée (fenêtre sans élément UIA), désigné par son nom."""
+        shown = self.get_shown()
+        if shown is None:
+            return None
+        texts = [e for e in shown.elements if e.props.get("ocr") and e.id in shown.displayed]
+        if not texts:
+            return None
+        try:
+            element, _ = snapshot.pick(dataclasses.replace(shown, elements=texts), spec)
+        except snapshot.AmbiguousTarget as error:
+            raise ActionError(f"{error} (texts read by OCR)") from None
+        except snapshot.TargetError:
+            return None
+        return element
+
+    def _ocr_point(self, element: snapshot.Element) -> tuple[str, tuple[int, int]]:
+        """Texte lu par OCR : aucun élément derrière, la cible est le centre de son texte. Sa position est celle de
+        l'écran à la lecture (vue montrée) : suivie si la fenêtre a bougé depuis, refusée si elle a changé de taille."""
+        rect = element.rect
+        shown = self.get_shown()
+        anchor = shown.frame.anchor if shown is not None else None
+        if rect is None or shown is None or anchor is None:
+            raise ActionError(f"{element.describe()}: text read by OCR without a position: run look again.")
+        current = w.frame_rect(self.hwnd)
+        if shown.frame.resized(current):
+            raise ActionError(
+                "The window has changed size since the text was read: run look again before targeting it."
+            )
+        cx, cy = rect.center
+        point = (cx + current.left - anchor[0], cy + current.top - anchor[1])
+        hit = self._hit(self.view, *point)
+        self._aim(hit[0] if hit else None)
+        self.notes.append(f"{element.describe()} read by OCR: targeted at its position")
+        return "point", point
 
     def _scroll_to_named(
         self, spec: str, prefer: set[str] | None, missing: snapshot.TargetError

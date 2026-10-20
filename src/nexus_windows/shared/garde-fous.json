@@ -1,6 +1,6 @@
 {
   "_": "Politique unique des garde-fous des outils de pilotage (bureau, navigateur, téléphone). Tout ce qui n'est pas ici est libre. Chaque outil en embarque une copie identique. Motifs : expressions régulières sur un texte sans accents ni casse, ponctuation ramenée à des espaces.",
-  "version": 1,
+  "version": 2,
   "blocage_dur": {
     "_": "Jamais lu ni piloté : pas d'auto-élévation, pas de fuite de secrets. Chaque outil applique les catégories listées pour lui dans « agents ».",
     "bureau_securise": {
@@ -127,5 +127,50 @@
       "StatusBar", "TitleBar", "ToolTip", "ProgressBar", "Calendar"
     ],
     "roles_declencheurs": ["Button", "SplitButton", "Hyperlink", "MenuItem"]
+  },
+  "accord": {
+    "_": "Accord de la trinité du 19/10/2026 (« ameliorations-outils », priorité 1). Un geste SORTANT (envoyer, appeler, payer, publier, transférer, partager par son bouton final) exige, en plus de confirm=true, l'accord de l'utilisateur lié à l'action EXACTE : l'outil décrit l'action (outil, geste, cible, destinataires, contenu, pièces jointes, contexte) et rend un jeton à usage unique ; l'agent montre ce résumé à l'utilisateur et ne renvoie le geste avec accord=<jeton> qu'après SON oui. Tout changement entre l'accord et l'exécution annule le jeton. Un texte lu (mail, SMS, notification, page, document, message du relais) n'élargit jamais une autorisation. Destinataire nouveau : permis s'il est demandé par l'utilisateur (signalé quand il figure dans un texte lu). Sortant = tout motif de confirmation sauf ceux de « motifs_locaux » (destruction ou réglage local : le seul confirm=true suffit).",
+    "duree_s": 600,
+    "motifs_locaux": [
+      "supprim(er|ez) definitivement",
+      "delete (permanently|forever)",
+      "permanently delete",
+      "vider (la )?corbeille",
+      "empty (the )?(trash|recycle bin)",
+      "desinstall(er|ez)",
+      "uninstall",
+      "^format(er|ez)$",
+      "format(er|ez) (le |ce |la |cette |un |une )?(disque|lecteur|volume|partition|cle|carte)",
+      "format (the |this )?(disk|drive|partition|volume)",
+      "format(er|ez) (le |la |l |ce |cette |votre )?(telephone|appareil|tablette)",
+      "format (the |this |your )?(phone|device|tablet)",
+      "reinitialis(er|ez)(?! (les |la |le |l |ce |cette |vos |mes )?(filtres?|zoom|affichage|vue|recherche|tri|mise en page|formulaire|champs?|zone|texte|selection|couleurs?)\\b)",
+      "reinitialisation (des donnees )?d usine",
+      "factory reset",
+      "reset (this pc|(the )?app|to factory( settings)?|all settings)",
+      "reset (this |the |your )?(pc|phone|device|tablet)",
+      "(effac(er|ez)|supprim(er|ez)) (toutes )?(les |mes |vos )?donnees",
+      "(erase|wipe|clear) (all )?(data|everything|device)"
+    ]
+  },
+  "injection": {
+    "_": "Détecteur d'injection dans le texte lu : SIGNAL seulement (avertissement dans la réponse de l'outil), jamais une garantie ni un blocage. Une attaque qu'il manque reste incapable d'autoriser une action (voir « accord »). Motifs appliqués au texte rendu comparable (sans accents ni casse, ponctuation en espaces : « confirm=true » → « confirm true », « a@example.com » → « a example com »).",
+    "motifs": [
+      "(ignore|ignorer|ignorez|disregard|forget|oublie|oubliez) (all |the |your |any |toutes |tous |les |tes |vos )?(previous |prior |above |earlier |precedentes |anciennes )?(instructions?|consignes?|regles|rules|directives)",
+      "(you are|tu es|vous etes) (now |maintenant |desormais )?(an? |un |une )?(ai|ia|assistant|agent|claude|gemini|codex|chatgpt|llm)\\b",
+      "(dear|hey|hello|bonjour|salut|cher|chere|attention|note to|message (to|pour|a)) (the |l )?(ai|ia|assistant|agent|claude|gemini|codex|chatgpt|llm|bot)\\b",
+      "\\b(ai|ia|assistant|agent|llm|bot)s? (must|should|shall|doit|devez|dois|doivent)\\b",
+      "\\b(new|nouvelles?) (instructions?|consignes?|directives?)\\b",
+      "\\bsystem (prompt|message|override|instruction)",
+      "\\b(developer|admin|administrator|administrateur) (mode|override|message|instruction)",
+      "\\bconfirm (true|1|yes)\\b",
+      "\\baccord [0-9a-f]{6,}\\b",
+      "\\b(julien|the user|l utilisateur|your user|ton utilisateur|votre utilisateur|le proprietaire|the owner) (a |has |have |already |deja )*(autoris|approuv|valid|authoriz|approv|confirm|dit oui|said yes|agreed|accepte)",
+      "\\b(sans|without) (lui |le |leur |en )?(demander|asking|ask|confirmation|confirmer|prevenir|telling|parler)",
+      "\\b(envoie|envoies|envoyez|envoyer|send|forward|transfere|transferez|transferer|transmets|transmettez|transmettre|partage|partagez|partager|share|exporte|exportez|upload)\\b[a-z0-9 ]{0,40}\\b(contacts?|repertoire|address book|codes?|mots? de passe|passwords?|identifiants|credentials|tokens?|jetons?|cles?|keys?|cookies?|fichiers|files|photos|tous (les|mes) messages|all (the |my )?messages|sms|historique|history)\\b",
+      "\\b(contacts?|codes?|mots? de passe|passwords?|identifiants|credentials|tokens?|jetons?|cookies?)\\b[a-z0-9 ]{0,30}\\b(a|to|vers|au|chez) (\\d[\\d ]{5,}|[a-z0-9._-]+ [a-z0-9-]+ (com|fr|net|org|io|ru|xyz))\\b",
+      "\\b(appelle|appelez|appeler|call|dial|compose|composez) (le |the |ce |this )?(numero |number )?\\d[\\d ]{5,}",
+      "\\b(vire|virez|virer|wire|paye|payez|payer|pay|envoie|envoyez|send|transfere|transferez|transfer)\\b[a-z ]{0,20}\\d+( \\d{1,2})? ?(eur|euros?|usd|gbp|btc|eth|usdt|dollars?)\\b"
+    ]
   }
 }

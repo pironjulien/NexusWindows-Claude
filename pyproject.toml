@@ -1,6 +1,6 @@
 [project]
 name = "nexus-windows"
-version = "0.10.1"
+version = "0.13.3"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"
@@ -21,6 +21,14 @@ dependencies = [
     "pillow>=12.3.0",
     "websockets>=17.2",
     "windows-capture>=2.0.1; sys_platform == 'win32'",
+    # OCR Windows natif en secours d'une fenêtre sans arbre UI Automation (Tk, canevas) : moteur du système, local.
+    "winrt-runtime>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-foundation>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-foundation-collections>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-globalization>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-graphics-imaging>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-media-ocr>=3.2.1; sys_platform == 'win32'",
+    "winrt-windows-storage-streams>=3.2.1; sys_platform == 'win32'",
 ]
 
 [project.urls]

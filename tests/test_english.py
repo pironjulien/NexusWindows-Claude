@@ -132,4 +132,4 @@ def test_error_and_refusal_texts_have_no_french(monkeypatch):
 
     leaks = {where: (_french(text), text) for where, text in texts.items() if _french(text)}
     assert not leaks
-    assert "nothing was done" in texts["confirm"] and "confirm=true" in texts["confirm"]
+    assert "nothing was done" in texts["confirm"].lower() and "confirm=true" in texts["confirm"]

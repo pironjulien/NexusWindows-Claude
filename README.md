@@ -5,6 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/pironjulien/NexusWindows-Claude)](https://github.com/pironjulien/NexusWindows-Claude/releases)
 [![PyPI](https://img.shields.io/pypi/v/nexus-windows)](https://pypi.org/project/nexus-windows/)
 [![Tests](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/pironjulien/NexusWindows-Claude/badge)](https://scorecard.dev/viewer/?uri=github.com/pironjulien/NexusWindows-Claude)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/NexusWindows-Claude/blob/main/LICENSE)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://github.com/pironjulien/NexusWindows-Claude/blob/main/pyproject.toml)
 [![MCP](https://img.shields.io/badge/MCP-server-7ee2a8)](https://modelcontextprotocol.io)
@@ -12,13 +13,13 @@
 
 [![NexusWindows: Windows computer use for AI agents, in the background. Works with Claude, Codex and Antigravity.](https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/docs/assets/banner.webp)](https://julienpiron.fr/nexuswindows/)
 
-![NexusWindows: an AI agent fills and submits a form in a window that stays behind another one, then reports five verified steps](docs/assets/demo.webp)
+![NexusWindows: an AI agent fills and submits a form in a window that stays behind another one, then reports five verified steps](https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/docs/assets/demo.webp)
 
 **Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 0.9.2 · Windows 10/11 · Python 3.14 · MIT licence
+Version 0.13.3 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -59,6 +60,23 @@ Step actions: `click`, `double_click`, `right_click`, `type`, `set`, `clear`, `k
 `toggle`, `expand`, `collapse`, `scroll`, `focus`, `menu`, `wait`, `drag`, `hover`. A target is an `[N]` from the last
 `look`, a visible name (`"OK"`), a role-qualified name (`"button:OK"`, `"edit:Name"`, `"checkbox:Subscribe"`) or an
 `x,y` point in the last image.
+
+### Only what changed (`then="changes"`, `show="changes"`)
+
+After an action, `act(then="changes")` (or `look(show="changes")`) returns only what changed since the last list
+shown for that window: `+` added, `~` changed (text, state or moved), `-` removed; every other element keeps its
+`[N]`. A common scroll of many elements is one line naming them as ranges (`[2-21]`), not a full list. Comparison is
+made in the window's own frame, so moving the window is not a change. A removed `[N]` is never given again, and an
+element whose change was cut from a long report loses its `[N]` until the next `look`. When almost everything changed
+(60 %), the full list is returned. Measured: 2 to 2.6 times shorter than the full list after a click.
+
+### Text read from the image (OCR fallback)
+
+When a window publishes almost no UI Automation elements (fewer than 6: Tk, canvases) or a Chromium page stops
+publishing its content, the text of the window image is read with the Windows built-in OCR engine
+(`Windows.Media.Ocr`, local, offline) and listed as `[N] Text "…" (OCR)` with its position; such an element can be
+targeted by number or by name (click at its position, recomputed if the window moved). Measured on the lab apps: 10 to
+21 ms per window; text correct 16/16 (WPF), 20/23 (Edge), 6/7 (Tk).
 
 ### Four outcomes per step
 
@@ -115,7 +133,8 @@ with the file name. Scripts, shortcuts and installers are refused.
   activation. Apps started with `launch(devtools=true)` are driven through the DevTools protocol instead.
 - **Steam (CEF in an SDL frame)**: recognised as Chromium; `launch(app="Steam")` adds Steam's own
   `-cef-disable-occlusion -cef-force-accessibility` switches so the UI stays readable while covered.
-- **Tk**: no UI Automation and posted input has no effect; refused unless real input is allowed.
+- **Tk**: no UI Automation and posted input has no effect (its buttons show up as Win32 `Button` but ignore
+  `BN_CLICKED`): refused in the background, real input with `foreground=true`; its text is found by the OCR fallback.
 
 ### Capture
 
@@ -177,7 +196,8 @@ src/nexus_windows/
   act_chromium.py  Chromium/Electron/CEF: verified click, DevTools, simulated activation, <select>
   act_pointer.py   points, message clicks, scrolling, drag, hover
   act_wait.py      text presence and waiting
-  snapshot.py      window + popups, [N] elements, image, coordinates
+  snapshot.py      window + popups, [N] elements, image, coordinates, changes since the last list
+  ocr.py           Windows built-in OCR (Windows.Media.Ocr) for windows without UI Automation
   uia.py           UI Automation with a single cross-process cache request
   methods.py       Win32 message techniques
   cdp.py           minimal Chrome DevTools Protocol client
@@ -296,6 +316,30 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 
 Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
+## Side by side with Cua Driver (October 20, 2026)
+
+[Cua Driver](https://github.com/trycua/cua) 0.36.0 is the closest other tool: it also works in the background by
+default. Both were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab window, covered by
+an opaque window, nobody at the PC; Cua was used the way its own agent guide says (background first, then clicks, then
+its foreground fallback after a refusal). The effect is judged by the application (event received or value read
+back), never by the tool's report. 48 tasks each across Win32, WinForms, WPF, Electron and Edge.
+
+| In the background | nexus-windows 0.13 | Cua Driver 0.36.0 |
+|---|---|---|
+| Effect proven | 39 | 26 |
+| False success (reported done, the app got nothing) | 0 | 3 |
+| Foreground taken | 1 (Edge raw click, handed back) | 8 |
+| Real cursor moved | 0 | 2 |
+| Median time of a successful action | 138 ms | 628 ms |
+
+Taken from Cua: reading only what changed (`then="changes"`). Not taken, with the measurement in `RESULTS.md`: its
+injected WPF click (moves the user's real cursor), CDP clicks in an already open Chrome (turns on remote debugging in
+the user's real profile). Tried and dropped because they do not work in the background or touch the user's window:
+simulated activation for WPF shortcuts (WPF takes the foreground), `WM_POINTERWHEEL` (Windows refuses to post it),
+`WM_VSCROLL` to the Chromium renderer (no effect), `InjectSyntheticPointerInput` (goes to the window on top).
+CursorTouch/Windows-MCP, deploymenttheory/windows-mcp-server and microsoft/UFO² were read, not run: all three use the
+real mouse or the foreground.
+
 ## Cross-agent bench (October 16, 2026)
 
 The same task was run by the three Windows desktop agents used on this PC (this server, the Codex layer and the
@@ -323,7 +367,13 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
   deleting an account or making a repository public need `confirm: true` on the step, which the model sets only on the
   user's explicit order or yes. The check covers what the gesture triggers: click by `[N]`, by name or by coordinates,
   double-click, Enter (target, default button, nearby send button), Ctrl+Enter, Space, Alt+letter, a typed line break
-  and DevTools pages. A routine never records nor replays `confirm`.
+  DevTools pages and Win32 menus. A routine never records nor replays `confirm`.
+- **Approval bound to the exact action**: an outward gesture (sending, calling, paying, publishing, transferring) also
+  needs `accord: "<token>"`. The first try is refused before any input with a summary of the exact action (trigger,
+  process, window title, values of the window's editable fields) and a single-use token; only after the user's own
+  yes is the same step sent again with `confirm: true` and that token. Any change in between voids it.
+- **Prompt injection signal**: text read on screen that looks like instructions aimed at an AI gets a warning appended
+  to the response (a signal only; it can never authorise an action).
 - **Launch**: a browser never gets a profile chosen by the model, a DevTools port or a loaded extension (`devtools=true`
   opens a fresh throwaway profile). Consoles, File Explorer, the taskbar and other applications are not refused:
   the server is meant for a user who already lets Claude run commands; keep Claude's own permission prompts on if
@@ -346,7 +396,11 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 - Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
   been checked.
 - Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
-  approval and the foreground.
+  approval and the foreground; the OCR fallback finds their text but does not make background input possible.
+- WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF ignores posted
+  mouse input and takes the foreground when activated); controls with UI Automation patterns work.
+- A mouse wheel on a point of a covered Chromium page has no effect (no `wheel` event; 8 variants measured); it is
+  reported as `~`, never as a success.
 - Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);
   one that Windows still does not render can only be shown by taking the foreground; this is reported.
 - In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.
@@ -361,7 +415,8 @@ requests of its own (DevTools connections stay on `127.0.0.1`).
 
 - **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
   only when a tool is called. Password managers and the secure desktop are never inspected
-  (`look`) nor driven (`act`); `windows` still lists their window titles, like the taskbar does.
+  (`look`) nor driven (`act`); `windows` still lists their window titles, like the taskbar does. The OCR fallback
+  uses the Windows built-in engine on the PC; no image leaves it for OCR.
 - **Where it goes**: tool results are returned to Claude Desktop or Claude Code, which send them to Anthropic under
   Anthropic's own privacy policy; this server sends nothing anywhere else.
 - **What it stores**, under `%USERPROFILE%\.claude\nexus-claude\` (or `NEXUS_WINDOWS_HOME`): a JSONL debug log kept

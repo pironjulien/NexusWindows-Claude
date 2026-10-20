@@ -6,6 +6,37 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-10-20
+
+Versions 0.11.0 to 0.13.2 were not published separately; 0.13.3 ships all of them. Every fix below comes from a
+review by another AI (Codex or Antigravity) that reproduced the defect first; each reproduction is kept as a test.
+
+### Added
+- `act(then="changes")` and `look(show="changes")`: only what changed since the last list shown for the window
+  (`+` added, `~` changed with the reason, `-` removed); other elements keep their `[N]`. Full list when almost
+  everything changed (60 %) or when there is no previous list. Idea taken from Cua Driver; 2 to 2.6 times shorter
+  than the full list after a click.
+- A common scroll is reported as one line naming the scrolled elements as ranges (`[2-21]`) instead of every element
+  marked as moved.
+- OCR fallback with the Windows built-in engine (`Windows.Media.Ocr`, local) when a window has fewer than 6 UI
+  Automation elements or a Chromium page stops publishing its content: `[N] Text "…" (OCR)` elements with a
+  position, targetable by number or name. 10 to 21 ms per window. Optional `winrt-*` dependencies (Windows only).
+- Approval bound to the exact action: an outward gesture (send, call, pay, publish, transfer) needs `confirm: true`
+  and a single-use `accord` token returned by a first refusal that summarises the exact action; any change voids it.
+  Same check for every path, now including Win32 menus (`WM_COMMAND`).
+- Text read on screen that looks like instructions aimed at an AI gets a warning appended (signal only).
+- Bench side by side with Cua Driver 0.36.0 (`bench/cua_vs_nexus.py`, results in `bench/RESULTS.md`), background
+  probes (`bench/background_probes.py`, `bench/chromium_wheel_probe.py`) and OCR bench (`bench/ocr_live.py`).
+
+### Fixed
+- Mouse wheel on an aimed point whose container is already at the end: `~` with the reason instead of a false `✓`.
+- Tk buttons: no more `BN_CLICKED` or posted messages (Tk ignores them); clear refusal in the background.
+- `then="changes"`: an element whose change was cut from a long report loses its `[N]`; a removed `[N]` is never
+  given again (monotonic counter per window); moving the window is no longer reported as a scroll or as moves
+  (comparison in the window's frame); an OCR target follows the window when it moves.
+- Re-validating a target by `[N]` or name no longer alters the list used as the base of `then="changes"` (the base is
+  frozen when shown), and targets keep their rank among siblings (duplicate options in a Win32 list, Win32 tabs).
+
 ## [0.10.1] - 2026-10-19
 
 ### Fixed

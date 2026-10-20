@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import struct
 import sys
+import threading
 from pathlib import Path
 
 from . import win32 as w
@@ -79,6 +80,23 @@ def hard_block(process: str, cls: str) -> str:
         return english_reason(garde_fous.hard_block_reason(AGENT, process, cls))
     except garde_fous.GardeFousError as error:
         raise PolicyError(f"safety policy unreadable ({error}): nothing was done (fail closed)") from error
+
+
+_ACCORDS: garde_fous.Accords | None = None
+_ACCORDS_LOCK = threading.Lock()
+
+
+def accords() -> garde_fous.Accords:
+    """Registre unique (par processus serveur) des accords liés à l'action exacte et des textes lus (provenance).
+    Créé au premier besoin : une politique illisible refuse le geste (échec fermé) sans empêcher le démarrage."""
+    global _ACCORDS
+    with _ACCORDS_LOCK:
+        if _ACCORDS is None:
+            try:
+                _ACCORDS = garde_fous.Accords()
+            except garde_fous.GardeFousError as error:
+                raise PolicyError(f"safety policy unreadable ({error}): nothing was done (fail closed)") from error
+        return _ACCORDS
 
 
 def act_refusal(process: str, cls: str, title: str = "") -> str | None:

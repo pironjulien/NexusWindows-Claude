@@ -80,6 +80,8 @@ class UiaActions(ExecutorBase):
 
         if fw == "Chromium":
             return self._click_chromium(e, page, what)
+        if fw == "Tk":  # aucun canal d'arrière-plan (mesuré) : refus franc, ou vraie souris avec foreground=true
+            return self._try_or_foreground([], what, lambda: realinput.click(*self._point_of(e)))
         if hwnd and methods._is_class(hwnd, methods.BUTTON_CLASSES):
             kind = w.style(hwnd) & methods.BS_TYPEMASK
             if not winforms or kind in (methods.BS_PUSHBUTTON, methods.BS_DEFPUSHBUTTON):
@@ -621,6 +623,7 @@ class UiaActions(ExecutorBase):
         if not parts:
             raise ActionError("Empty menu path.")
         if methods.win32_menu_items(self.hwnd):
+            self._confirm_menu(path)  # WM_COMMAND ne passe par aucun clic d'élément : contrôlé ici
             try:
                 return self._try(
                     [("WM_COMMAND menu", lambda: methods.win32_menu_command(self.hwnd, path))], f'menu "{path}"'

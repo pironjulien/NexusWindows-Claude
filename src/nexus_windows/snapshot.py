@@ -12,12 +12,13 @@ import io
 import math
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 
 import comtypes
 from PIL import Image, ImageDraw, ImageFont
 
-from . import capture, steam, uia
+from . import capture, ocr, steam, uia
 from . import win32 as w
 
 # Limites de vision de Claude : sans réduction côté serveur, les coordonnées lues sur l'image restent exactes.
@@ -386,6 +387,9 @@ class View:
     detail: str = "normal"
     notes: list[str] = field(default_factory=list)
     displayed: dict[int, tuple] = field(default_factory=dict)  # [N] réellement montrés → identité à l'affichage
+    issued: int = 0  # plus grand [N] jamais donné dans cette fenêtre (rapports de changements successifs compris)
+    ocr_done: bool = False  # texte de l'image déjà lu par OCR et ajouté aux éléments
+    frozen: dict[int, dict] = field(default_factory=dict)  # [N] montrés → leurs propriétés à l'affichage (copie)
     # Lecture incomplète : un texte absent de l'arbre n'y est pas prouvé absent (ni présent ni absent).
     truncated: bool = False  # arbre coupé à max_nodes
     web_missing: bool = False  # Chromium n'a pas publié le contenu de la page
@@ -604,6 +608,8 @@ def _wait_web_content(auto: uia.Automation, hwnd: int, tree: uia.Node, max_nodes
 # --- Rendu texte ----------------------------------------------------------------------------------------------
 def flags(e: Element) -> str:
     p = e.props
+    if p.get("ocr"):
+        return " (OCR)"  # lu dans l'image : ni valeur ni état, position seulement
     out = []
     value = p.get("value")
     if value is None and e.role in ("Slider", "Spinner", "ProgressBar"):
@@ -668,19 +674,208 @@ def lines(
             title = w.window_text(e.window)
             out.append(f'— popup window "{clip(title, 60)}" —' if title else "— popup menu / list —")
         indent = "  " * min(e.depth, 8) if not query else ""
-        rect = e.rect
-        where = ""
-        if rect is not None and coords:
-            cx, cy = frame.to_image(*rect.center, view.info.rect)
-            if not frame.contains_image_point(cx, cy):
-                where = " (outside the image)"
-            else:
-                where = f" @{cx},{cy}"
-                if e.role in CONTAINER_ROLES or e.role in ("Document", "List", "Tree", "Table", "DataGrid"):
-                    where += f" {round(rect.width * frame.scale)}×{round(rect.height * frame.scale)}"
-        name = f' "{clip(e.name, 80)}"' if e.name else ""
-        out.append(f"{indent}[{e.id}] {e.role}{name}{flags(e)}{where}")
+        out.append(indent + line_of(e, view, frame, coords))
     return out, hidden
+
+
+def line_of(e: Element, view: View, frame: Frame, coords: bool = True) -> str:
+    """Une ligne « [N] Rôle « nom » = valeur [états] @x,y » (sans retrait)."""
+    rect = e.rect
+    where = ""
+    if rect is not None and coords:
+        cx, cy = frame.to_image(*rect.center, view.info.rect)
+        if not frame.contains_image_point(cx, cy):
+            where = " (outside the image)"
+        else:
+            where = f" @{cx},{cy}"
+            if e.role in CONTAINER_ROLES or e.role in ("Document", "List", "Tree", "Table", "DataGrid"):
+                where += f" {round(rect.width * frame.scale)}×{round(rect.height * frame.scale)}"
+    name = f' "{clip(e.name, 80)}"' if e.name else ""
+    return f"[{e.id}] {e.role}{name}{flags(e)}{where}"
+
+
+# --- Changements depuis la dernière liste montrée -------------------------------------------------------------
+DIFF_FULL = 0.6  # part d'éléments différents au-delà de laquelle la liste complète est rendue (comme nexus-android)
+MOVED_PX = 10  # déplacement du centre (pixels d'écran) au-delà duquel un élément est dit déplacé
+
+
+@dataclass
+class Changes:
+    """Vue actuelle comparée à la dernière liste montrée. Les éléments retrouvés ont repris leur [N] (renumérotés
+    dans la vue), les nouveaux ont un numéro neuf, jamais déjà donné dans cette fenêtre."""
+
+    added: list[Element]
+    removed: list[Element]  # éléments de la liste précédente (leur ancien [N])
+    changed: list[tuple[Element, list[str]]]
+    unchanged: int
+    ratio: float  # part d'éléments différents (0 : rien n'a changé, 1 : tout)
+    known: set[int]  # [N] valables pour le modèle après ce rapport (retrouvés et ajoutés)
+    shift: tuple[int, int] | None = None  # translation commune (défilement) dans la fenêtre, en pixels d'écran
+    shifted: list[int] = field(default_factory=list)  # [N] déplacés de cette seule translation (non dits changés)
+
+
+def diff_view(previous: View, current: View) -> Changes:
+    """Rapproche `current` de la liste montrée de `previous` (seuls ses [N] montrés comptent) : même identifiant
+    d'exécution UIA d'abord, puis même rôle, nom et identifiant d'automatisation dans l'ordre d'apparition. Modifie
+    les numéros de `current` en place ; à appeler sur une vue neuve, avant de la montrer."""
+    # Éléments tels que le modèle les a vus : propriétés figées à l'affichage (les actions relisent les nœuds en
+    # place ; sans copie figée, une cible revalidée changerait la base de comparaison).
+    shown = [
+        Element(
+            e.id, uia.Node(e.node.element, e.node.depth, dict(previous.frozen.get(e.id, e.props))), e.depth, e.window
+        )
+        for e in previous.elements
+        if e.id in previous.displayed
+    ]
+    match: dict[int, Element] = {}  # id(élément neuf) → élément ancien
+    used: set[int] = set()
+    by_rid: dict[tuple, Element] = {}
+    for old in shown:
+        if rid := uia.runtime_id(old.props):
+            by_rid.setdefault(rid, old)
+    for e in current.elements:
+        old = by_rid.get(uia.runtime_id(e.props) or ())
+        if old is not None and old.role == e.role and old.id not in used:
+            match[id(e)] = old
+            used.add(old.id)
+    groups: dict[tuple, list[Element]] = {}
+    for old in shown:
+        if old.id not in used:
+            groups.setdefault(identity(old.props), []).append(old)
+    for e in current.elements:
+        if id(e) not in match and (queue := groups.get(identity(e.props))):
+            old = queue.pop(0)
+            match[id(e)] = old
+            used.add(old.id)
+    # Compteur monotone par fenêtre : un [N] retiré n'est jamais redonné à un autre élément.
+    following = max(previous.issued, max((e.id for e in previous.elements), default=0))
+    # Positions comparées dans le repère de la fenêtre : un déplacement de la fenêtre entière n'est ni un défilement
+    # ni un déplacement d'élément (les coordonnées de l'image le neutralisent déjà).
+    offset = _window_offset(previous, current)
+    shift = _common_shift([(e, match[id(e)]) for e in current.elements if id(e) in match], offset)
+    added, changed, unchanged, known = [], [], 0, set()
+    shifted: list[int] = []
+    for e in current.elements:
+        old = match.get(id(e))
+        if old is None:
+            following += 1
+            e.id = following
+            added.append(e)
+            known.add(e.id)
+            continue
+        e.id = old.id
+        known.add(e.id)
+        moved = _moved(e, old, offset)
+        if moved and shift is not None and _moved_by(e, old, shift, offset):
+            moved = False
+            shifted.append(e.id)
+        why = [
+            label
+            for label, differs in (("text", e.name != old.name), ("state", flags(e) != flags(old)), ("moved", moved))
+            if differs
+        ]
+        if why:
+            changed.append((e, why))
+        else:
+            unchanged += 1
+    current.issued = following
+    removed = [old for old in shown if old.id not in used]
+    differing = len(added) + len(removed) + len(changed)
+    ratio = differing / max(len(shown), len(current.elements), 1)
+    return Changes(added, removed, changed, unchanged, ratio, known, shift if shifted else None, sorted(shifted))
+
+
+SHIFT_SHARE = 0.5  # part des éléments retrouvés déplacés du même vecteur au-delà de laquelle c'est un défilement
+
+
+def _window_offset(previous: View, current: View) -> tuple[int, int]:
+    """Déplacement de la fenêtre entre les deux vues (son coin à la construction de chacune)."""
+    a, b = previous.frame.anchor, current.frame.anchor
+    return (b[0] - a[0], b[1] - a[1]) if a is not None and b is not None else (0, 0)
+
+
+def _delta(e: Element, old: Element, offset: tuple[int, int] = (0, 0)) -> tuple[int, int] | None:
+    """Déplacement de l'élément DANS la fenêtre (celui de la fenêtre retiré)."""
+    if e.rect is None or old.rect is None:
+        return None
+    (x1, y1), (x2, y2) = e.rect.center, old.rect.center
+    return x1 - x2 - offset[0], y1 - y2 - offset[1]
+
+
+def _common_shift(pairs: list[tuple[Element, Element]], offset: tuple[int, int] = (0, 0)) -> tuple[int, int] | None:
+    """Translation partagée par la plupart des éléments déplacés dans la fenêtre (défilement d'une page ou d'une
+    liste) : la même à MOVED_PX près pour au moins SHIFT_SHARE des éléments retrouvés. None : pas de défilement."""
+    deltas = [
+        d for e, old in pairs if (d := _delta(e, old, offset)) is not None and max(abs(d[0]), abs(d[1])) > MOVED_PX
+    ]
+    if not deltas or not pairs:
+        return None
+    # Candidat : le vecteur exact le plus fréquent (un défilement déplace tout du même nombre de pixels), puis tous
+    # ceux qui en sont à MOVED_PX près.
+    best = Counter(deltas).most_common(1)[0][0]
+    count = sum(1 for x, y in deltas if abs(x - best[0]) <= MOVED_PX and abs(y - best[1]) <= MOVED_PX)
+    return best if count >= SHIFT_SHARE * len(pairs) else None
+
+
+def _moved_by(e: Element, old: Element, shift: tuple[int, int], offset: tuple[int, int] = (0, 0)) -> bool:
+    d = _delta(e, old, offset)
+    return d is not None and abs(d[0] - shift[0]) <= MOVED_PX and abs(d[1] - shift[1]) <= MOVED_PX
+
+
+def _moved(e: Element, old: Element, offset: tuple[int, int] = (0, 0)) -> bool:
+    if e.rect is None or old.rect is None:
+        return (e.rect is None) != (old.rect is None)
+    d = _delta(e, old, offset)
+    return d is not None and max(abs(d[0]), abs(d[1])) > MOVED_PX
+
+
+def id_ranges(ids: list[int]) -> str:
+    """[2, 3, 4, 7, 9, 10] → "[2-4], [7], [9-10]"."""
+    runs: list[list[int]] = []
+    for n in sorted(set(ids)):
+        if runs and n == runs[-1][1] + 1:
+            runs[-1][1] = n
+        else:
+            runs.append([n, n])
+    return ", ".join(f"[{a}]" if a == b else f"[{a}-{b}]" for a, b in runs)
+
+
+# --- OCR en secours ------------------------------------------------------------------------------------------
+OCR_BELOW = 6  # moins d'éléments UIA que cela (Tk, canevas, jeu) : le texte de l'image est lu par OCR
+_TEXT_TYPE = next(k for k, v in uia.CONTROL_TYPES.items() if v == "Text")
+
+
+def wants_ocr(view: View) -> bool:
+    return not view.ocr_done and (view.web_missing or view.unreadable or len(view.elements) < OCR_BELOW)
+
+
+def add_ocr(view: View, physical: Image.Image) -> int:
+    """Ajoute aux éléments de la vue les lignes de texte lues par OCR dans son image physique (`capture_view`), en
+    éléments « Text » marqués (OCR) ; un texte déjà publié par UIA n'est pas doublé. Renvoie le nombre ajouté."""
+    view.ocr_done = True
+    lines = ocr.read(physical)
+    if not lines:
+        return 0
+    known = {e.name.lower() for e in view.elements if e.name}
+    ox, oy = view.frame.origin
+    following = max(view.issued, max((e.id for e in view.elements), default=0))
+    added = 0
+    for line in lines:
+        if line.text.lower() in known:
+            continue
+        left, top, width, height = line.rect
+        props = {
+            "control_type": _TEXT_TYPE,
+            "name": line.text,
+            "rect": (ox + left, oy + top, width, height),
+            "ocr": True,
+        }
+        following += 1
+        view.elements.append(Element(following, uia.Node(None, 0, props), 0, view.hwnd))
+        added += 1
+    if added:
+        view.notes.append(f"{added} texts read by OCR in the image (no UI Automation element): targets by point")
+    return added
 
 
 # --- Image ----------------------------------------------------------------------------------------------------

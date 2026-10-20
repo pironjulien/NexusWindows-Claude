@@ -332,6 +332,8 @@ def _wait_window(app: LabApp, ready: queue.Queue, timeout_s: float) -> None:
             app.close()
             raise TimeoutError(f"{app.kind} : pas de signal « ready » en {timeout_s} s.") from None
         app.hwnd = int(data["top"])
+        if "zone_hwnd" in data:  # Tk : aucun élément UI Automation, fenêtre de la zone donnée par l'application
+            app.extra["zone_hwnd"] = int(data["zone_hwnd"])
     else:
         title = "Labo Web"
         app.hwnd = _find_window(app.pids, title, timeout_s)  # fenêtre du navigateur, même relancé

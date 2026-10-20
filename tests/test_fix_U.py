@@ -12,7 +12,7 @@ dans leurs surgissantes et les doublons d'un même contrôle.
 from __future__ import annotations
 
 import pytest
-from test_contract import HWND, FakeAuto, as_auto, make_view, node
+from test_contract import HWND, FakeAuto, accorded, as_auto, make_view, node
 
 from nexus_windows import actions, foreground, launch, physical, policy, realinput, session, snapshot, steam, uia
 from nexus_windows import win32 as w
@@ -99,7 +99,7 @@ def test_invoke_and_default_action_are_never_both_played():
     auto = FakeAuto()
     ex = chromium_executor(make_view(button), auto)
     ex._watched = _ignored(still=True)
-    ex.confirm = True  # « Envoyer » : accord de Julien
+    accorded(ex, lambda: ex.click("Envoyer"))  # « Envoyer » : geste sortant, accord lié à l'action exacte
     with pytest.raises(actions.Unconfirmed):
         ex.click("Envoyer")
     assert [c[0] for c in auto.calls] == ["invoke"]

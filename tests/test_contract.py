@@ -102,6 +102,20 @@ def as_call(call: object | None = None) -> log.Call:
     return cast(log.Call, call if call is not None else FakeCall())
 
 
+def token_of(refusal: str) -> str:
+    """Jeton d'accord rendu par un refus de geste sortant (garde_fous.Accords.request)."""
+    return refusal.rsplit('accord="', 1)[1].split('"', 1)[0]
+
+
+def accorded(ex: actions.Executor, attempt) -> str:
+    """Geste sortant : premier essai refusé (rien n'est fait) avec le résumé et un jeton, puis le oui de l'utilisateur
+    simulé : confirm=true et accord=jeton posés sur l'exécuteur, pour une nouvelle étape. Rend le refus."""
+    with pytest.raises(actions.ConfirmationRequired) as refused:
+        attempt()
+    ex.confirm, ex.accord, ex.approved = True, token_of(str(refused.value)), set()
+    return str(refused.value)
+
+
 def executor(view: snapshot.View, auto: object, shown: snapshot.View | None = None, rebuilt=None):
     state = {"view": view}
 
@@ -148,7 +162,7 @@ def test_name_target_rebuilds_after_an_action():
     ex = executor(make_view(old), FakeAuto(), rebuilt=make_view(fresh))
     ex.acted = True
     kind, element = ex.resolve("Envoyer")
-    assert element.node is fresh
+    assert element.node is fresh  # relu en place : parents et frères le retrouvent par identité
 
 
 # --- P7 : [N] résolu dans la numérotation montrée au modèle -------------------------------------------------

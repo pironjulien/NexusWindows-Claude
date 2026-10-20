@@ -270,3 +270,95 @@ contrat dépend, et l'instantané est déjà unique par appel (cache UIA en un a
 ailleurs : l'attente FIXE de 300 ms avant le rendu final de chaque act. Elle s'arrête désormais dès que l'interface
 est posée (deux empreintes PrintWindow réduites identiques à 50 ms d'intervalle, après 50 ms ; `settle_ms` reste le
 plafond) : 120–200 ms gagnés par act avec rendu.
+
+## Huitième passage — côte à côte avec Cua Driver 0.36.0 (0.12.0, 20 octobre)
+Question de Julien : « on est SOTA pour nexus windows ? ». Concurrent le plus proche : Cua Driver (trycua/cua,
+`cua-driver-rs` 0.36.0, mode « background delivery », release GitHub officielle, somme SHA-256 vérifiée, télémétrie
+coupée, installé hors OneDrive sous `~\.claude\nexus-claude\lab\cua`). Banc `bench/cua_vs_nexus.py` : les deux par leur
+vrai serveur MCP (stdio), même fenêtre du labo, mêmes tâches, Julien absent (0 entrée physique), fenêtre recouverte par
+une fenêtre opaque non activée. Cua piloté comme son guide le demande à un agent : `run_steps` par rôle et nom, mode
+d'arrière-plan d'abord ; capture d'abord avant un point ; `invoke_menu` puis clics ; « foreground_fallback » seulement
+après son refus. Effet jugé par l'application (événement émis ou valeur relue), jamais par le compte rendu.
+Résultats : `results/2026-10-20_0224-cua-vs-nexus.json` (nexus 0.13.0, après les relectures de Codex et
+d'Antigravity ; premier passage 0.12.0 : `2026-10-20_0137`, Tk `0148`).
+
+✓ effet prouvé, premier plan et curseur intacts · ⚠ effet prouvé, mais premier plan pris ou curseur réel déplacé
+(relevé toutes les millisecondes pendant l'appel, déplacement passager compris) · ~ effet non prouvé et l'outil le dit
+lui-même · ✗ échec ou refus honnête · **✗F** faux succès (l'outil annonce la réussite, l'application n'a rien reçu) ·
+— sans objet · n.m. non mesuré (point de la zone hors de l'image, défaut du banc).
+
+| Tâche | Win32 nexus / Cua | WinForms nexus / Cua | WPF nexus / Cua | Electron nexus / Cua | Edge nexus / Cua |
+|---|---|---|---|---|---|
+| Bouton | ✓ 32 / ✓ 65 ms | ✓ 54 / ✓ 94 | ✓ 116 / ✓ 66 | ✓ 144 / ✓ 126 | ✓ 144 / ✓ 134 |
+| Case | ✓ 60 / ✓ 624 | ✓ 67 / ✓ 649 | ✓ 117 / ✓ 610 | ✓ 142 / ✓ 650 | ✓ 138 / ✓ 660 |
+| Champ | ✓ 41 / ✓ 615 | ✓ 61 / ✓ 621 | ✓ 130 / ✓ 618 | ✓ 79 / ✓ 684 | ✓ 40 / ✓ 679 |
+| Éditeur riche | — | — | — | ✓ 141 / ⚠ 1394 (en premier plan, après ✗) | ✓ 125 / ⚠ 1370 (idem) |
+| Liste déroulante | ✓ 35 / ✓ 594 | ✓ 57 / ✓ 645 | ✓ 451 / ✓ 459 (clics, après ✗) | ✓ 158 / ~ puis ✗ | ✓ 130 / ~ puis ✗ |
+| Élément de liste | ✓ 39 / **✗F** (UIA Select) | ✓ 58 / ⚠ 631 (curseur déplacé) | ✓ 169 / ✓ 609 | ✓ 182 / ⚠ 686 (premier plan) | ✓ 145 / ⚠ 690 (premier plan) |
+| Menu | ✓ 7 / ✗ (invoke_menu puis clics) | ✓ 321 / ⚠ 408 (premier plan) | ✓ 436 / ✓ 1347 (clics, après ✗) | — | — |
+| Clic brut (canevas) | ✓ 187 / ✓ 921 | ✓ 167 / ✓ 758 | ✗ refus / ⚠ 213 (en premier plan, curseur) | n.m. / ⚠ 693 (premier plan) | ⚠ 130 (premier plan) / ⚠ 697 (idem) |
+| Molette | ✓ 182 / ✗ | ✓ 143 / ✗ | ✗ refus / ✗ | ~ / ✗ | ~ / ✗ |
+| Ctrl+K | ✓ 287 / **✗F** | ✓ 324 / **✗F** | ✗ refus / ⚠ 74 (en premier plan) | ✓ 709 / ✗ (en premier plan : sans effet) | ✓ 707 / ✗ (idem) |
+
+Tk (aucun élément UIA) : les deux refusent en arrière-plan ; Cua réussit clic et Ctrl+K avec `foreground_fallback`
+(premier plan pris 16–322 ms, curseur réel déplacé), nexus avec `foreground=true` et l'accord de Julien.
+
+| Bilan en arrière-plan (48 essais chacun, 0.13.0) | nexus-windows | Cua Driver 0.36.0 |
+|---|---|---|
+| Effet prouvé | 39 | 26 (+2 par clics, +3 en premier plan) |
+| Faux succès | 0 (0.12.0 : 2, molette web, corrigés) | 3 |
+| Effet non prouvé, dit par l'outil (~) | 2 (molette web) | 2 (liste déroulante web) |
+| Premier plan pris | 1 (Edge, clic brut, rendu) | 8 |
+| Curseur réel déplacé | 0 | 2 |
+| Durée médiane d'une action réussie | 138 ms | 628 ms |
+
+Premier passage (0.12.0, `2026-10-20_0137`, avant reclassement) : faux succès 2 contre 6 ; deux des six de Cua étaient
+ses « valeur posée, l'application ne l'a peut-être pas prise » (liste déroulante web), qu'il signale lui-même : ce sont
+des « ~ », comme ceux de nexus (relecture de Codex). Le curseur n'y était comparé qu'avant et après l'appel ; il est
+désormais relevé pendant (relecture de Codex), ce qui a trouvé le déplacement passager de Cua sur la liste WinForms.
+
+| Lecture (caractères, ms) | Win32 | WinForms | WPF | Electron | Edge |
+|---|---|---|---|---|---|
+| Liste complète nexus / Cua | 999 / 1 418 | 857 / 1 266 | 818 / 1 390 | 1 530 / 2 833 | 1 460 / 3 280 |
+| Après un clic : nexus `then="changes"` / Cua `observe` | 460 / 507 | 375 / 420 | 367 / 422 | 709 / 918 | 694 / 916 |
+| Capture seule nexus / Cua (ms) | 305 / 722 | 69 / 34 | 189 / 37 | 50 / 36 | 51 / 30 |
+
+Capture Cua d'une fenêtre non adaptée au DPI (Win32, WinForms, Tk du labo) : contenu réduit à 80 % et bande noire
+(36 % de l'image), le défaut que nexus a corrigé en 0.2.0. Ailleurs Cua capture plus vite (30–37 ms) : sa capture seule
+saute l'arbre UIA, celle de nexus le lit pour numéroter l'image (capture elle-même 11–25 ms dans les journaux).
+
+| Ce que Cua fait mieux ou autrement | Décision |
+|---|---|
+| Lecture des seuls changements (`since`, diff `+ ~ -`) | **repris** : `then="changes"` (act) et `show="changes"` (look), numéros [N] gardés, liste complète si presque tout a changé (60 %), même contrat que nexus-android ; réponse après un clic 2 à 2,6 fois plus courte que la liste |
+| Clic brut WPF en arrière-plan (« Injected click ») | **écarté** : mesuré, il déplace le vrai curseur de Julien et ne le remet pas ; nexus refuse et propose `foreground=true` |
+| Molette au point dans Chromium | sans gain : ni Cua ni nexus n'y arrivent recouvert ; sonde `bench/chromium_wheel_probe.py`, 8 variantes (fenêtre de rendu ou principale, survol d'abord, avec ou sans activation simulée) sur Electron 44 et Edge : aucun événement `wheel`. Le « ✓ déjà en bas » de nexus sur un point visé devient « ~ » avec la raison |
+| Curseur d'agent visible en surimpression (actif par défaut chez Cua ; Windows-MCP l'exclut de ses captures) | **écarté pour l'instant** : aucun gain mesuré sur l'effet, le focus ou la durée ; sur une fenêtre recouverte il pointerait la fenêtre de Julien ; à décider par Julien (option désactivée par défaut possible) |
+| Clics CDP dans un Chrome/Edge déjà ouvert (`browser_prepare existing_profile`) | **écarté** : il coche le débogage à distance dans le profil réel de l'utilisateur (accord de lancement exigé) ; le Chrome de Julien est déjà piloté par Claude in Chrome et NexusBrowser, et nexus réussit déjà en Chromium sans DevTools (éditeur riche, liste déroulante, Ctrl+K ci-dessus) là où Cua échoue ou prend le premier plan |
+| Capture seule plus rapide | sans gain sûr : l'écart vient de la numérotation de l'image (contrat de look) ; la capture elle-même est au même niveau |
+| Script JavaScript (`run_script`), enregistrement de trajectoires, `verify_state` | équivalents : routines vérifiées, `check`/`expect` |
+
+Autres outils étudiés (code lu, non exécutés) : CursorTouch/Windows-MCP, deploymenttheory/windows-mcp-server et
+microsoft/UFO² prennent tous la vraie souris ou le premier plan (UFO focalise la cible avant chaque action ; son « bureau
+Picture-in-Picture » n'existe pas encore dans le code) et capturent l'écran entier (fenêtre recouverte invisible). Pistes
+hors du périmètre « arrière-plan » : Office par COM (UFO), IAccessible2 pour Firefox (Firefox absent du poste), OCR
+Windows en secours des canevas.
+
+### Micro-essais demandés par les relectures (0.13.0, `bench/background_probes.py`, fenêtre recouverte, Julien absent)
+| Essai | Résultat mesuré | Décision |
+|---|---|---|
+| WPF Ctrl+K : messages seuls | ✗ sans effet | — |
+| WPF Ctrl+K : activation simulée étendue (WM_NCACTIVATE + WM_ACTIVATE + WM_SETFOCUS envoyés, état clavier simulé) | ✗, et WPF **prend le premier plan** à la réception de WM_ACTIVATE | écarté : WPF garde le refus franc |
+| Molette Chromium : WM_POINTERWHEEL posté (rendu, avec ou sans activation simulée) | refusé par Windows (PostMessage, erreur 1002 : messages pointeur non postables) | écarté |
+| Molette Chromium : WM_VSCROLL SB_LINEDOWN à Chrome_RenderWidgetHostHWND | ✗ sans effet (Electron, Edge) | écarté |
+| Tk : clic, molette, Ctrl+K postés à la fenêtre enfant du canevas | ✗ sans effet (les trois) | écarté : Tk reste sans canal d'arrière-plan |
+| InjectSyntheticPointerInput (toucher) au centre de la zone recouverte | va à la fenêtre **du dessus** (lors de l'essai, la fenêtre de l'appli Claude : un toucher sans effet visible), déplace le curseur ; seule la WPF découverte l'a reçu, en prenant le premier plan | **écarté** : touche la fenêtre de Julien et son curseur |
+| OCR Windows (Windows.Media.Ocr) sur les captures du labo | 10–21 ms (113 ms au premier appel) ; justes : 16/16 (WPF), 20/23 (Edge), 6/7 (Tk : « l.abo Tk ») ; par le vrai serveur, Tk : 6 textes en [N], « Valider » ciblé par son nom → clic réel avec `foreground=true`, effet prouvé (« clic 1 ») | **repris** en secours (< 6 éléments UIA ou page Chromium muette) |
+
+Défaut trouvé en chemin : les boutons Tk se publient en « Button » Win32 (proxy MSAA) ; nexus leur envoyait BN_CLICKED,
+que Tk ignore (« ~ » sans effet, même avec `foreground=true`). Corrigé : toute fenêtre Tk est traitée en Tk (refus franc,
+vraie souris avec accord). Lecture des seuls changements, d'après les relectures : un ajout ou un changement coupé au-delà
+de 200 lignes perd son [N], un [N] retiré n'est jamais redonné (compteur par fenêtre), un défilement commun tient en une ligne.
+
+Conclusion mesurée : nexus-windows reste devant sur ce qui compte (effet prouvé 39/48 contre 26/48, 0 faux succès
+contre 3, premier plan pris 1 fois contre 8, curseur jamais touché, actions réussies 4,5 fois plus rapides) ; la lecture
+des seuls changements, seul vrai gain de Cua, est reprise, et l'OCR en secours couvre les fenêtres sans arbre UIA.

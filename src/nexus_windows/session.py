@@ -132,6 +132,9 @@ class Session:
             return
         by_id = view.by_id
         view.displayed = {i: snapshot.identity(by_id[i].props) for i in ids if i in by_id}
+        # Propriétés telles que montrées (position, valeur, états), copiées : les actions relisent les éléments en
+        # place, then="changes" compare toujours à ce que le modèle a vu.
+        view.frozen = {i: dict(by_id[i].props) for i in view.displayed}
         self.shown[view.hwnd] = view
 
     def mark_image(self, view: snapshot.View) -> None:

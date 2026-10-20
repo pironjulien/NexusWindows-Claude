@@ -1,0 +1,547 @@
+"""Banc côte à côte : nexus-windows contre Cua Driver (trycua/cua, cua-driver-rs, « background delivery »).
+
+Les deux par leur vrai serveur MCP (stdio), sur la même fenêtre du labo, pour les mêmes tâches que RESULTS.md :
+bouton, case, champ, éditeur riche, liste déroulante, élément de liste, menu, clic brut, molette, raccourci, capture
+d'une fenêtre recouverte. Chaque essai : effet PROUVÉ par l'application (événement émis, ou valeur relue par UIA pour
+le champ Nom des applications de bureau), ce que l'outil a déclaré (pour compter les faux succès), premier plan pris
+par un autre que Julien (relevé toutes les millisecondes), curseur réel déplacé, durée de l'appel.
+
+Cua est piloté comme son guide le demande à un agent : `run_steps` avec cible par rôle et nom, mode d'arrière-plan
+d'abord ; seulement s'il répond « background_unavailable », le même lot est renvoyé avec `foreground_fallback`
+(noté à part : c'est un vol de premier plan assumé). Cua Driver s'installe hors OneDrive (CUA ci-dessous) depuis sa
+release GitHub officielle, télémétrie coupée (`cua-driver telemetry disable`).
+
+Banc intrusif : refusé si Julien a utilisé clavier ou souris depuis moins de 2 min (comme `pytest -m live`).
+Usage : python bench/cua_vs_nexus.py [win32 winforms wpf tk electron edge] [--wait secondes]
+Résultats : bench/results/<date>-cua-vs-nexus.json
+"""
+
+from __future__ import annotations
+
+import asyncio
+import ctypes
+import datetime
+import json
+import os
+import sys
+import threading
+import time
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tests" / "live"))
+sys.path.insert(0, str(ROOT / "lab"))
+
+import apps  # noqa: E402
+import drive  # noqa: E402
+from mcp import Client, StdioServerParameters  # noqa: E402
+
+from nexus_windows import foreground, uia  # noqa: E402
+from nexus_windows import win32 as w  # noqa: E402
+
+CUA = Path.home() / ".claude" / "nexus-claude" / "lab" / "cua" / "bin" / "cua-driver.exe"
+WEB = drive.WEB
+DESKTOP = ("win32", "winforms", "wpf")
+Expect = Callable[[str], bool]
+
+
+class _Point(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+def cursor() -> tuple[int, int]:
+    point = _Point()
+    ctypes.windll.user32.GetCursorPos(ctypes.byref(point))
+    return point.x, point.y
+
+
+class Foreground:
+    """Premier plan relevé toutes les millisecondes pendant un appel : chaque fenêtre qui l'a pris à la place de celle
+    de départ (fenêtre du labo, surimpression de l'outil…), avec sa durée cumulée."""
+
+    def __init__(self) -> None:
+        self.start = w.foreground()
+        self.taken: dict[str, float] = {}
+        self.cursor0 = cursor()
+        self.cursor_moved = False  # curseur réel déplacé à un instant quelconque de l'appel (même remis ensuite)
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="bench-foreground", daemon=True)
+
+    def _run(self) -> None:
+        last = time.perf_counter()
+        while not self._stop.is_set():
+            now = time.perf_counter()
+            fg = w.foreground()
+            if not self.cursor_moved and cursor() != self.cursor0:
+                self.cursor_moved = True
+            if fg and fg != self.start:
+                key = f"{w.class_name(fg)} (pid {w.window_pid(fg)})"
+                self.taken[key] = self.taken.get(key, 0.0) + (now - last)
+            last = now
+            time.sleep(0.001)
+
+    def __enter__(self) -> Foreground:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join(2)
+        if w.foreground() != self.start and self.start:
+            self.not_given_back = True
+            foreground.give_back(self.start)  # banc : le premier plan de départ revient avant l'essai suivant
+        else:
+            self.not_given_back = False
+
+    def summary(self) -> str:
+        if not self.taken:
+            return "intact"
+        parts = [f"{k} {round(v * 1000)} ms" for k, v in self.taken.items()]
+        return "PRIS : " + ", ".join(parts) + (" (non rendu)" if self.not_given_back else "")
+
+
+def nexus_params() -> StdioServerParameters:
+    return drive.server_params()
+
+
+def cua_params() -> StdioServerParameters:
+    return StdioServerParameters(command=str(CUA), args=["mcp"], env=dict(os.environ))
+
+
+def text_of(result: Any) -> str:
+    return drive.text_of(result)
+
+
+# --- Géométrie : point de la zone (canevas) en pixels d'image de chaque outil -----------------------------------
+def zone_screen(app: apps.LabApp) -> tuple[int, int] | None:
+    """Centre de la zone (canevas) en pixels d'écran. Page web : amenée dans la vue d'abord (ScrollIntoView par le
+    banc, pour les deux outils) ; WPF (Border sans pair UIA) : sous le statut ; Tk : donné par l'application."""
+    if "zone_hwnd" in app.extra:
+        return w.window_rect(app.extra["zone_hwnd"]).center
+    uia.com_init()
+    auto = uia.Automation(auto_set_focus=False)
+    tree = auto.tree(app.hwnd)
+    for node in tree.walk():
+        if node.name == "Zone" and node.rect is not None and node.rect.height > 40:
+            if app.kind in WEB:
+                try:
+                    auto.scroll_into_view(node.element)
+                    time.sleep(0.3)
+                    node = next(n for n in auto.tree(app.hwnd).walk() if n.name == "Zone" and n.rect is not None)
+                except uia.UIAError, StopIteration:
+                    pass
+            assert node.rect is not None
+            return node.rect.center
+    statut = next((n for n in tree.walk() if n.control_type == "Text" and n.name == "Statut" and n.rect), None)
+    if statut is not None and statut.rect is not None:
+        return statut.rect.left + 160, statut.rect.bottom + 60
+    return None
+
+
+def to_image(app: apps.LabApp, point: tuple[int, int], size: tuple[int, int]) -> tuple[int, int]:
+    """Point écran → pixels d'une image de toute la fenêtre (rectangle GetWindowRect) de taille `size`."""
+    rect = w.window_rect(app.hwnd)
+    sx, sy = size[0] / rect.width, size[1] / rect.height
+    return round((point[0] - rect.left) * sx), round((point[1] - rect.top) * sy)
+
+
+class Cover:
+    """Fenêtre opaque posée sur celle du labo sans être activée (comme une fenêtre de Julien par-dessus) : toutes les
+    mesures se font fenêtre recouverte, cas réel d'un agent qui travaille derrière Julien."""
+
+    def __init__(self, hwnd: int) -> None:
+        self.target = hwnd
+        self.hwnd = 0
+        self._ready = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="bench-cover", daemon=True)
+
+    def _run(self) -> None:
+        user32 = ctypes.windll.user32
+        user32.CreateWindowExW.restype = ctypes.c_void_p
+        user32.CreateWindowExW.argtypes = [ctypes.c_uint32, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        user32.CreateWindowExW.argtypes += [ctypes.c_int] * 4 + [ctypes.c_void_p] * 4
+        rect = w.window_rect(self.target)
+        ex = 0x08000000 | 0x00000080  # WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
+        style = 0x80000000 | 0x00800000  # WS_POPUP | WS_BORDER (rendu visible juste après, sans activation)
+        handle = user32.CreateWindowExW(
+            ex, "Static", "Couverture du banc", style, rect.left - 20, rect.top - 20, rect.width + 40,
+            rect.height + 40, None, None, None, None,
+        )  # fmt: skip
+        self.hwnd = int(handle or 0)
+        if self.hwnd:
+            user32.SetWindowPos(ctypes.c_void_p(self.hwnd), None, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+        self._ready.set()
+        msg = ctypes.create_string_buffer(64)
+        while user32.GetMessageW(msg, None, 0, 0) > 0:
+            user32.TranslateMessage(msg)
+            user32.DispatchMessageW(msg)
+
+    def __enter__(self) -> Cover:
+        self._thread.start()
+        self._ready.wait(5)
+        return self
+
+    def raise_(self) -> None:
+        """Remet la couverture devant la fenêtre du labo (qui a pu remonter), toujours sans activation."""
+        if self.hwnd:
+            flags = 0x0001 | 0x0002 | 0x0010 | 0x0040  # NOSIZE | NOMOVE | NOACTIVATE | SHOWWINDOW
+            ctypes.windll.user32.SetWindowPos(ctypes.c_void_p(self.hwnd), None, 0, 0, 0, 0, flags)
+
+    def __exit__(self, *exc: object) -> None:
+        if self.hwnd:
+            ctypes.windll.user32.PostMessageW(ctypes.c_void_p(self.hwnd), 0x0010, 0, 0)  # WM_CLOSE
+            ctypes.windll.user32.PostThreadMessageW(self._thread.native_id, 0x0012, 0, 0)  # WM_QUIT
+        self._thread.join(3)
+
+
+def covered(app: apps.LabApp) -> bool:
+    """La fenêtre du labo est-elle recouverte (au centre) par une autre fenêtre ?"""
+    rect = w.window_rect(app.hwnd)
+    cx, cy = rect.left + rect.width // 2, rect.top + rect.height // 2
+    hit = ctypes.windll.user32.WindowFromPoint(_Point(cx, cy))
+    return bool(hit) and w.root(w.handle(hit)) != app.hwnd
+
+
+# --- Tâches ----------------------------------------------------------------------------------------------------
+# (tâche, familles, attendu côté nexus, attendu côté Cua). Valeurs différentes pour les deux outils : chaque essai
+# change l'état et ne peut pas être confondu avec le précédent.
+TASKS: list[tuple[str, tuple[str, ...]]] = [
+    ("bouton", DESKTOP + WEB),
+    ("case", DESKTOP + WEB),
+    ("champ", DESKTOP + WEB),
+    ("éditeur riche", WEB),
+    ("liste déroulante", DESKTOP + WEB),
+    ("élément de liste", DESKTOP + WEB),
+    ("menu", DESKTOP),
+    ("clic brut", DESKTOP + WEB + ("tk",)),
+    ("molette", DESKTOP + WEB + ("tk",)),
+    ("raccourci ctrl+k", DESKTOP + WEB + ("tk",)),
+]
+VALUES = {
+    "nexus": {"nom": "Julien Piron", "couleur": "Bleu", "item": "Charlie", "edit": "Bonjour"},
+    "cua": {"nom": "Cua Driver", "couleur": "Vert", "item": "Bravo", "edit": "Salut"},
+}
+
+
+def expectation(task: str, tool: str, kind: str) -> Expect | None:
+    v = VALUES[tool]
+    return {
+        "bouton": lambda e: e.startswith("clic"),
+        "case": lambda e: e.startswith("coche"),
+        "champ": (lambda e: e == f"nom {v['nom']}") if kind in WEB else None,
+        "éditeur riche": lambda e: e.startswith("editeur") and v["edit"] in e,
+        "liste déroulante": lambda e: e == f"couleur {v['couleur']}",
+        "élément de liste": lambda e: e == f"liste {v['item']}",
+        "menu": lambda e: e == "menu action",
+        "clic brut": lambda e: e.startswith("zone gauche"),
+        "molette": lambda e: e.startswith("molette"),
+        "raccourci ctrl+k": lambda e: e == "raccourci ctrl+k",
+    }[task]
+
+
+def name_value(app: apps.LabApp) -> str | None:
+    """Valeur du champ Nom relue par UIA (applications de bureau : aucun événement émis pour ce champ)."""
+    uia.com_init()
+    auto = uia.Automation(auto_set_focus=False)
+    for node in auto.tree(app.hwnd).walk():
+        if node.control_type == "Edit" and node.name == "Nom":
+            try:
+                value = auto.refresh(node.element).get("value")
+            except uia.UIAError:
+                return None
+            if value is None and node.hwnd:
+                value = w.get_text_message(node.hwnd)
+            return value
+    return None
+
+
+def nexus_call(task: str, app: apps.LabApp, image_size: tuple[int, int]) -> tuple[str, dict]:
+    v = VALUES["nexus"]
+    hwnd = app.hwnd
+    steps: list[dict[str, Any]]
+    if task == "bouton":
+        steps = [{"do": "click", "target": "Valider"}]
+    elif task == "case":
+        steps = [{"do": "toggle", "target": "Option"}]
+    elif task == "champ":
+        steps = [{"do": "set", "target": "champ:Nom", "text": v["nom"]}]
+    elif task == "éditeur riche":
+        steps = [{"do": "type", "target": "Éditeur", "text": v["edit"]}]
+    elif task == "liste déroulante":
+        steps = [{"do": "select", "target": "Couleur", "option": v["couleur"]}]
+    elif task == "élément de liste":
+        steps = [{"do": "click", "target": v["item"]}]
+    elif task == "menu":
+        steps = [{"do": "menu", "path": "Fichier > Action menu"}]
+    elif task in ("clic brut", "molette"):
+        point = zone_screen(app)
+        if point is None:
+            raise RuntimeError("zone introuvable")
+        x, y = to_image(app, point, image_size)
+        steps = [{"do": "click", "target": f"{x},{y}"}] if task == "clic brut" else [
+            {"do": "scroll", "target": f"{x},{y}", "direction": "down", "amount": 1}
+        ]  # fmt: skip
+    else:
+        steps = [{"do": "key", "keys": "ctrl+k"}]
+    return "act", {"window": hwnd, "steps": steps, "then": "none"}
+
+
+def cua_calls(task: str, app: apps.LabApp, image_size: tuple[int, int], attempt: str) -> list[tuple[str, dict]]:
+    """Appels qu'un agent ferait avec Cua, d'après son guide : run_steps par rôle et nom ; pour un point, une capture
+    d'abord (get_window_state : elle fixe le cadre des coordonnées) ; menu par invoke_menu, puis par clics."""
+    v = VALUES["cua"]
+    pid, wid = w.window_pid(app.hwnd), app.hwnd
+    base = {"pid": pid, "window_id": wid}
+    calls: list[tuple[str, dict]] = []
+    steps: list[dict[str, Any]]
+    if task == "menu" and attempt == "arrière-plan":
+        return [("invoke_menu", {**base, "path": ["Fichier", "Action menu"]})]
+    if task == "menu":
+        steps = [
+            {"click": {"role": "menuitem", "name": "Fichier"}},
+            {"click": {"role": "menuitem", "name": "Action menu"}},
+        ]
+    elif task == "bouton":
+        steps = [{"click": {"role": "button", "name": "Valider"}}]
+    elif task == "case":
+        steps = [{"click": {"role": "checkbox", "name": "Option"}}]
+    elif task == "champ":
+        # Page web : « Nom » désigne aussi l'étiquette (Cua refuse l'ambiguïté) ; l'agent ajoute nth comme demandé.
+        nth = {"nth": 1} if app.kind in WEB else {}
+        steps = [{"set_value": {"role": "textfield", "name": "Nom", "value": v["nom"], **nth}}]
+    elif task == "éditeur riche":
+        steps = [{"click": {"name": "Éditeur", "nth": 1}}, {"type_text": {**base, "text": v["edit"]}}]
+    elif task == "liste déroulante" and attempt == "par clics":
+        # Ce que la réponse de Cua conseille quand la valeur posée n'est pas une sélection : ouvrir, puis l'option.
+        steps = [{"click": {"role": "combobox", "name": "Couleur"}}, {"click": {"name": v["couleur"]}}]
+    elif task == "liste déroulante":
+        steps = [{"set_value": {"role": "combobox", "name": "Couleur", "value": v["couleur"]}}]
+    elif task == "élément de liste":
+        steps = [{"click": {"role": "listitem", "name": v["item"]}}]
+    elif task in ("clic brut", "molette"):
+        point = zone_screen(app)
+        if point is None:
+            raise RuntimeError("zone introuvable")
+        x, y = to_image(app, point, image_size)
+        calls.append(("get_window_state", {**base, "include_accessibility_tree": False}))
+        if task == "clic brut":
+            steps = [{"click": {**base, "x": x, "y": y}}]
+        else:
+            steps = [{"scroll": {**base, "x": x, "y": y, "direction": "down", "amount": 1}}]
+    else:
+        steps = [{"hotkey": {**base, "keys": ["ctrl", "k"]}}]
+    args: dict[str, Any] = {**base, "steps": steps}
+    if attempt == "premier plan":
+        args["foreground_fallback"] = True
+    calls.append(("run_steps", args))
+    return calls
+
+
+def cua_refused_background(text: str) -> bool:
+    low = text.lower()
+    return "background_unavailable" in low or "foreground_fallback" in low or "background input" in low
+
+
+UNCERTAIN = ("may change the shown text", "check with get_window_state", "verify t", "unverifiable")
+
+
+def claim_of(result: Any, text: str) -> str:
+    """Ce que Cua a déclaré : « ok », « incertain » (il dit lui-même que l'effet n'est pas prouvé, l'équivalent du
+    « ~ » de nexus) ou « échec »."""
+    if result.is_error:
+        return "échec"
+    low = text.lower()
+    if any(m in low for m in ("error", "failed", "✗", "refused", "unavailable", "not found", "no element")):
+        return "échec"
+    return "incertain" if any(m in low for m in UNCERTAIN) else "ok"
+
+
+def nexus_claim(text: str) -> str:
+    first = text.splitlines()[0] if text else ""
+    if not drive.step_ok(first):
+        return "échec"
+    return "ok" if "✓" in first[:8] else "incertain"
+
+
+async def capture(client: Client, tool: str, app: apps.LabApp) -> dict:
+    """Capture de la fenêtre (recouverte par celles de Julien) : durée, taille, image pleine (non noire, non vide)."""
+    t0 = time.perf_counter()
+    if tool == "nexus":
+        result = await client.call_tool("look", {"window": app.hwnd, "show": "image"})
+    else:
+        args = {"pid": w.window_pid(app.hwnd), "window_id": app.hwnd, "include_accessibility_tree": False}
+        result = await client.call_tool("get_window_state", args)
+    ms = (time.perf_counter() - t0) * 1000
+    image = drive.image_of(result)
+    if image is None:
+        return {"ok": False, "ms": round(ms), "note": text_of(result)[:200], "size": None}
+    gray = image.convert("L")
+    hist = gray.histogram()
+    dark = sum(hist[:20]) / (image.width * image.height)
+    top = max(hist) / (image.width * image.height)
+    ok = dark < 0.5 and top < 0.97  # ni noire, ni d'une seule couleur
+    path = apps.STATE / "cua-vs-nexus"
+    path.mkdir(parents=True, exist_ok=True)
+    image.save(path / f"{app.kind}-{tool}.png")
+    note = f"{image.width}×{image.height}, sombre {dark:.0%}, couleur dominante {top:.0%}"
+    return {"ok": ok, "ms": round(ms), "note": note, "size": (image.width, image.height)}
+
+
+async def run_task(
+    client: Client, tool: str, task: str, app: apps.LabApp, events: drive.Events, size: tuple[int, int]
+) -> dict:
+    expect = expectation(task, tool, app.kind)
+    out: dict[str, Any] = {"tâche": task}
+    by_clicks = tool == "cua" and task in ("menu", "liste déroulante")
+    attempts = ["arrière-plan"] + (["par clics"] if by_clicks else []) + ["premier plan"]
+    for attempt in attempts:
+        if tool == "nexus" and attempt != "arrière-plan":
+            break  # nexus choisit seul sa technique ; aucun premier plan sans l'accord de Julien
+        events.reset()
+        if tool == "nexus":
+            calls = [nexus_call(task, app, size)]
+        else:
+            calls = cua_calls(task, app, size, attempt)
+        mouse0 = cursor()
+        with Foreground() as fg:
+            t0 = time.perf_counter()
+            result: Any = None
+            for name, args in calls:
+                result = await client.call_tool(name, args)
+            ms = (time.perf_counter() - t0) * 1000
+        text = text_of(result)
+        if expect is not None:
+            seen = events.collect(1.5, lambda s, e=expect: any(e(x) for x in s))
+            effect = any(expect(x) for x in seen)
+        else:
+            value = name_value(app)
+            seen = [f"valeur relue : {value!r}"]
+            effect = value == VALUES[tool]["nom"]
+        claim = claim_of(result, text) if tool == "cua" else nexus_claim(text)
+        row = {
+            "effet": effect,
+            "déclaré": claim,
+            "faux succès": claim == "ok" and not effect,
+            "premier plan": fg.summary(),
+            "curseur déplacé": fg.cursor_moved or cursor() != mouse0,
+            "ms": round(ms),
+            "appels": [name for name, _ in calls],
+            "réponse": text[:400],
+            "vu": [s[:80] for s in seen[-3:]],
+        }
+        out[attempt] = row
+        flag = "OK " if effect else "NON"
+        print(f"   {tool:5} {attempt:12} {flag} {task:18} {ms:6.0f} ms  {fg.summary()[:70]}  {text[:90]!r}")
+        if tool == "nexus" or effect:
+            break
+        if attempt == "arrière-plan" and by_clicks:
+            continue  # invoke_menu en échec, ou valeur posée sans sélection : l'agent essaie les clics par nom
+        if not cua_refused_background(text):
+            break
+    return out
+
+
+async def reading_sizes(nexus: Client, cua: Client, app: apps.LabApp) -> dict:
+    """Taille des réponses (caractères) : liste complète, puis rendu après un clic (nexus then="changes", Cua
+    run_steps avec observe : ses lectures « since » par défaut). Moins de texte = moins de jetons pour l'agent."""
+    pid, wid = w.window_pid(app.hwnd), app.hwnd
+    out: dict[str, Any] = {}
+    t0 = time.perf_counter()
+    full_n = text_of(await nexus.call_tool("look", {"window": wid, "show": "elements"}))
+    out["nexus liste"] = {"car": len(full_n), "ms": round((time.perf_counter() - t0) * 1000)}
+    t0 = time.perf_counter()
+    args = {"pid": pid, "window_id": wid, "include_screenshot": False}
+    full_c = text_of(await cua.call_tool("get_window_state", args))
+    out["cua liste"] = {"car": len(full_c), "ms": round((time.perf_counter() - t0) * 1000)}
+    t0 = time.perf_counter()
+    step = {"do": "click", "target": "Valider"}
+    after_n = text_of(await nexus.call_tool("act", {"window": wid, "steps": [step], "then": "changes"}))
+    out["nexus après clic (changes)"] = {"car": len(after_n), "ms": round((time.perf_counter() - t0) * 1000)}
+    t0 = time.perf_counter()
+    batch = {"pid": pid, "window_id": wid, "steps": [{"click": {"role": "button", "name": "Valider"}}], "observe": {}}
+    after_c = text_of(await cua.call_tool("run_steps", batch))
+    out["cua après clic (observe)"] = {"car": len(after_c), "ms": round((time.perf_counter() - t0) * 1000)}
+    out["textes"] = {"nexus": after_n[:600], "cua": after_c[:600]}
+    for key, value in out.items():
+        if key != "textes":
+            print(f"   lecture {key:28} {value['car']:6} car  {value['ms']:5} ms")
+    return out
+
+
+async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
+    app = apps.launch(kind, x=150, y=110)
+    events = drive.Events(app)
+    report: dict[str, Any] = {"famille": kind, "recouverte": None, "capture": {}, "tâches": []}
+    try:
+        with Cover(app.hwnd) as cover:
+            await asyncio.sleep(1.0)
+            await nexus.call_tool("look", {"window": app.hwnd, "show": "elements"})  # arbre publié (Chromium)
+            cover.raise_()
+            report["recouverte"] = covered(app)
+            print(f"== {kind} : {w.window_text(app.hwnd)!r}, recouverte={report['recouverte']}")
+            if app.kind != "tk":
+                report["lecture"] = await reading_sizes(nexus, cua, app)
+            sizes = {}
+            for tool, client in (("nexus", nexus), ("cua", cua)):
+                cap = await capture(client, tool, app)
+                report["capture"][tool] = cap
+                sizes[tool] = cap["size"] or (1, 1)
+                print(f"   {tool:5} capture      {'OK ' if cap['ok'] else 'NON'} {cap['ms']:5} ms  {cap['note']}")
+            for task, kinds in TASKS:
+                if kind not in kinds:
+                    continue
+                row: dict[str, Any] = {"tâche": task}
+                for tool, client in (("nexus", nexus), ("cua", cua)):
+                    cover.raise_()
+                    try:
+                        row[tool] = await run_task(client, tool, task, app, events, sizes[tool])
+                    except Exception as exc:  # noqa: BLE001  (banc : une erreur d'un outil n'arrête pas l'autre)
+                        row[tool] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
+                        print(f"   {tool:5} ERREUR {task} : {exc}")
+                row["recouverte"] = covered(app)
+                report["tâches"].append(row)
+    finally:
+        app.close()
+    return report
+
+
+async def main(kinds: list[str], wait_s: float) -> None:
+    if not CUA.exists():
+        raise SystemExit(f"Cua Driver absent : {CUA}")
+    results = []
+    async with (
+        Client(nexus_params(), read_timeout_seconds=120) as nexus,
+        Client(cua_params(), read_timeout_seconds=120) as cua,
+    ):
+        deadline = time.monotonic() + wait_s
+        for kind in kinds:
+            while True:
+                try:
+                    results.append(await bench_app(kind, nexus, cua))
+                    break
+                except apps.JulienActive as exc:
+                    print(f"== {kind} : {exc}", flush=True)
+                    if time.monotonic() > deadline:
+                        results.append({"famille": kind, "refus": str(exc)})
+                        break
+                    await asyncio.sleep(30)  # Julien au travail : on attend qu'il s'absente
+    out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-cua-vs-nexus.json"
+    text = json.dumps(results, ensure_ascii=False, indent=1)
+    # Réponses brutes des deux serveurs : le profil du poste (URL file:/// du labo) n'a rien à faire dans un relevé.
+    for home in {Path.home().as_posix(), str(Path.home()).replace("\\", "\\\\")}:
+        text = text.replace(home, "~")
+    out.write_text(text, encoding="utf-8")
+    print(f"Résultats : {out}")
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    args = sys.argv[1:]
+    wait = 0.0
+    if "--wait" in args:  # --wait <secondes> : attendre l'absence de Julien au lieu de refuser
+        i = args.index("--wait")
+        wait = float(args[i + 1])
+        del args[i : i + 2]
+    asyncio.run(main(args or list(apps.KINDS), wait))

@@ -12,6 +12,14 @@ DÉCLENCHE, pas sur sa forme, pour ne pas être contourné :
 - pages DevTools : mêmes questions posées au DOM (élément actif, boutons d'envoi de son formulaire, élément au point).
 Un élément de liste, d'arbre, un onglet, un champ ou une case ne déclenche rien (rôles non actifs) ; un élément de menu
 qui ouvre un sous-menu non plus (« Envoyer vers »). Politique illisible : refus (échec fermé).
+
+Accord de la trinité du 19/10/2026 (« ameliorations-outils », priorité 1) : un geste SORTANT (garde_fous.outward_word :
+envoyer, appeler, payer, publier, transférer…) exige en plus accord=<jeton> lié à l'action EXACTE
+(garde_fous.Accords, un objet par serveur) : geste, déclencheur(s), processus et titre de la fenêtre, et le CONTENU
+(valeurs des champs éditables de la fenêtre, texte tapé par l'étape). Le premier essai rend le résumé et un jeton
+neuf ; tout changement entre l'accord et le geste l'annule. Tous les chemins ci-dessus passent par ce même contrôle,
+une seule fois par geste (déclencheurs UIA et DOM réunis). Les destructions locales (désinstaller, formater…)
+gardent confirm=true seul. Un texte lu ne peut jamais élargir une autorisation.
 """
 
 from __future__ import annotations
@@ -194,51 +202,122 @@ _DOM_POINT_JS = (
 )
 
 
+# DOM : valeurs des champs éditables de la page (jamais les mots de passe), ce que l'accord lie comme contenu.
+_DOM_FIELDS_JS = (
+    "(() => { const out = [];"
+    " document.querySelectorAll('input:not([type=password]):not([type=hidden]):not([type=checkbox]):not([type=radio])"
+    ':not([type=submit]):not([type=button]),textarea,[contenteditable=""],[contenteditable=true]\').forEach(e => {'
+    " const v = ((e.isContentEditable ? e.innerText : e.value) || '').trim(); if (!v) return;"
+    " const n = (e.getAttribute('aria-label') || e.name || e.id || e.placeholder || '').trim().slice(0, 60);"
+    " out.push(n + ': ' + v); }); return out; })()"
+)
+CONTENT_CHARS = 20000  # texte d'un document lu au plus par champ (TextPattern)
+
+
 class ConfirmActions(ExecutorBase):
     """Contrôles de confirmation appelés par les actions (clic, touches, saisie) avant toute entrée envoyée."""
 
     def _title(self) -> str:
         return w.window_text(self.hwnd)
 
-    def _refuse_if(self, what: str, labels: list[tuple[str, str]]) -> None:
-        if self.confirm:
+    def _field_contents(self) -> list[str]:
+        """« nom: valeur » des champs éditables de la fenêtre (Edit, Document ; DOM s'il y a une page), triés : le
+        contenu que l'accord lie (destinataires, objet, corps). Jamais un mot de passe."""
+        view = self._rebuild() if self.acted else self.view
+        fields: list[str] = []
+        for node in _all_nodes(view):
+            if node.control_type not in ("Edit", "Document") or node.props.get("password"):
+                continue
+            value = node.props.get("value")
+            if not str(value or "").strip() and node.props.get("has_text"):
+                value = self.auto.text(node.element, max_chars=CONTENT_CHARS)
+            if str(value or "").strip():
+                fields.append(f"{node.name}: {str(value).strip()}")
+        page = self._get_page()
+        if page is not None:
+            try:
+                found = page.evaluate(_DOM_FIELDS_JS) or []
+                fields += [f"page {item}" for item in found]
+            except cdp.CDPError, TypeError, ValueError:
+                fields.append("page fields unreadable")
+        return sorted(fields)
+
+    def _check_accord(self, what: str, outward: list[tuple[str, str, str]], title: str) -> None:
+        """Geste sortant : permis seulement avec confirm=true ET l'accord lié à cette action exacte."""
+        labels = sorted({" ".join(label.split()) for label, _source, _word in outward})
+        content = self._field_contents()
+        if self.step_text:
+            content.append(f"typed: {self.step_text}")
+        act = garde_fous.action(
+            "windows",
+            self.gesture or what,
+            " | ".join(labels),
+            content="\n".join(content),
+            context=f"{self.view.info.process} — {title}",
+        )
+        key = garde_fous.fingerprint(act)
+        if key in self.approved:
             return
         try:
+            registry = policy.accords()
+        except policy.PolicyError as error:
+            raise ActionError(str(error)) from error
+        answer = registry.check(act, self.confirm, self.accord)
+        if not answer:
+            self.approved.add(key)
+            return
+        label, source, word = outward[0]
+        detail = f"{what} ({source})" if source else what
+        raise ConfirmationRequired(
+            f'{detail} on "{label.strip()[:60]}": outward action ("{english_word(word)}").\n{answer}'
+        )
+
+    def _refuse_if(self, what: str, labels: list[tuple[str, str]]) -> None:
+        """Tout ce que le geste déclencherait, réuni : destruction locale → confirm=true ; geste sortant → confirm=true
+        et accord lié à l'action exacte. Un seul contrôle par geste (un seul jeton)."""
+        try:
             title = self._title()
+            outward: list[tuple[str, str, str]] = []
             for label, source in labels:
-                word = garde_fous.confirm_word(label, title)
+                word = garde_fous.outward_word(label, title)
                 if word:
+                    outward.append((label, source, word))
+                elif not self.confirm and (word := garde_fous.confirm_word(label, title)):
                     detail = f"{what} ({source})" if source else what
                     raise ConfirmationRequired(refusal(detail, label, word))
+            if outward:
+                self._check_accord(what, outward, title)
         except garde_fous.GardeFousError as error:
             raise ActionError(f"safety policy unreadable ({error}): nothing was done (fail closed)") from error
 
     def _confirm_click(self, e: snapshot.Element, button: str = "left") -> None:
-        """Clic gauche (simple ou double) sur un élément : refus sans confirm si ce qu'il déclenche est à confirmer."""
-        if self.confirm or button != "left":
+        """Clic gauche (simple ou double) sur un élément : ce qu'il déclenche est contrôlé (confirm, accord)."""
+        if button != "left":
             return
         trigger = trigger_of(e.node)
         if trigger is not None:
             self._refuse_if("click", [(label_of(trigger), "")])
 
     def _confirm_point(self, x: int, y: int, button: str = "left") -> None:
-        """Clic en coordonnées : même contrôle que le clic sur l'élément sous le point (arbre UIA, puis DOM)."""
-        if self.confirm or button != "left":
+        """Clic en coordonnées : même contrôle que le clic sur l'élément sous le point (arbre UIA et DOM réunis)."""
+        if button != "left":
             return
         view = self._rebuild() if self.acted else self.view
+        labels: list[tuple[str, str]] = []
         hit = self._hit(view, x, y)
         if hit is not None:
             trigger = trigger_of(hit[0])
             if trigger is not None:
-                self._refuse_if("click by coordinates", [(label_of(trigger), "")])
+                labels.append((label_of(trigger), ""))
         page = self._get_page()
         if page is not None:
             try:
                 cx, cy = self._css_point(page, x, y)
-                labels = page.evaluate(f"{_DOM_POINT_JS}({cx}, {cy})") or []
+                found = page.evaluate(f"{_DOM_POINT_JS}({cx}, {cy})") or []
             except cdp.CDPError, TypeError, ValueError:
-                labels = []
-            self._refuse_if("click by coordinates", [(str(label), "page") for label in labels])
+                found = []
+            labels += [(str(label), "page") for label in found]
+        self._refuse_if("click by coordinates", labels)
 
     def _field_node(self, element: snapshot.Element | None) -> uia.Node | None:
         """Nœud du champ dans l'instantané (avec ses ancêtres), même s'il vient d'une lecture directe du focus."""
@@ -252,20 +331,21 @@ class ConfirmActions(ExecutorBase):
 
     def _confirm_kinds(self, kinds: list[str], element: snapshot.Element | None, what: str) -> None:
         kinds = [kind for kind in dict.fromkeys(kinds) if kind]
-        if self.confirm or not kinds:
+        if not kinds:
             return
         field = self._field_node(element if element is not None else self._focused_target_element())
         view = self._rebuild() if self.acted else self.view
         page = self._get_page()
+        labels: list[tuple[str, str]] = []
         for kind in kinds:
-            labels = key_triggers(view, field, kind)
+            labels += key_triggers(view, field, kind)
             if page is not None:
                 try:
                     found = page.evaluate(f"{_DOM_KEY_JS}({json.dumps(kind)})") or []
                 except cdp.CDPError, TypeError, ValueError:
                     found = []
                 labels += [(str(label), "page") for label in found]
-            self._refuse_if(f"{what}: would trigger", labels)
+        self._refuse_if(f"{what}: would trigger", labels)
 
     def _confirm_keys(self, combos: list[keys.Combo], spec: str, element: snapshot.Element | None) -> None:
         self._confirm_kinds([combo_kind(c) for c in combos], element, f'key "{spec}"')
@@ -274,3 +354,9 @@ class ConfirmActions(ExecutorBase):
         """Un saut de ligne tapé dans un champ vaut Entrée (envoi d'une messagerie, validation d'un formulaire)."""
         if "\n" in text or "\r" in text:
             self._confirm_kinds(["submit"], element, "line break in the text")
+
+    def _confirm_menu(self, path: str) -> None:
+        """Menu par WM_COMMAND (sans clic d'élément contrôlé) : son entrée finale est contrôlée comme un clic."""
+        leaf = [p.strip() for p in path.replace("/", ">").split(">") if p.strip()][-1:]
+        if leaf:
+            self._refuse_if("menu", [(leaf[0], "")])

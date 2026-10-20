@@ -51,7 +51,9 @@ def main() -> None:
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         ctypes.windll.user32.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
         ctypes.windll.user32.SetWindowPos(hwnd, 1, 0, 0, 0, 0, 0x1 | 0x2 | 0x10)
-        print(json.dumps({"ready": True, "top": hwnd}), flush=True)
+        # Fenêtre Windows du canevas : le banc lit son rectangle lui-même, en pixels physiques (Tk n'a pas d'UIA).
+        zone_hwnd = zone.winfo_id()
+        print(json.dumps({"ready": True, "top": hwnd, "zone_hwnd": zone_hwnd}), flush=True)
 
     root.after(50, show)
     root.mainloop()
