@@ -34,6 +34,18 @@ def test_mask_codes():
     assert notifications.mask_codes("Réunion le 20/10/2026 à 10:30, salle 2048") == (
         "Réunion le 20/10/2026 à 10:30, salle 2048"
     )  # aucun mot de code : les nombres restent lisibles
+    # Relecture de Codex : codes alphanumériques
+    assert notifications.mask_codes("Your sign-in code is K7F2QX") == "Your sign-in code is •••"
+    assert notifications.mask_codes("Verification code: ab12-cd34.") == "Verification code: •••."
+    assert notifications.mask_codes("Code de vérification envoyé", "") == "Code de vérification envoyé"
+
+
+def test_numeric_entities_decoded_then_masked(tmp_path):
+    path = tmp_path / "wpndatabase.db"
+    hidden = "".join(f"&#{ord(c)};" for c in "739201")  # code écrit en entités XML numériques
+    xml = f"<toast><visual><binding><text>Code</text><text>Saisir {hidden}</text></binding></visual></toast>"
+    _database(path, [("electron.app.App", "toast", xml, 134_369_640_000_000_000)])
+    assert notifications.read(database=path)[0].texts == ["Code", "Saisir •••"]
 
 
 def test_app_name():

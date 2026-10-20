@@ -9,6 +9,7 @@ modifiée ; codes de sécurité masqués, comme sur le téléphone (nexus-androi
 from __future__ import annotations
 
 import datetime as dt
+import html
 import os
 import re
 import sqlite3
@@ -17,7 +18,6 @@ from pathlib import Path
 
 DATABASE = Path(os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db"))
 _TEXT = re.compile(r"<text\b[^>]*>(.*?)</text>", re.DOTALL)
-_ENTITIES = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'"}
 # Un code se masque quand le texte parle de code, de vérification ou de connexion : suites de 4 à 8 chiffres
 # (espacées ou non, « 123 456 », « G-123456 »). Les nombres d'un texte ordinaire (années, montants) restent lisibles.
 _CODE_CONTEXT = re.compile(
@@ -25,6 +25,11 @@ _CODE_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 _CODE = re.compile(r"(?<![\w.,])(?:[A-Z]-)?\d(?:[ -]?\d){3,7}(?![\w.,]|\d)")
+# Code alphanumérique (« K7F2QX », « ab12-cd34 ») : 5 à 12 signes, au moins un chiffre et une lettre (relecture de Codex).
+_ALNUM_CODE = re.compile(
+    r"(?<![\w.-])(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[A-Za-z0-9](?:[A-Za-z0-9-]{3,10})[A-Za-z0-9](?![\w-])"
+)
+MAX_ROWS = 1000  # toasts lus au plus (les plus récents), filtrés ensuite par application
 FILETIME_EPOCH = dt.datetime(1601, 1, 1, tzinfo=dt.UTC)
 
 
@@ -42,7 +47,9 @@ class Notification:
 def mask_codes(text: str, context: str = "") -> str:
     """Codes de sécurité masqués (« ••• ») quand le texte, ou la notification entière (context : titre « Code de
     connexion », code dans le corps), parle de code ou de connexion."""
-    return _CODE.sub("•••", text) if _CODE_CONTEXT.search(context or text) else text
+    if not _CODE_CONTEXT.search(context or text):
+        return text
+    return _ALNUM_CODE.sub("•••", _CODE.sub("•••", text))
 
 
 def app_name(primary_id: str) -> str:
@@ -60,9 +67,8 @@ def _texts(payload: bytes | str | None) -> list[str]:
     raw = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else payload or ""
     out = []
     for match in _TEXT.findall(raw):
-        text = re.sub(r"<[^>]+>", "", match)
-        for entity, char in _ENTITIES.items():
-            text = text.replace(entity, char)
+        # Entités numériques comprises (« &#55;&#51;… ») : un code ainsi écrit doit être vu, donc masqué.
+        text = html.unescape(re.sub(r"<[^>]+>", "", match))
         text = re.sub(r"\s+", " ", text).strip()
         if text:
             out.append(text)
@@ -82,7 +88,8 @@ def read(limit: int = 20, app: str | None = None, database: Path = DATABASE) -> 
         rows = connection.execute(
             "SELECT h.PrimaryId, n.ArrivalTime, n.Payload FROM Notification n "
             "JOIN NotificationHandler h ON h.RecordId = n.HandlerId "
-            "WHERE n.Type = 'toast' ORDER BY n.ArrivalTime DESC"
+            # Lecture bornée avant de charger les contenus (relecture de Codex) : la base garde des centaines de toasts.
+            f"WHERE n.Type = 'toast' ORDER BY n.ArrivalTime DESC LIMIT {MAX_ROWS}"
         ).fetchall()
     except sqlite3.Error as error:
         raise NotificationsError(f"Notification database unreadable: {error}") from error

@@ -1,6 +1,6 @@
 [project]
 name = "nexus-windows"
-version = "0.14.0"
+version = "0.14.1"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"

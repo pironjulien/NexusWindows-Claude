@@ -6,6 +6,13 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-10-20
+
+### Fixed
+- `notifications`: alphanumeric security codes are masked too ("K7F2QX", "ab12-cd34"); numeric XML entities are
+  decoded before masking (a code written as `&#55;…` was shown in clear); reading is bounded to the 1,000 most recent
+  toasts. Found by a review from Codex.
+
 ## [0.14.0] - 2026-10-20
 
 ### Added
