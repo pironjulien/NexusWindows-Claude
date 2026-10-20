@@ -567,18 +567,20 @@ async def drive_windows_shell() -> list[tuple[str, bool, str]]:
             if settings:
                 # « Activation » est en bas de la liste Système, hors de l'arbre tant qu'on n'a pas défilé.
                 steps = [
-                    {"do": "click", "target": "Système"},
+                    # Rôle précisé : la page À propos montre aussi un fil d'Ariane « Système » (bouton) ; un nom seul
+                    # est refusé comme ambigu, à raison (relevé le 20/10).
+                    {"do": "click", "target": "ListItem:Système"},
                     {"do": "wait", "text": "Son", "timeout": 6},
                     {"do": "click", "target": "Activation"},
                     {"do": "wait", "text": "Windows 11", "timeout": 6},
                 ]
                 result = await client.call_tool("act", {"window": settings, "steps": steps, "then": "none"})
                 report = text_of(result)
-                # Oracle : l'attente de la page Activation (étape 4) relue ✓, et le nom trouvé dans la longue liste.
+                # Oracle : l'attente de la page Activation (étape 4) relue ✓, aucun échec. « Activation » peut être déjà
+                # dans l'arbre (fenêtre assez haute, relevé le 20/10) : la longue liste n'est alors pas parcourue, et
+                # elle a son propre test hors ligne (_realize_named).
                 reached = re.search(r"^4\. ✓", report, re.MULTILINE) is not None
-                rows.append(
-                    ("liste virtualisée", reached and "long list" in report and "✗" not in report, report[:200])
-                )
+                rows.append(("liste virtualisée", reached and "✗" not in report, report[:200]))
                 rows.append(("Paramètres : premier plan intact", w.foreground() == fg0, ""))
         finally:
             if settings and settings not in settings_before:

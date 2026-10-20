@@ -12,13 +12,14 @@ d'abord ; seulement s'il répond « background_unavailable », le même lot est 
 release GitHub officielle, télémétrie coupée (`cua-driver telemetry disable`).
 
 Banc intrusif : refusé si Julien a utilisé clavier ou souris depuis moins de 2 min (comme `pytest -m live`).
-Usage : python bench/cua_vs_nexus.py [win32 winforms wpf tk electron edge] [--wait secondes]
+Usage : python bench/cua_vs_nexus.py [win32 winforms wpf tk electron edge] [--wait secondes] [--nexus-only]
 Résultats : bench/results/<date>-cua-vs-nexus.json
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ctypes
 import datetime
 import json
@@ -36,6 +37,7 @@ sys.path.insert(0, str(ROOT / "lab"))
 
 import apps  # noqa: E402
 import drive  # noqa: E402
+import tally_cua  # noqa: E402
 from mcp import Client, StdioServerParameters  # noqa: E402
 
 from nexus_windows import foreground, uia  # noqa: E402
@@ -470,7 +472,7 @@ async def reading_sizes(nexus: Client, cua: Client, app: apps.LabApp) -> dict:
     return out
 
 
-async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
+async def bench_app(kind: str, nexus: Client, cua: Client | None) -> dict:
     app = apps.launch(kind, x=150, y=110)
     events = drive.Events(app)
     report: dict[str, Any] = {"famille": kind, "recouverte": None, "capture": {}, "tâches": []}
@@ -481,10 +483,11 @@ async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
             cover.raise_()
             report["recouverte"] = covered(app)
             print(f"== {kind} : {w.window_text(app.hwnd)!r}, recouverte={report['recouverte']}")
-            if app.kind != "tk":
+            tools = [("nexus", nexus)] + ([("cua", cua)] if cua is not None else [])
+            if app.kind != "tk" and cua is not None:
                 report["lecture"] = await reading_sizes(nexus, cua, app)
             sizes = {}
-            for tool, client in (("nexus", nexus), ("cua", cua)):
+            for tool, client in tools:
                 cap = await capture(client, tool, app)
                 report["capture"][tool] = cap
                 sizes[tool] = cap["size"] or (1, 1)
@@ -494,7 +497,7 @@ async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
                     continue
                 row: dict[str, Any] = {"tâche": task}
                 covers: list[bool] = []
-                for tool, client in (("nexus", nexus), ("cua", cua)):
+                for tool, client in tools:
                     cover.raise_()
                     covers.append(covered(app))  # exigé AVANT chaque essai, pas seulement noté après (W16, Codex)
                     try:
@@ -515,14 +518,13 @@ async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
     return report
 
 
-async def main(kinds: list[str], wait_s: float) -> None:
-    if not CUA.exists():
-        raise SystemExit(f"Cua Driver absent : {CUA}")
+async def main(kinds: list[str], wait_s: float, nexus_only: bool = False) -> None:
+    if not nexus_only and not CUA.exists():
+        raise SystemExit(f"Cua Driver absent : {CUA} (ou --nexus-only)")
     results = []
-    async with (
-        Client(nexus_params(), read_timeout_seconds=120) as nexus,
-        Client(cua_params(), read_timeout_seconds=120) as cua,
-    ):
+    async with contextlib.AsyncExitStack() as stack:
+        nexus = await stack.enter_async_context(Client(nexus_params(), read_timeout_seconds=120))
+        cua = None if nexus_only else await stack.enter_async_context(Client(cua_params(), read_timeout_seconds=120))
         deadline = time.monotonic() + wait_s
         for kind in kinds:
             while True:
@@ -535,13 +537,15 @@ async def main(kinds: list[str], wait_s: float) -> None:
                         results.append({"famille": kind, "refus": str(exc)})
                         break
                     await asyncio.sleep(30)  # Julien au travail : on attend qu'il s'absente
-    out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-cua-vs-nexus.json"
+    suffix = "nexus-seul" if nexus_only else "cua-vs-nexus"
+    out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-{suffix}.json"
     text = json.dumps(results, ensure_ascii=False, indent=1)
     # Réponses brutes des deux serveurs : le profil du poste (URL file:/// du labo) n'a rien à faire dans un relevé.
     for home in {Path.home().as_posix(), str(Path.home()).replace("\\", "\\\\")}:
         text = text.replace(home, "~")
     out.write_text(text, encoding="utf-8")
     print(f"Résultats : {out}")
+    print(tally_cua.report(out))  # comptes de RESULTS.md, calculés depuis le relevé
 
 
 if __name__ == "__main__":
@@ -552,4 +556,6 @@ if __name__ == "__main__":
         i = args.index("--wait")
         wait = float(args[i + 1])
         del args[i : i + 2]
-    asyncio.run(main(args or list(apps.KINDS), wait))
+    nexus_only = "--nexus-only" in args  # côté nexus-windows seul (Cua absent du poste)
+    args = [a for a in args if a != "--nexus-only"]
+    asyncio.run(main(args or list(apps.KINDS), wait, nexus_only))

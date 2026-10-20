@@ -384,3 +384,29 @@ Limites relevées : un clic UIA Invoke sur la ligne « Avancé » des Paramètre
 (page atteinte par `ms-settings:developers` sans souci) ; une application Store réduite détache et masque sa
 CoreWindow comme une application jamais affichée (distinguée par son cadre réduit depuis la relecture). Rejouable :
 `pytest -m live tests/test_live.py::test_windows_shell` (Julien absent).
+
+## Dixième passage — côte à côte avec Cua Driver 0.37.0 (0.15.7, 20 octobre, soir)
+Même banc (`bench/cua_vs_nexus.py`), Cua Driver 0.37.0 (release officielle trycua/cua du 20/10, somme SHA-256 égale à
+celle de GitHub, signature Sigstore du flux de publication `cd-rust-cua-driver.yml` vérifiée, télémétrie coupée),
+nexus-windows 0.15.7, Julien absent (aucune entrée physique depuis plus de 2 min). Nouveau décompte (relecture de
+Codex, W16) : l'occultation est exigée avant chaque essai et après ; une ligne où la cible n'était pas recouverte est
+mise hors compte. Comptes calculés par `bench/tally_cua.py` depuis `results/2026-10-20_1750-cua-vs-nexus.json`.
+
+| Bilan en arrière-plan, cible recouverte (38 essais chacun) | nexus-windows 0.15.7 | Cua Driver 0.37.0 |
+|---|---|---|
+| Effet prouvé | 29 | 17 (+2 par clics, +5 en premier plan) |
+| Faux succès | 0 | 3 |
+| Effet non prouvé, dit par l'outil (~) | 2 | 2 |
+| Premier plan pris | 1 (Edge, clic brut, rendu) | 7 |
+| Curseur réel déplacé | 0 | 0 |
+| Durée médiane d'une action réussie | 211 ms | 706 ms |
+
+Toutes lignes comprises (48 essais) : effet prouvé 39 contre 25 (+3 par clics, +6 en premier plan), faux succès 0
+contre 3, premier plan pris 1 contre 8, curseur déplacé 0 contre 1, médiane 194 ms contre 696 ms. Hors compte (cible
+découverte au moment de l'essai) : 10 lignes, toutes au début de WinForms et d'Electron ; la fenêtre opaque du banc ne
+les recouvrait pas encore. Durée de nexus plus longue qu'en 0.13 (138 ms) : relectures de focus et de premier plan
+ajoutées par les relectures croisées 0.14 à 0.15.7, prix assumé de la sûreté.
+
+Correction du huitième passage : Cua y réussissait 6 tâches en premier plan après refus (2 WPF, 2 Tk, 2 éditeurs
+riches web), pas 3 ; le décompte à la main est remplacé par `tally_cua.py`. Sur le relevé 0.13 avec le nouveau
+décompte (37 lignes recouvertes) : 28 contre 15, faux succès 0 contre 3, premier plan pris 1 contre 8.

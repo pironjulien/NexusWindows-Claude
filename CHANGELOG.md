@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Changed
+- Side-by-side bench redone: nexus-windows 0.15.7 against Cua Driver 0.37.0, target covered before and after each
+  attempt (38 tasks each): effect proven 29 against 17, false successes 0 against 3, foreground taken 1 against 7,
+  median 211 ms against 706 ms. Counts computed by `bench/tally_cua.py`; `--nexus-only` mode. Live test: the Settings
+  step targets `ListItem:Système` (a breadcrumb button has the same name).
+
 ## [0.15.7] - 2026-10-20
 
 ### Fixed
