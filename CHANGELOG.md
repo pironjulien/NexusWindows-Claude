@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Fixed
+- Emergency stop: the remaining time is clamped to [0, hold duration]; floating-point rounding could report 120.00000000000003 s.
+
+### Changed
+- Dependency updates: pyright 1.1.414 (dev), `uv_build` build backend allowed up to <0.14.0.
+
 ## [0.15.6] - 2026-10-20
 
 ### Fixed

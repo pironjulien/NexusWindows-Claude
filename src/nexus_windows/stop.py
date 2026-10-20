@@ -104,9 +104,10 @@ def _read_one(path: Path, seen: str) -> None:
 
 
 def remaining_s() -> float:
-    """Secondes d'arrêt restantes (0 : pas d'arrêt), d'après le verrou en mémoire (nouveau fichier lu d'abord)."""
+    """Secondes d'arrêt restantes, bornées à [0, HOLD_S] (0 : pas d'arrêt), d'après le verrou en mémoire (nouveau
+    fichier lu d'abord). La borne haute absorbe l'arrondi flottant de « _now() + secondes - _now() »."""
     _read_file()
-    return max(_latched_until - _now(), 0.0)
+    return min(max(_latched_until - _now(), 0.0), HOLD_S)
 
 
 def request() -> None:
