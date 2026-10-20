@@ -68,7 +68,11 @@ EXPECTED = (
     ValueError,
     foreground.BusyUser,
 )
-SELECT_ALL_JS = "(() => { const a = document.activeElement; if (a && a.select) a.select(); else document.execCommand('selectAll'); })()"
+# Élément actif EN PROFONDEUR : un champ dans un shadow DOM ouvert, pas son hôte (tour 7 : mot de passe non vu).
+DEEP_ACTIVE_JS = "let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;"
+SELECT_ALL_JS = (
+    "(() => { " + DEEP_ACTIVE_JS + " if (a && a.select) a.select(); else document.execCommand('selectAll'); })()"
+)
 
 
 class ActionError(RuntimeError):
@@ -580,6 +584,27 @@ class ExecutorBase:
                     continue
                 return element, f"{element.describe()} out of view in a long list: brought on screen"
         raise ActionError(str(missing)) from None
+
+    def _focus_reaches(self, e: snapshot.Element, wait_s: float = 0.0, real: bool = False) -> bool:
+        """Le clavier atteindra-t-il CE champ ? Vrai si le focus PROPRE À L'APPLICATION (celui qui reçoit les
+        messages : methods.keyboard_target) est la fenêtre du champ ou une de ses enfants, ou si le focus UI Automation
+        est sur le champ ou un de ses descendants (champ sans fenêtre propre, champ intérieur d'une liste déroulante).
+        Relu jusqu'à wait_s (Chromium remonte son focus en différé). Relectures, tours 4 et 5 : sans ce contrôle, Ctrl+A
+        puis Suppr partaient dans un autre champ ; avec le seul focus global, une frappe en arrière-plan était refusée
+        à tort."""
+        own = int(e.props.get("hwnd") or 0)
+        deadline = time.monotonic() + wait_s
+        while True:
+            # real : le VRAI clavier va au focus du premier plan, pas au focus mémorisé du fil principal (une surgissante
+            # d'un autre fil peut être devant : tour 6, Codex) ; seul le focus UI Automation global fait foi.
+            target = 0 if real else methods.keyboard_target(self.hwnd, self.windows)
+            if own and target and (target == own or w.IsChild(own, target)):
+                return True
+            if self.auto.focus_within(e.node.element):
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
 
     def _web_documents(self) -> list[uia.Node]:
         """Documents web de premier niveau de la fenêtre principale (cadres internes exclus)."""

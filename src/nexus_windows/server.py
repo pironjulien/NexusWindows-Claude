@@ -1159,16 +1159,14 @@ async def launch(
     then: Show = "both",
     wait_s: float = 15.0,
     restart: bool = False,
-    confirm: bool = False,
 ) -> list[Any]:
     """Open an application in the background (without giving it the foreground) and see it. app: Start menu name
     ("Calculator", "Notepad"), executable ("notepad.exe") or path. args: arguments.
     app = path of a FOLDER or a DOCUMENT: opened by its file association (Explorer, default application), opening
     verified (displayed folder read back, or title carrying the file name).
     app = ADDRESS: ms-settings: opens that Settings page behind the user's window (Windows flashes it ~1 s;
-    foreground given back); mailto:, http(s):, ms-windows-store: by the app of their scheme.
-    confirm=true, only on the user's explicit order for THIS launch: addresses that call or message someone (tel:,
-    sms:, callto:, skype:, msteams:…); refused otherwise.
+    foreground given back); any other scheme (mailto:, https:, tel:…) by its app. Calling or sending stays a click,
+    guarded in act (confirm + accord).
     devtools=true (Chromium/Electron/Edge only, application not already open): opens a local DevTools port for more
     reliable clicks, typing and shortcuts. The window becomes the current window.
     Steam: always launched readable even when covered; devtools=true opens its DevTools port (127.0.0.1:8080, its own
@@ -1176,15 +1174,14 @@ async def launch(
     the user's consent."""
 
     def job(auto):
-        payload = {"app": app, "args": args, "devtools": devtools, "restart": restart, "confirm": confirm}
+        payload = {"app": app, "args": args, "devtools": devtools, "restart": restart}
         with log.Call("launch", payload) as call:
             worker.check_cancelled()
             # Garde-fou d'intégrité des comptes (dans launcher.launch, puis avant chaque act) : un navigateur DevTools
             # qui porte un compte est fermé aussitôt, oublié de la session et son profil supprimé.
             result = launcher.launch(
-                app, args, devtools, wait_s, auto=auto, on_account_kill=SESSION.forget_profile, restart=restart,
-                confirm=confirm,
-            )  # fmt: skip
+                app, args, devtools, wait_s, auto=auto, on_account_kill=SESSION.forget_profile, restart=restart
+            )
             call.note(hwnd=result.hwnd, pid=result.pid, via=result.via, port=result.port, returned=result.returned)
             notes = [f"Launched ({result.via}), pid {result.pid}"]
             if result.port and result.hwnd:

@@ -25,24 +25,10 @@ def test_uri_scheme():
     assert launcher.uri_scheme("cmd /c start x:y") == ""
 
 
-@pytest.mark.parametrize("uri", ["tel:+33600000000", "callto:alice", "sms:+33600000000", "msteams:/l/call/0/0"])
-def test_outward_addresses_need_confirmation(monkeypatch, uri):
-    """Seul ce qui appelle ou écrit à quelqu'un demande confirm=true (geste sortant), comme partout dans l'outil."""
-    monkeypatch.setattr(launcher, "shell_open", lambda target: pytest.fail("opened"))
-    with pytest.raises(launcher.LaunchError, match="Needs confirm=true"):
-        launcher.launch(uri)
-
-
-def test_confirmed_address_is_opened(monkeypatch):
-    opened: list[str] = []
-    monkeypatch.setattr(launcher, "open_uri", lambda uri, scheme, *a: opened.append(uri) or "ok")
-    assert launcher.launch("tel:+33600000000", confirm=True) == "ok" and opened == ["tel:+33600000000"]
-
-
-@pytest.mark.parametrize("uri", ["steam://run/730", "ms-settings:about", "https://example.com", "shell:startup"])
+@pytest.mark.parametrize("uri", ["steam://run/730", "ms-settings:about", "https://example.com", "tel:+33600000000"])
 def test_launch_is_free_otherwise(monkeypatch, uri):
-    """Tour 3 (agent neuf) : lancer est libre (politique commune du 18/10 : consoles, interpréteurs, scripts libres) ;
-    une liste « à confirmer » était une façade contournable."""
+    """Tours 3 et 4 : lancer est libre (politique commune du 18/10) ; tel: ouvre un composeur, l'appel reste un clic
+    gardé dans act. Chaque liste « à confirmer » se contournait (npx, explorer.exe tel:…)."""
     opened: list[str] = []
     monkeypatch.setattr(launcher, "open_uri", lambda uri, scheme, *a: opened.append(uri) or "ok")
     assert launcher.launch(uri) == "ok" and opened == [uri]
@@ -343,6 +329,7 @@ def test_dialog_of_user_window_not_taken_back(monkeypatch):
     monkeypatch.setattr(w, "root", lambda h: h)
     monkeypatch.setattr(w, "owner", lambda h: {20: 10}.get(h, 0))
     monkeypatch.setattr(foreground, "user_input_since", lambda *a: False)
+    monkeypatch.setattr(foreground, "system_foreground", lambda: "")
     monkeypatch.setattr(foreground, "user_is_switching", lambda: False)
     monkeypatch.setattr(foreground, "system_foreground", lambda: "")
     monkeypatch.setattr(foreground, "give_back", lambda *a, **k: pytest.fail("dialog taken back"))
@@ -389,3 +376,287 @@ def test_access_codes_masked():
     assert "482913" not in notifications.mask_codes(
         "Use 482913 to access your Microsoft account. Do not share this number."
     )
+
+
+def test_open_uri_reports_kept_foreground(monkeypatch):
+    """Tour 4 (Codex) : sans fenêtre identifiée, « rendu » n'est plus supposé : l'état réel est relu."""
+    from nexus_windows import foreground
+
+    monkeypatch.setattr(launcher, "shell_open", lambda target: 0)
+    monkeypatch.setattr(launcher, "_give_back_while", lambda *a, **k: False)
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "foreground", lambda: 20)
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(foreground, "user_input_since", lambda *a: False)
+    monkeypatch.setattr(foreground, "system_foreground", lambda: "")
+    result = launcher.open_uri("https://example.com", "https", 1.0, 10, set())
+    assert result.returned is False and any("kept the foreground" in n for n in result.notes)
+
+
+def test_real_write_stops_when_target_lost_focus(monkeypatch):
+    """Tours 3 et 4 : après le clic, le champ visé (ou son champ intérieur) doit avoir le focus ; sinon, ni Ctrl+A ni
+    Suppr ni texte (un autre champ aurait été vidé)."""
+    from nexus_windows import actions
+
+    sent: list[str] = []
+    monkeypatch.setattr(actions.realinput, "click", lambda *a, **k: sent.append("click"))
+    monkeypatch.setattr(actions.realinput, "press", lambda combo: sent.append("key"))
+    monkeypatch.setattr(actions.realinput, "type_text", lambda text: sent.append("text"))
+
+    class Auto:
+        def focus_within(self, element):
+            return False
+
+    ex = actions.Executor.__new__(actions.Executor)
+    ex.auto = Auto()  # type: ignore[assignment]
+    target = snapshot.Element(1, __import__("nexus_windows").uia.Node(object(), 0, {"name": "Nom"}), 0, 1)
+    monkeypatch.setattr(ex, "_point_of", lambda e: (5, 5))
+    monkeypatch.setattr(actions.methods, "keyboard_target", lambda top, windows=None: 99)  # autre champ
+    ex.hwnd, ex._windows = 1, {1}
+    with pytest.raises(actions.ActionError, match="did not take the focus"):
+        ex._real_write(target, "nouveau", replace=True)
+    assert sent == ["click"]
+
+
+def test_switch_to_gives_up_when_user_picks_another_window(monkeypatch):
+    """Tour 5 (Codex) : la restitution vers 10 ne reprend jamais la fenêtre 30 que l'utilisateur vient de choisir."""
+    from nexus_windows import foreground
+
+    fronts = iter([20, 20, 30, 30, 30, 30, 30, 30])
+    monkeypatch.setattr(w, "window_pid", lambda h: h)  # 30 : un autre programme
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 30))
+    monkeypatch.setattr(foreground, "_attempt", lambda hwnd, expected: None)
+    monkeypatch.setattr(foreground, "_SwitchToThisWindow", lambda *a: pytest.fail("forced switch over the user"))
+    assert foreground._switch_to(10, 1.0) is False
+
+
+def test_reused_instance_does_not_claim_foreground_returned(monkeypatch):
+    """Tour 5 (Codex) : instance déjà ouverte réutilisée (aucune fenêtre identifiée) qui garde le premier plan : le
+    compte rendu le dit, il ne suppose pas « rendu »."""
+    from nexus_windows import foreground
+
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "foreground", lambda: 20)
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(foreground, "system_foreground", lambda: "")
+    assert launcher._front_returned(10, 0) is False
+    monkeypatch.setattr(w, "foreground", lambda: 10)
+    assert launcher._front_returned(10, 0) is True
+
+
+# --- Tour 6 (Codex et agent neuf) ---------------------------------------------------------------------------------
+def _focus_executor(monkeypatch, local_target: int):
+    from nexus_windows import actions
+
+    class Auto:
+        def focus_within(self, element):
+            return False  # le focus réel du premier plan est ailleurs (surgissante d'un autre fil)
+
+    ex = actions.Executor.__new__(actions.Executor)
+    ex.auto = Auto()  # type: ignore[assignment]
+    ex.hwnd, ex._windows = 1, {1}
+    monkeypatch.setattr(actions.methods, "keyboard_target", lambda top, windows=None: local_target)
+    node = __import__("nexus_windows").uia.Node(object(), 0, {"name": "Champ", "hwnd": 7})
+    return ex, snapshot.Element(1, node, 0, 1)
+
+
+def test_real_input_trusts_only_the_real_focus(monkeypatch):
+    """P1 : le focus local du fil (messages adressés) ne prouve pas où ira le VRAI clavier."""
+    ex, field = _focus_executor(monkeypatch, local_target=7)
+    assert ex._focus_reaches(field) is True  # messages adressés : le focus local suffit
+    assert ex._focus_reaches(field, real=True) is False  # vrai clavier : refus
+
+
+def test_give_back_never_falls_back_over_the_users_choice(monkeypatch):
+    from nexus_windows import foreground
+
+    fronts = iter([20, 20, 20])
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 30))  # puis l'utilisateur prend 30
+    monkeypatch.setattr(w, "window_pid", lambda h: h)
+    monkeypatch.setattr(w, "process_name", lambda pid: "cible.exe")
+    monkeypatch.setattr(foreground, "_restorable", lambda h: True)
+    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, t, ours=None: False)
+    monkeypatch.setattr(foreground, "_hand_over", lambda *a: pytest.fail("hand-over over the user's choice"))
+    monkeypatch.setattr(foreground, "_ask_holder", lambda *a: pytest.fail("ask-holder over the user's choice"))
+    monkeypatch.setattr(foreground, "_checkpoint", lambda: None)
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "IsIconic", lambda h: False)
+    assert foreground.give_back(10, exclude={20}) is False
+    fronts = iter([20])  # départ : la cible tient le premier plan, puis l'utilisateur prend 30
+    assert foreground.activate(21) is False
+
+
+def test_attempt_rechecks_before_set_foreground(monkeypatch):
+    from nexus_windows import foreground
+
+    fronts = iter([20, 20, 30])  # l'utilisateur change de fenêtre pendant BringWindowToTop
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 30))
+    monkeypatch.setattr(w, "window_thread", lambda h: 0)
+    monkeypatch.setattr(w, "BringWindowToTop", lambda h: True)
+    monkeypatch.setattr(w, "SetForegroundWindow", lambda h: pytest.fail("set over the user's new window"))
+    foreground._attempt(10, 20)
+
+
+@pytest.mark.parametrize("blip", [0, 21])  # premier plan nul un instant ; autre fenêtre de la CIBLE (démarrage)
+def test_switch_to_keeps_trying_through_target_windows_or_empty_front(monkeypatch, blip):
+    from nexus_windows import foreground
+
+    fronts = iter([20, blip, blip, 10])
+    expected: list[int] = []
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 10))
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(foreground, "_attempt", lambda hwnd, exp: expected.append(exp))
+    monkeypatch.setattr(foreground, "_SwitchToThisWindow", lambda *a: None)
+    assert foreground._switch_to(10, 1.0, {20, 21}) is True
+    assert expected and expected[-1] == (
+        blip or 20
+    )  # la tentative vise la fenêtre de la cible qui tient le premier plan
+
+
+def test_switch_to_gives_up_for_another_window_of_the_same_program(monkeypatch):
+    """Tour 7 : Explorateur A → Explorateur B (même explorer.exe) choisi par l'utilisateur : jamais repris."""
+    from nexus_windows import foreground
+
+    fronts = iter([20, 31])
+    monkeypatch.setattr(w, "foreground", lambda: next(fronts, 31))
+    monkeypatch.setattr(w, "window_pid", lambda h: 5)  # tout le même processus
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(foreground, "_attempt", lambda *a: pytest.fail("attempt over the user's choice"))
+    assert foreground._switch_to(10, 1.0) is False
+
+
+def _desk(monkeypatch, state):
+    """Bureau simulé pour UserChoice : premier plan, bouton tenu, fenêtre sous le pointeur, Alt."""
+    from nexus_windows import foreground
+
+    monkeypatch.setattr(w, "foreground", lambda: state["fg"])
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "class_name", lambda h: "Shell_TrayWnd" if h == 99 else "App")
+    monkeypatch.setattr(w, "mouse_button_down", lambda: state["button"])
+    monkeypatch.setattr(w, "cursor_pos", lambda: (0, 0))
+    monkeypatch.setattr(w, "window_at", lambda x, y: state["over"])
+    monkeypatch.setattr(foreground, "user_is_switching", lambda: state["button"] or state["alt"])
+    return foreground
+
+
+@pytest.mark.parametrize("over", [30, 99])  # clic sur la fenêtre elle-même, ou sur son bouton de la barre des tâches
+def test_user_choice_follows_a_click(monkeypatch, over):
+    state = {"fg": 10, "button": False, "alt": False, "over": 10}
+    fg = _desk(monkeypatch, state)
+    choice = fg.UserChoice(10)
+    state.update(button=True, over=over)
+    choice.observe()
+    state.update(button=False, fg=30)
+    assert choice.chose(30) and choice.front == 30
+
+
+def test_user_choice_follows_alt_tab(monkeypatch):
+    state = {"fg": 10, "button": False, "alt": True, "over": 10}
+    fg = _desk(monkeypatch, state)
+    choice = fg.UserChoice(10)
+    choice.observe()
+    state.update(alt=False, fg=30)
+    assert choice.chose(30) and choice.front == 30
+
+
+def test_user_choice_sees_a_steal(monkeypatch):
+    """Aucun geste, ou un clic dans SA fenêtre pendant que la cible s'active : c'est un vol."""
+    state = {"fg": 10, "button": True, "alt": False, "over": 10}
+    fg = _desk(monkeypatch, state)
+    choice = fg.UserChoice(10)
+    choice.observe()
+    state.update(button=False, fg=30)
+    assert not choice.chose(30) and choice.front == 10
+
+
+def test_address_watch_never_takes_back_the_window_the_user_clicked(monkeypatch):
+    """Tour 7, P1 : launch("https://…") dans un Chrome déjà ouvert ; l'utilisateur clique Chrome : il le garde."""
+    import time as _t
+
+    state = {"fg": 10, "button": False, "alt": False, "over": 10}
+    fg = _desk(monkeypatch, state)
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(fg, "system_foreground", lambda: "")
+    monkeypatch.setattr(fg, "give_back", lambda *a, **k: pytest.fail("took back the user's choice"))
+    launcher._CHOICE = None
+    launcher._choice(10)
+    state.update(button=True, over=30)
+    launcher._choice(10).observe()
+    state.update(button=False, fg=30)
+    assert launcher._give_back_while(10, _t.monotonic() + 0.2) is False
+    assert launcher._users(10) == 30 and launcher._front_returned(10, 0)
+
+
+def test_address_watch_gives_back_a_steal(monkeypatch):
+    import time as _t
+
+    state = {"fg": 30, "button": False, "alt": False, "over": 10}
+    fg = _desk(monkeypatch, state)
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "owner", lambda h: 0)
+    monkeypatch.setattr(fg, "system_foreground", lambda: "")
+    calls: list[int] = []
+    monkeypatch.setattr(fg, "give_back", lambda prev, **k: calls.append(prev) or state.update(fg=prev) or True)
+    launcher._CHOICE = None
+    assert launcher._give_back_while(10, _t.monotonic() + 0.2) is True and calls == [10]
+
+
+def test_password_in_shadow_dom_is_refused(monkeypatch):
+    """Tour 7, P1 : le contrôle du mot de passe lit l'élément actif EN PROFONDEUR (shadow DOM), pas son hôte."""
+    from nexus_windows import actions
+    from nexus_windows.act_chromium import ChromiumActions
+
+    class Page:
+        def evaluate(self, script):
+            return "shadowRoot.activeElement" in script and "password" in script
+
+    with pytest.raises(actions.ActionError, match="password"):
+        ChromiumActions._cdp_refuse_secret(Page())  # type: ignore[arg-type]
+    from nexus_windows.act_base import SELECT_ALL_JS
+
+    assert "shadowRoot.activeElement" in SELECT_ALL_JS
+
+
+@pytest.mark.parametrize(("front", "moved"), [(50, False), (10, True)])
+def test_settings_not_pushed_under_when_user_chose_them(monkeypatch, front, moved):
+    """P2 : Paramètres au premier plan parce que l'utilisateur y est allé : pas glissés sous son ancienne fenêtre."""
+    from nexus_windows import foreground
+
+    moves: list[int] = []
+    monkeypatch.setattr(w, "foreground", lambda: front)
+    monkeypatch.setattr(w, "root", lambda h: h)
+    monkeypatch.setattr(w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(w, "is_cloaked", lambda h: False)
+    monkeypatch.setattr(w, "SetWindowPos", lambda h, *a: moves.append(h))
+    monkeypatch.setattr(launcher, "_settings_window", lambda: 50)
+    monkeypatch.setattr(launcher, "_is_settings", lambda h: False)
+    monkeypatch.setattr(launcher, "SETTINGS_SETTLE_S", 0.0)
+    monkeypatch.setattr(foreground, "user_is_switching", lambda: False)
+    import time as _t
+
+    launcher._settings_behind(10, _t.monotonic() + 1)
+    assert moves == ([50] if moved else [])
+
+
+@pytest.mark.parametrize("state", ["unfocused", "unselected", "none"])
+def test_devtools_focus_refused_unless_proven(state):
+    """P1 : éditeur riche (enfant [tabindex], sélection ailleurs) ou shadow DOM non atteint → rien n'est envoyé."""
+    from nexus_windows import cdp
+    from nexus_windows.act_chromium import ChromiumActions
+
+    sent: list[str] = []
+
+    class Page:
+        def evaluate(self, script):
+            sent.append(script)
+            return state
+
+    for editable in (False, True):
+        with pytest.raises(cdp.CDPError):
+            ChromiumActions._cdp_focus_at(Page(), 5, 5, editable=editable)  # type: ignore[arg-type]
+    assert all("shadowRoot" in s and "isContentEditable" in s and "getSelection" in s for s in sent)

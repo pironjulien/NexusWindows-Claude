@@ -441,7 +441,7 @@ class FakePage:
         if point:
             x, y = float(point.group(1)), float(point.group(2))
             inside = 0 <= x < 400 and 0 <= y < 300
-            return ("ok" if inside else "none") if "closest" in script else inside
+            return ("ok" if inside else "none") if "isContentEditable" in script else inside
         return False  # pas de mot de passe ; sélection : sans valeur de retour
 
     def insert_text(self, text: str) -> None:

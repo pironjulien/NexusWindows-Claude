@@ -6,6 +6,53 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.6] - 2026-10-20
+
+### Fixed
+- `launch`: the tool follows the window the user picks during the wait (click on a window or the taskbar, Alt+Tab,
+  Windows key) and never takes it back; only a window that took the foreground without a gesture from the user is
+  pushed back, to the user's current window. Applies to addresses, documents, Settings, Steam and the end of a launch.
+- Web pages: a password field inside a shadow DOM is refused again (the active element is read in depth everywhere);
+  a target designated as a password is refused before any focus. A fully editable page (body) is accepted again.
+- Foreground give-back is judged window by window, not per process (Explorer or a browser run all their windows in
+  one process); a new window of the target (splash screen, then main window) is followed.
+
+## [0.15.5] - 2026-10-20
+
+### Fixed
+- Real keyboard (`foreground=true`, typing after a real click): only the effective foreground focus (UI Automation)
+  counts; the focus remembered by the app is used only for addressed messages.
+- DevTools: in a rich editor the outermost editing host is targeted and the selection must be inside it; shadow DOM
+  traversed (point, ancestors, focus read back). Otherwise refused, nothing sent. Checked in a real Chromium.
+- Foreground give-back: no fallback when the user took a window of another program; last check right before
+  `SetForegroundWindow`; a momentary null foreground or another window of the same program no longer stops it.
+- Regression of 0.15.4 removed: typing in the user's own window no longer suspends the give-back.
+- Settings are never slid under the previous window when the user went there themselves.
+
+## [0.15.4] - 2026-10-20
+
+### Fixed
+- Focus checked on the channel actually used: the app's own focus (the one that receives messages) or the UI
+  Automation focus on the field or a descendant; read back briefly for Chromium (deferred focus).
+- DevTools: a targeted key aims at the focusable element under the point, focus read back (Ctrl+A then Delete could
+  empty the previous field of a rich editor).
+- Long typing in chunks: focus read back before each chunk; typing stops rather than continue in another field.
+- Known limit, refused honestly: a Ctrl shortcut aimed at a native field during a brief activation (simulated
+  modifiers never reach the foreground thread, to protect the user's keyboard); `foreground=true` does it.
+
+## [0.15.3] - 2026-10-20
+
+### Changed
+- `launch` is entirely free: the last guard (confirming `tel:`, `sms:`…) was bypassable (`explorer.exe tel:…`, `.url`
+  file). The outward gesture ("Call", "Send") stays a click guarded by `confirm` and the exact accord in `act`. The
+  `confirm` parameter is removed from `launch`.
+
+### Fixed
+- Clearing or replacing a field (messages, real typing): focus read back on the targeted field, or its inner field,
+  before Ctrl+A and Delete; a field that vanished or was replaced stops everything.
+- Address taken by an already open app: the user's input marker is taken at launch time; "foreground given back" is
+  read back, never assumed.
+
 ## [0.15.2] - 2026-10-20
 
 ### Fixed

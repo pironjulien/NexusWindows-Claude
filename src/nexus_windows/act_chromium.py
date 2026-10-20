@@ -14,6 +14,7 @@ import comtypes
 from . import capture, cdp, foreground, keys, methods, realinput, snapshot, uia, worker
 from . import win32 as w
 from .act_base import (
+    DEEP_ACTIVE_JS,
     EXPECTED,
     OWN_STATE_S,
     SELECT_ALL_JS,
@@ -250,24 +251,42 @@ class ChromiumActions(ExecutorBase):
     def _cdp_focus_at(page: cdp.Page, cx: float, cy: float, editable: bool = False) -> None:
         """Focus DOM d'un élément sans clic (un clic DevTools activerait la fenêtre). editable : le champ de saisie qui
         contient le point (le point d'un éditeur tombe souvent sur un enfant non focalisable), focus relu ; sinon le
-        texte partirait dans le champ qui avait le focus avant."""
-        if not editable:
-            script = f"(() => {{ const el = document.elementFromPoint({cx}, {cy}); if (!el) return false; el.focus(); return true; }})()"
-            if not page.evaluate(script):
-                raise cdp.CDPError("no element under the point")
-            return
+        texte partirait dans le champ qui avait le focus avant.
+
+        Shadow DOM traversé (point, ancêtres et focus relu en profondeur) ; dans un éditeur riche, c'est l'hôte
+        d'édition le plus extérieur qui est visé et la sélection doit y être : un enfant [tabindex] focalisé ne
+        recevrait pas la frappe (tour 6, Codex). Sinon refus, rien n'est envoyé."""
+        wanted = (
+            "'input, textarea, [contenteditable]:not([contenteditable=\"false\"])'"
+            if editable
+            else "'input, textarea, select, button, a[href], [tabindex], [contenteditable]:not([contenteditable=\"false\"])'"
+        )
         script = (
-            f"(() => {{ const hit = document.elementFromPoint({cx}, {cy}); if (!hit) return 'none';"
-            " const el = hit.closest('input, textarea, [contenteditable]:not([contenteditable=\"false\"])') || hit;"
-            " el.focus(); const a = document.activeElement;"
-            " const field = !!a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');"
-            " return field && (a === el || el.contains(a)) ? 'ok' : 'unfocused'; })()"
+            "(() => {"
+            " const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;"
+            " const within = (n, el) => { for (; n; n = n.parentNode || n.host) if (n === el) return true; return false; };"
+            f" let hit = document.elementFromPoint({cx}, {cy}); if (!hit) return 'none';"
+            f" while (hit.shadowRoot) {{ const d = hit.shadowRoot.elementFromPoint({cx}, {cy});"
+            " if (!d || d === hit) break; hit = d; }"
+            " let el = null;"
+            " if (hit.isContentEditable) { el = hit; for (let p = up(el); p && p.isContentEditable; p = up(p)) el = p; }"
+            f" else {{ for (let n = hit; n; n = up(n)) if (n.matches && n.matches({wanted})) {{ el = n; break; }} }}"
+            " el = el || hit; el.focus();"
+            " let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement)"
+            " a = a.shadowRoot.activeElement;"
+            " if (!a || (a === document.body && !a.isContentEditable) || !within(a, el)) return 'unfocused';"
+            " const field = a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA';"
+            + (" if (!field) return 'unfocused';" if editable else "")
+            + " if (a.isContentEditable) { const r = el.getRootNode(); const s = (r.getSelection && r.getSelection())"
+            " || document.getSelection(); if (!s || !s.anchorNode || !within(s.anchorNode, el)) return 'unselected'; }"
+            " return 'ok'; })()"
         )
         state = page.evaluate(script)
         if state == "none":
             raise cdp.CDPError("no element under the point")
         if state != "ok":
-            raise cdp.CDPError("no input field takes the focus under the point")
+            what = "no input field takes the focus" if editable else "the element did not take the focus"
+            raise cdp.CDPError(f"{what} under the point: no key was sent")
 
     def _visible_point(self, e: snapshot.Element, refresh: bool = False) -> tuple[int, int] | None:
         """Centre de la partie de l'élément visible dans la page (None : hors de la zone visible)."""
@@ -303,7 +322,7 @@ class ChromiumActions(ExecutorBase):
 
     @staticmethod
     def _cdp_refuse_secret(page: cdp.Page) -> None:
-        if page.evaluate("(() => { const a = document.activeElement; return !!a && a.type === 'password'; })()"):
+        if page.evaluate("(() => { " + DEEP_ACTIVE_JS + " return !!a && a.type === 'password'; })()"):
             raise ActionError("The focused field is a password field: I do not write in it (security rule).")
 
     # --- Activation simulée : clavier sans activation réelle (methods.simulated_activation) ----------------------
@@ -358,8 +377,9 @@ class ChromiumActions(ExecutorBase):
                 page.key("Delete", "Delete", 0x2E)
         else:
             page.evaluate(
-                "(() => { const a = document.activeElement;"
-                " if (a && a.setSelectionRange) a.setSelectionRange(a.value.length, a.value.length); })()"
+                "(() => { "
+                + DEEP_ACTIVE_JS
+                + " if (a && a.setSelectionRange) a.setSelectionRange(a.value.length, a.value.length); })()"
             )
         if text:
             page.insert_text(text)

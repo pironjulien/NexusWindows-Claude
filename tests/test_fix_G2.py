@@ -178,7 +178,7 @@ class Frame:
         m.setattr(foreground, "HAND_OVER_S", 0.05)
         self.obeys = obeys
 
-    def _switch(self, hwnd, timeout_s):
+    def _switch(self, hwnd, timeout_s, ours=None):
         self.switches += 1
         return False  # AttachThreadInput refusé (ERROR_ACCESS_DENIED, mesuré) : SetForegroundWindow refusé
 

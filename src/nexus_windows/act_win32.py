@@ -158,8 +158,17 @@ class Win32Actions(ExecutorBase):
             foreground.mark_own_input()
             if first:
                 self.auto.set_focus(e.node.element)
+                # Focus relu sur le champ (ou son champ intérieur) AVANT toute sélection ou Suppr : sinon Ctrl+A puis
+                # Suppr partaient dans le champ qui avait gardé le focus (relecture de Codex, tour 4).
+                if not chromium and not self._focus_reaches(e, wait_s=0.2):
+                    raise methods.MethodError(f"{e.describe()} did not take the keyboard focus: nothing was sent")
             if chromium:
                 self._ensure_active()
+            elif not first and not self._focus_reaches(e, wait_s=0.2):
+                # Tranches suivantes : focus relu AVANT chaque envoi, sans refocaliser ni resélectionner (l'application a
+                # pu déplacer son focus en perdant l'activation) : la saisie s'arrête là, rien n'est tapé ailleurs
+                # (tour 5, Codex : la suite du texte partait dans un autre champ).
+                raise Unconfirmed(f"{e.describe()} lost the keyboard focus between two slices: typing stopped there")
             if first:
                 if replace:
                     try:

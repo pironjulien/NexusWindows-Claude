@@ -283,6 +283,8 @@ class UiaActions(ExecutorBase):
         page = self._get_page()
         fw = self.view.framework
         if page is not None:
+            if element is not None and printable:
+                self._refuse_secret(element.props, element.describe())  # avant tout focus (tour 7)
             if element is not None:
                 self._cdp_focus_at(page, *self._css_point(page, *self._point_of(element)))
             if printable:
@@ -305,10 +307,12 @@ class UiaActions(ExecutorBase):
         def real() -> None:
             # Cible désignée : le vrai clavier va à l'élément qui a le focus, donc la cible le reçoit d'abord et c'est
             # relu ; sinon rien n'est envoyé (relecture de Codex : Ctrl+A visait B et sélectionnait A).
-            if element is not None and not self._refresh(element.node.element).get("focused"):
+            if element is not None and not self._focus_reaches(element, real=True):
                 foreground.mark_own_input()
                 self.auto.set_focus(element.node.element)
-                if not self._refresh(element.node.element).get("focused"):
+                # La cible ou un de ses descendants (champ d'une liste déroulante) : tour 4 ; relu un court moment
+                # (Chromium remonte son focus en différé) : tour 5.
+                if not self._focus_reaches(element, wait_s=0.3, real=True):
                     raise ActionError(f"{element.describe()} did not take the keyboard focus: no key was sent.")
             for combo in combos:
                 realinput.press(combo)
@@ -356,7 +360,7 @@ class UiaActions(ExecutorBase):
                 self.auto.set_focus(element.node.element)
                 # Même invariant que le vrai clavier (tour 3, Codex) : les messages vont à la fenêtre qui a le focus ;
                 # cible désignée sans focus relu → rien n'est envoyé, jamais Suppr dans un autre champ.
-                if fw != "Chromium" and not self._refresh(element.node.element).get("focused"):
+                if fw != "Chromium" and not self._focus_reaches(element):
                     raise ActionError(f"{element.describe()} did not take the keyboard focus: no key was sent.")
             if fw == "Chromium":
                 if element is None:

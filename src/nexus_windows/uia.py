@@ -327,6 +327,23 @@ class Automation:
     def scroll_into_view(self, element) -> None:
         self.pattern(element, "scroll_item").ScrollIntoView()
 
+    def focus_within(self, element) -> bool:
+        """Le focus clavier est-il sur cet élément ou un de ses descendants (champ intérieur d'une liste déroulante,
+        conteneur d'un éditeur) ? Faux si l'élément a disparu ou si le focus est ailleurs (relectures du 20/10 : sans
+        ce contrôle, Ctrl+A puis Suppr partaient dans un autre champ)."""
+        try:
+            current = self.uia.GetFocusedElement()
+            walker = self.uia.ControlViewWalker
+            for _ in range(32):
+                if not current:
+                    return False
+                if self.uia.CompareElements(current, element):
+                    return True
+                current = walker.GetParentElement(current)
+        except comtypes.COMError:
+            return False
+        return False
+
     def realize_named(self, container, name: str) -> bool:
         """Élément de ce nom exact dans une liste virtualisée (ItemContainer) : créé s'il ne l'était pas encore
         (VirtualizedItem.Realize) puis amené à l'écran. Faux si la liste ne le contient pas."""

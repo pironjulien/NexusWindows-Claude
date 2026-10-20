@@ -28,7 +28,7 @@ import json
 
 from . import cdp, keys, policy, snapshot, uia
 from . import win32 as w
-from .act_base import ActionError, ExecutorBase, _locate, _roots_top_down
+from .act_base import DEEP_ACTIVE_JS, ActionError, ExecutorBase, _locate, _roots_top_down
 
 garde_fous = policy.garde_fous
 STATE_SYSTEM_DEFAULT = 0x100
@@ -184,8 +184,7 @@ _DOM_TRIGGER = (
 _DOM_LABEL = "const lab = e => ((e.getAttribute('aria-label') || e.innerText || e.value || e.title || '') + '').trim().slice(0, 80);"
 _DOM_KEY_JS = (
     "((kind) => { " + _DOM_LABEL + " const T = " + json.dumps(_DOM_TRIGGER) + ";"
-    " const out = []; const a = document.activeElement;"
-    " if (a && a.matches && a.matches(T)) out.push(lab(a));"
+    " const out = []; " + DEEP_ACTIVE_JS + " if (a && a.matches && a.matches(T)) out.push(lab(a));"
     " if (kind === 'press') return out;"
     " if (kind === 'send') { document.querySelectorAll('button,[role=button],input[type=submit]').forEach(b => out.push(lab(b))); return out; }"
     " if (kind.startsWith('alt+')) { document.querySelectorAll('[accesskey]').forEach(b => { if ((b.accessKey || '').toLowerCase() === kind.slice(4)) out.push(lab(b)); }); return out; }"

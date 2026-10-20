@@ -71,6 +71,9 @@ class FakeAuto:
     def focused(self):
         return None
 
+    def focus_within(self, element: FakeEl) -> bool:
+        return bool(element.live.get("focused", True))  # sans état publié : focus supposé (doubles anciens)
+
 
 def node(role: str, name: str, **props) -> uia.Node:
     live = {"control_type": ROLE_IDS[role], "name": name, "rect": (10, 10, 20, 20), "framework": "WPF", "pid": 7}

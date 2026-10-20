@@ -235,7 +235,10 @@ def _attempt(prev: int, expected_fg: int) -> None:
     try:
         if w.foreground() == expected_fg:
             w.BringWindowToTop(prev)
-            w.SetForegroundWindow(prev)
+            # BringWindowToTop peut bloquer (fenêtre occupée) : relu juste avant, jamais SetForegroundWindow par-dessus
+            # une fenêtre que l'utilisateur a choisie entre-temps (tour 6, Codex).
+            if w.foreground() == expected_fg:
+                w.SetForegroundWindow(prev)
     finally:
         if attached:
             w.AttachThreadInput(own, thread, False)
@@ -253,13 +256,29 @@ def _next_user_window(exclude: set[int]) -> int:
     return 0
 
 
-def _switch_to(hwnd: int, timeout_s: float) -> bool:
+def _in(hwnd: int, windows: set[int]) -> bool:
+    return bool(hwnd) and (hwnd in windows or w.root(hwnd) in windows or owned_by(hwnd, windows))
+
+
+def _switch_to(hwnd: int, timeout_s: float, ours: set[int] | None = None) -> bool:
+    """ours : fenêtres de la cible qui peuvent remplacer celle qui tient le premier plan (écran de démarrage puis
+    fenêtre principale) sans que ce soit un choix de l'utilisateur."""
     deadline = time.monotonic() + timeout_s
     tries = 0
+    ours = ours or set()
+    # Premier plan de départ fixé (tour 5, Codex) : si une AUTRE fenêtre que celles de la cible le prend pendant les
+    # essais, c'est l'utilisateur qui a changé de fenêtre ; on abandonne au lieu de la lui reprendre. Comparé fenêtre
+    # par fenêtre, jamais par programme : Explorateur et navigateurs ont un seul processus pour toutes leurs fenêtres
+    # (tour 7). Un premier plan nul un instant ne compte pas.
+    expected = w.foreground()
     while time.monotonic() < deadline:
-        expected = w.foreground()
-        if expected == hwnd:
+        current = w.foreground()
+        if current == hwnd:
             return True
+        if current and current != expected:
+            if not _in(current, ours):
+                return False
+            expected = current  # la cible a changé de fenêtre : c'est elle qu'on ménage désormais
         # Thread à part : BringWindowToTop attend le thread de la fenêtre qui perd l'activation (cible occupée).
         worker = threading.Thread(target=_attempt, args=(hwnd, expected), daemon=True)
         worker.start()
@@ -321,7 +340,18 @@ def give_back(prev: int, timeout_s: float = 0.6, exclude: set[int] | None = None
     exclude = exclude or set()
     if w.process_name(w.window_pid(w.foreground())).lower() in HOST_PROCESSES and _hand_over(prev, exclude):
         return True  # cadre Store : l'attache serait refusée, inutile de faire attendre Julien 0,6 s
-    return _switch_to(prev, timeout_s) or _hand_over(prev, exclude)
+    start = w.foreground()
+    if _switch_to(prev, timeout_s, exclude):
+        return True
+    # Abandon de _switch_to parce que l'utilisateur a pris une autre fenêtre : aucun repli par-dessus son choix
+    # (tour 6, Codex).
+    return False if _user_moved(start, exclude) else _hand_over(prev, exclude)
+
+
+def _user_moved(start: int, ours: set[int]) -> bool:
+    """Le premier plan est-il passé à une autre fenêtre que celle de départ, hors fenêtres de la cible ?"""
+    current = w.foreground()
+    return bool(current and start and current != start and not _in(current, ours))
 
 
 def system_foreground() -> str:
@@ -349,7 +379,10 @@ def activate(hwnd: int, timeout_s: float = 0.4) -> bool:
     if not hwnd or not w.IsWindow(hwnd) or w.IsIconic(hwnd):
         return False
     mark_own_input()
-    return _switch_to(hwnd, timeout_s) or _ask_holder(hwnd)
+    start = w.foreground()
+    if _switch_to(hwnd, timeout_s):
+        return True
+    return False if _user_moved(start, {hwnd}) else _ask_holder(hwnd)  # jamais par-dessus un choix de l'utilisateur
 
 
 def _ask_holder(hwnd: int) -> bool:
@@ -497,6 +530,42 @@ def adopt_foreground() -> None:
         live = list(_LIVE)
     for watch in live:
         watch._follow(fg)
+
+
+class UserChoice:
+    """Pendant un lancement : la fenêtre que l'utilisateur a choisie. Suit ses vrais changements de fenêtre (clic sur
+    la fenêtre ou sur la barre des tâches, Alt+Tab, touche Windows, sélecteur vu), comme Watch : une fenêtre qu'il a
+    prise lui-même n'est jamais reprise, ni visée par un repli (tour 7 : seul l'instant d'un bouton tenu était vu)."""
+
+    def __init__(self, front: int) -> None:
+        self.origin = front
+        self.front = front
+        self._keys = -1e9  # dernier Alt, touche Windows ou sélecteur vu
+        self._click = (-1e9, 0)  # dernier bouton tenu et fenêtre (racine) sous le pointeur
+
+    def observe(self) -> None:
+        now = time.monotonic()
+        if w.mouse_button_down():
+            self._click = (now, w.root(w.window_at(*w.cursor_pos())))
+        elif user_is_switching():
+            self._keys = now
+        fg = w.foreground()
+        if fg and w.class_name(fg) in SWITCHER_CLASSES:
+            self._keys = now
+
+    def chose(self, fg: int) -> bool:
+        """`fg` est-elle devant par le choix de l'utilisateur ? Si oui (geste relâché), elle devient sa fenêtre ;
+        geste en cours : on ne lutte pas, on jugera au relâchement."""
+        self.observe()
+        if not fg or fg == self.front or user_is_switching():
+            return True
+        now, root = time.monotonic(), w.root(fg)
+        clicked_at, over = self._click
+        clicked = now - clicked_at <= SWITCH_WINDOW_S and (over == root or w.class_name(over) in SWITCHER_CLASSES)
+        if now - self._keys <= SWITCH_WINDOW_S or clicked:
+            self.front = fg
+            return True
+        return False
 
 
 class Watch:

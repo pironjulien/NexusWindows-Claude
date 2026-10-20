@@ -341,7 +341,7 @@ def test_activation_asks_store_frame_holder_to_hand_over(monkeypatch):
     monkeypatch.setattr(w, "IsIconic", lambda h: False)
     monkeypatch.setattr(w, "foreground", lambda: state["fg"])
     monkeypatch.setattr(w, "root", lambda h: h)
-    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s: False)  # attache de file refusée
+    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s, ours=None: False)  # attache de file refusée
     monkeypatch.setattr(foreground, "system_foreground", lambda: "")
 
     def post(hwnd, msg, wparam, lparam):
@@ -358,7 +358,7 @@ def test_no_hand_over_request_to_a_hidden_system_window(monkeypatch):
     monkeypatch.setattr(w, "IsWindow", lambda h: True)
     monkeypatch.setattr(w, "IsIconic", lambda h: False)
     monkeypatch.setattr(w, "foreground", lambda: 77)
-    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s: False)
+    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s, ours=None: False)
     monkeypatch.setattr(foreground, "system_foreground", lambda: "fenêtre système masquée « Recherche »")
     monkeypatch.setattr(w, "PostMessageW", lambda *a: pytest.fail("message à une fenêtre système"))
     assert not foreground.activate(HWND)

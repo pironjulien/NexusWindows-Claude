@@ -236,16 +236,18 @@ def _new_window(
         gone = exited and pids == {pid}
         strict = bool(pid) and not (fallback and gone)
         fg = w.foreground()
+        if user_front:
+            _choice(user_front).observe()
         if (
             user_front
             and fg
-            and fg != user_front
+            and fg != _users(user_front)
             and fg not in before
             and w.root(fg) not in before
             and _related(w.root(fg), pids, hint, stem, strict)  # jamais une nouvelle fenêtre ouverte par Julien
-            and not foreground.user_is_switching()
+            and _taken(user_front, fg)
         ):
-            took_back = foreground.give_back(user_front, exclude={fg}) or took_back
+            took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back
         for hwnd in w.enum_windows():
             if hwnd in before or not (snapshot.is_app_window(hwnd) or snapshot.is_hidden_store_window(hwnd)):
                 continue
@@ -646,25 +648,11 @@ def openable(candidate: str) -> Path | None:
 
 
 URI = re.compile(r"^([a-z][a-z0-9+.-]+):", re.IGNORECASE)  # deux lettres au moins : « C: » reste un chemin
-# Lancer est libre : consoles, interpréteurs, scripts et installeurs compris (politique commune, accord Claude–
-# Antigravity du 18/10 ; règle de Julien : autonomie maximale, jamais de bridage par précaution). Relectures du 20/10 :
-# une liste de programmes « à confirmer » était une façade (npx, winget, java, applis du Store passaient). Seul ce qui
-# SORT vers un tiers sans retour — appeler, envoyer un SMS ou un message — demande confirm=true, comme partout ailleurs
-# dans l'outil (geste sortant).
-OUTWARD_SCHEMES = {
-    "tel", "callto", "sip", "sips", "sms", "smsto", "mms", "skype", "msteams", "whatsapp", "tg", "facetime",
-    "facetime-audio",
-}  # fmt: skip
-
-
-def _require_confirm(reason: str, what: str, confirm: bool) -> None:
-    if reason and not confirm:
-        raise LaunchError(
-            f'"{what}": {reason}. Needs confirm=true, only on the user\'s explicit order for THIS launch: '
-            "nothing was launched."
-        )
-
-
+# Lancer est libre : programmes, consoles, interpréteurs, scripts, documents et adresses (politique commune, accord
+# Claude–Antigravity du 18/10 ; règle de Julien : autonomie maximale, jamais de bridage par précaution). Relectures du
+# 20/10 : chaque liste « à confirmer » (programmes, documents, schémas tel:/sms:) se contournait (npx, explorer.exe
+# tel:…, fichier .url) et n'empêchait rien d'irréversible : tel: ou sms: ouvrent un composeur ou un brouillon. Le
+# geste sortant lui-même (« Appeler », « Envoyer ») est un clic, gardé par confirm et l'accord exact dans act.
 SETTINGS_PROCESS = "systemsettings.exe"
 URI_WINDOW_S = 5.0  # attente de la fenêtre d'une adresse ; au-delà, la note renvoie à windows
 SETTINGS_SETTLE_S = 1.6  # Paramètres : fenêtre stable depuis ce délai (le cadre s'affiche 1 à 2 s après la CoreWindow)
@@ -677,6 +665,38 @@ def uri_scheme(candidate: str) -> str:
 
 
 URI_FRONT_S = 2.5  # adresse prise par une application déjà ouverte : surveillance du premier plan pendant ce délai
+_CHOICE: foreground.UserChoice | None = None
+
+
+def _choice(user_front: int) -> foreground.UserChoice:
+    """Suivi du choix de l'utilisateur pour le lancement en cours (remis à zéro au début de chaque lancement)."""
+    global _CHOICE
+    if _CHOICE is None or _CHOICE.origin != user_front:
+        _CHOICE = foreground.UserChoice(user_front)
+    return _CHOICE
+
+
+def _taken(user_front: int, fg: int) -> bool:
+    """`fg` a-t-elle pris le premier plan SANS que l'utilisateur la choisisse ? (Sinon elle devient sa fenêtre.)"""
+    return not _choice(user_front).chose(fg)
+
+
+def _users(user_front: int) -> int:
+    """Fenêtre de l'utilisateur à cet instant : celle de départ, ou celle où il est passé lui-même."""
+    return _choice(user_front).front if user_front else 0
+
+
+def _front_returned(user_front: int, hwnd: int) -> bool:
+    """Premier plan RELU en fin de lancement, jamais supposé (tours 4 et 5, Codex : une instance réutilisée, sans
+    fenêtre identifiée, faisait annoncer « rendu ») : vrai si la fenêtre de l'utilisateur (ou un de ses dialogues) est
+    devant, si la fenêtre lancée ne l'a pas, ou si l'utilisateur a lui-même changé de fenêtre."""
+    if not user_front or not w.IsWindow(user_front):
+        return True
+    if hwnd:
+        return not _holds_front(hwnd)
+    fg = w.foreground()
+    mine = _owned_by(w.root(fg), w.root(_users(user_front))) or not _taken(user_front, fg)
+    return mine or foreground.system_foreground() != ""
 
 
 def _owned_by(hwnd: int, owner_root: int) -> bool:
@@ -694,16 +714,16 @@ def _owned_by(hwnd: int, owner_root: int) -> bool:
 
 def _give_back_while(user_front: int, deadline: float) -> bool:
     """Jusqu'à deadline : toute autre fenêtre qui prend le premier plan de l'utilisateur (sans qu'il change lui-même de
-    fenêtre) le lui rend aussitôt. Vrai si on a dû le rendre."""
+    fenêtre : Alt+Tab, barre des tâches) le lui rend aussitôt. Vrai si on a dû le rendre."""
     took_back = False
-    started, tick = time.monotonic(), w.GetTickCount()
-    while user_front and w.IsWindow(user_front) and time.monotonic() < deadline:
-        if foreground.user_input_since(started, tick):
-            break  # l'utilisateur a touché clavier ou souris : la fenêtre au premier plan est peut-être son choix
-        fg = w.root(w.foreground())
-        mine = _owned_by(fg, w.root(user_front))
-        if fg and not mine and not foreground.user_is_switching() and not foreground.system_foreground():
-            took_back = foreground.give_back(user_front, exclude={fg}) or took_back
+    while user_front and w.IsWindow(_users(user_front)) and time.monotonic() < deadline:
+        raw = w.foreground()
+        fg = w.root(raw)
+        mine = _owned_by(fg, w.root(_users(user_front)))
+        if fg and not mine and _taken(user_front, raw) and not foreground.system_foreground():
+            took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back
+        elif user_front:
+            _choice(user_front).observe()
         time.sleep(0.05)
     return took_back
 
@@ -729,22 +749,29 @@ def _settings_behind(user_front: int, deadline: float) -> tuple[int, bool]:
     hwnd = 0
     while time.monotonic() < deadline:
         fg = w.foreground()
-        if user_front and fg and fg != user_front and _is_settings(w.root(fg)) and not foreground.user_is_switching():
-            took_back = foreground.give_back(user_front, exclude={w.root(fg)}) or took_back
+        if user_front:
+            _choice(user_front).observe()
+        if user_front and fg and fg != _users(user_front) and _is_settings(w.root(fg)) and _taken(user_front, fg):
+            took_back = foreground.give_back(_users(user_front), exclude={w.root(fg)}) or took_back
         current = _settings_window()
         if current and current != hwnd:
             hwnd, found_at = current, time.monotonic()  # le cadre affiché remplace la CoreWindow masquée
         if hwnd and time.monotonic() - found_at >= SETTINGS_SETTLE_S:
             break
         time.sleep(0.05)
-    if hwnd and user_front and w.IsWindow(user_front) and not w.is_cloaked(hwnd):
-        w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+    # Paramètres au premier plan à la fin (l'utilisateur y est allé lui-même) : jamais glissés sous son ancienne fenêtre
+    # (tour 6 : premier plan et ordre de pile se contredisaient).
+    front = _users(user_front)
+    if hwnd and front and w.IsWindow(front) and not w.is_cloaked(hwnd) and w.root(w.foreground()) != w.root(hwnd):
+        w.SetWindowPos(hwnd, front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
     return hwnd, took_back
 
 
 def open_uri(uri: str, scheme: str, wait_s: float, user_front: int, before: set[int]) -> Launched:
     """Adresse ouverte par l'application qui gère son schéma (ms-settings: → page des Paramètres, mailto:…), sans
     activation demandée ; fenêtre retrouvée : la nouvelle, ou celle des Paramètres pour ms-settings (réutilisée)."""
+    global _CHOICE
+    _CHOICE = foreground.UserChoice(user_front)
     notes: list[str] = []
     pid = shell_open(uri)
     deadline = time.monotonic() + min(max(1.0, wait_s), URI_WINDOW_S)
@@ -763,15 +790,22 @@ def open_uri(uri: str, scheme: str, wait_s: float, user_front: int, before: set[
         notes.append(f'opened by "{w.process_name(foreground.app_pid(hwnd))}"')
     else:
         notes.append("opened; no window found (the app may run in the background or reuse a window: windows)")
-    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
-    if hwnd and not returned:
-        took_back = foreground.give_back(user_front, exclude=foreground.target_windows(hwnd)) or took_back
+    if hwnd:
+        returned = not (user_front and w.IsWindow(user_front) and _holds_front(hwnd))
+    else:
+        # Sans fenêtre identifiée, l'état réel est relu (tour 4 : « rendu » était supposé) : rendu si le premier plan
+        # est à l'utilisateur (sa fenêtre ou un de ses dialogues), ou s'il a lui-même changé de fenêtre entre-temps.
+        returned = _front_returned(user_front, 0)
+        if not returned:
+            notes.append("the app kept the foreground and Windows refused to give it back to the user")
+    if hwnd and not returned and _taken(user_front, w.foreground()):
+        took_back = foreground.give_back(_users(user_front), exclude=foreground.target_windows(hwnd)) or took_back
         returned = not _holds_front(hwnd)
     if took_back:
         notes.append("the app came to the front: foreground given back to the user at once")
     log.event("open", {"via": "address", "scheme": scheme, "found": bool(hwnd)})
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
-    return Launched(hwnd, app_pid, 0, "address", notes, None, user_front, returned)
+    return Launched(hwnd, app_pid, 0, "address", notes, None, _users(user_front), returned)
 
 
 def shell_open(path: Path | str) -> int:
@@ -864,6 +898,8 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
     """Ouvre un dossier (Explorateur) ou un document (application associée) sans lui donner la main, et VÉRIFIE ce
     qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), ou fenêtre dont le titre porte le
     nom du document. Faute de preuve, la note le dit (jamais « ouvert » supposé)."""
+    global _CHOICE
+    _CHOICE = foreground.UserChoice(user_front)
     folder = path.is_dir()
     via = "folder" if folder else "document"
     notes: list[str] = []
@@ -874,19 +910,21 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
     hwnd = 0
     while True:
         fg = w.foreground()
+        if user_front:
+            _choice(user_front).observe()
         if (
             user_front
             and fg
-            and fg != user_front
+            and fg != _users(user_front)
             and w.root(fg) not in before
-            and not foreground.user_is_switching()
+            and _taken(user_front, fg)
             and (
                 w.class_name(w.root(fg)) in policy.EXPLORER_CLASSES
                 if folder
                 else path.stem.lower() in w.window_text(w.root(fg)).lower()
             )  # jamais une fenêtre que Julien vient d'ouvrir lui-même : seulement celle du dossier ou du document
         ):
-            took_back = foreground.give_back(user_front, exclude={fg}) or took_back  # la nouvelle fenêtre s'est activée
+            took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back  # nouvelle fenêtre activée
         hwnd = _opened_window(path, folder, before, time.monotonic() - start)
         if hwnd or time.monotonic() >= deadline:
             break
@@ -912,8 +950,8 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
         fg = w.foreground()
         if fg and fg != user_front and user_front and w.IsWindow(user_front):
             windows = foreground.target_windows(hwnd)
-            if foreground.belongs_to(fg, windows, foreground.target_pids(hwnd), before):
-                took_back = foreground.give_back(user_front, exclude=windows) or took_back
+            if foreground.belongs_to(fg, windows, foreground.target_pids(hwnd), before) and _taken(user_front, fg):
+                took_back = foreground.give_back(_users(user_front), exclude=windows) or took_back
         if w.foreground() != hwnd and user_front and w.IsWindow(user_front) and hwnd not in before:
             w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
     else:
@@ -921,14 +959,14 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
             f"opening NOT verified: no {'Explorer window on this folder' if folder else 'window bearing the document name'} "
             f"within {max(1.0, wait_s):.0f} s (windows to look for it)"
         )
-    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
+    returned = _front_returned(user_front, hwnd)
     if not returned:
         notes.append("the window took the foreground and Windows refused to give it back (the guard retries)")
     elif took_back:
         notes.append("the window came to the front: foreground given back to the user at once")
     log.event("open", {"via": via, "verified": verified, "pid": pid})
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
-    return Launched(hwnd, app_pid, 0, via, notes, None, user_front, returned)
+    return Launched(hwnd, app_pid, 0, via, notes, None, _users(user_front), returned)
 
 
 def launch(
@@ -939,14 +977,13 @@ def launch(
     auto: uia.Automation | None = None,
     on_account_kill: Callable[[Path], None] | None = None,
     restart: bool = False,
-    confirm: bool = False,
 ) -> Launched:
     """on_account_kill(profil) : appelé quand la garde de compte ferme le navigateur DevTools lancé (le serveur y
-    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur).
-    confirm : ordre explicite de l'utilisateur pour CE lancement d'une adresse qui appelle ou écrit à quelqu'un
-    (OUTWARD_SCHEMES) ; sans lui, refus avant tout lancement."""
+    oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur)."""
+    global _CHOICE
     notes: list[str] = []
     user_front = w.foreground()
+    _CHOICE = foreground.UserChoice(user_front)  # nouveau lancement : suivi du choix de l'utilisateur remis à zéro
     before = set(w.enum_windows())
     port = free_port() if devtools else 0
     extra = f" --remote-debugging-port={port} --remote-allow-origins=http://127.0.0.1:{port}" if devtools else ""
@@ -966,8 +1003,6 @@ def launch(
     if scheme and not Path(candidate).exists():
         if args.strip() or devtools or restart:
             raise LaunchError("Opening an address: no args, no devtools, no restart.")
-        if scheme in OUTWARD_SCHEMES:
-            _require_confirm(f'"{scheme}:" calls or messages someone', candidate, confirm)
         return open_uri(candidate, scheme, wait_s, user_front, before)
     exe = None
     if Path(os.path.expandvars(candidate)).exists():
@@ -1025,7 +1060,7 @@ def launch(
         target = _app_id_path(app_id)
         if target and target.lower().endswith(".exe"):
             # Exécutable : politique et identité par processus.
-            return launch(target, args, devtools, wait_s, auto, on_account_kill, restart, confirm)
+            return launch(target, args, devtools, wait_s, auto, on_account_kill, restart)
         if target:
             policy.check_launch_exe(target, "")  # raccourci vers un document : commutateurs jamais acceptés
         policy.check_launch_app_id(app_id, title_hint, args, devtools)
@@ -1066,17 +1101,17 @@ def launch(
     fg = w.foreground()
     if hwnd and fg and fg != user_front:
         windows = foreground.target_windows(hwnd)
-        if foreground.belongs_to(fg, windows, foreground.target_pids(hwnd) | pids, before):
-            if user_front and w.IsWindow(user_front):
-                took_back = foreground.give_back(user_front, exclude=windows) or took_back
+        if foreground.belongs_to(fg, windows, foreground.target_pids(hwnd) | pids, before) and _taken(user_front, fg):
+            if user_front and w.IsWindow(_users(user_front)):
+                took_back = foreground.give_back(_users(user_front), exclude=windows) or took_back
             elif not user_front:
                 # Aucune fenêtre de Julien à qui rendre le premier plan : la nouvelle reste active, mais au fond.
                 w.SetWindowPos(hwnd, w.HWND_BOTTOM, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
                 notes.append(
                     "no window was in the foreground: the app activated itself, placed at the bottom of the z-order"
                 )
-    if hwnd and w.foreground() != hwnd and user_front and w.IsWindow(user_front):
-        w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+    if hwnd and w.foreground() != hwnd and user_front and w.IsWindow(_users(user_front)):
+        w.SetWindowPos(hwnd, _users(user_front), 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
     if not hwnd:
         notes.append("no window of this app detected (single-instance app already open? windows to find it)")
     if devtools:
@@ -1113,18 +1148,25 @@ def launch(
                     "foreground=true) with the user's consent"
                 )
     # Premier plan relu en fin de lancement, jamais supposé : la note ne dit « rendu » que s'il l'est vraiment.
-    returned = not (user_front and w.IsWindow(user_front) and _holds_front(hwnd))
+    returned = _front_returned(user_front, hwnd)
+    if not returned and not hwnd:
+        # Instance réutilisée, aucune fenêtre identifiée : la garde du serveur ne suivra rien, la restitution se fait
+        # ici, une fois, puis l'état est relu (tour 6). _front_returned a déjà écarté une fenêtre que l'utilisateur a
+        # choisie (tour 7) : celle-ci a pris le premier plan sans lui.
+        fg = w.root(w.foreground())
+        took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back
+        returned = _front_returned(user_front, hwnd)
     if not returned:
         notes.append(
-            "the app took the foreground and Windows refused to give it back: foreground NOT given back to the user "
-            "(the server's guard retries)"
+            "the app took the foreground and Windows refused to give it back: foreground NOT given back to the user"
+            + (" (the server's guard retries)" if hwnd else "")
         )
     elif took_back:
         notes.append("the app came to the front: foreground given back to the user at once")
     app_pid = foreground.app_pid(hwnd) if hwnd else pid
     if pid and app_pid != pid and w.process_name(app_pid).lower() in foreground.HOST_PROCESSES:
         app_pid = pid  # cadre UWP sans CoreWindow enfant : l'application est le processus lancé, pas l'hôte
-    return Launched(hwnd, app_pid, port, via, notes, profile, user_front, returned)
+    return Launched(hwnd, app_pid, port, via, notes, profile, _users(user_front), returned)
 
 
 # --- Steam ----------------------------------------------------------------------------------------------------
@@ -1135,14 +1177,16 @@ def _wait_steam(deadline: float, user_front: int, before: set[int]) -> tuple[int
     while True:
         fg = w.foreground()
         name = w.process_name(w.window_pid(fg)).lower() if fg else ""
+        if user_front:
+            _choice(user_front).observe()
         if (
             user_front
             and fg
-            and fg != user_front
+            and fg != _users(user_front)
             and name in (steam.STEAM_EXE, steam.WEBHELPER)
-            and not foreground.user_is_switching()
+            and _taken(user_front, fg)
         ):
-            took_back = foreground.give_back(user_front, exclude={fg}) or took_back
+            took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back
         hwnd = steam.main_window()
         if hwnd:
             return hwnd, took_back
@@ -1240,7 +1284,7 @@ def launch_steam(
         notes.append("Steam main window not shown yet (update, sign-in?): windows, then look")
     elif took_back:
         notes.append("Steam came to the front: foreground given back to the user at once")
-    returned = not (user_front and w.IsWindow(user_front) and hwnd and _holds_front(hwnd))
+    returned = _front_returned(user_front, hwnd)
     pid = w.window_pid(hwnd) if hwnd else proc.pid
     return Launched(
         hwnd, pid, port, "Steam (restarted)" if running else "Steam", notes, None, user_front, returned,
