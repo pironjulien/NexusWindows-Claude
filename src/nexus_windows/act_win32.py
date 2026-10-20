@@ -242,10 +242,18 @@ class Win32Actions(ExecutorBase):
             raise Unconfirmed(f"text partially typed: {typed.detail()}. Check the target (look) before completing it")
         return typed.detail()
 
-    def _post_combos(self, combos: list[keys.Combo], fw: str, sent: list[str], simulated: bool = False) -> None:
+    def _post_combos(
+        self,
+        combos: list[keys.Combo],
+        fw: str,
+        sent: list[str],
+        simulated: bool = False,
+        element: snapshot.Element | None = None,
+    ) -> None:
         """simulated : Chromium en activation simulée (clavier à sa fenêtre de premier plan, raccourcis avec état
-        clavier simulé : mesuré, Ctrl+K reçu par la page)."""
-        target_hwnd = self._sim_top() if simulated else methods.keyboard_target(self.hwnd, self.windows)
+        clavier simulé : mesuré, Ctrl+K reçu par la page). element : la cible désignée ; ses touches vont à SA fenêtre
+        de premier niveau, celle que l'activation simulée vise (dialogue, surgissante : relecture de Codex, W14)."""
+        target_hwnd = self._sim_top(element) if simulated else methods.keyboard_target(self.hwnd, self.windows)
         for combo in combos:
             if combo.modifiers and (fw != "Chromium" or simulated):
                 hold = methods.SIM_MODIFIERS_HOLD_S if simulated else 0.15

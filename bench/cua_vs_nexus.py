@@ -493,14 +493,22 @@ async def bench_app(kind: str, nexus: Client, cua: Client) -> dict:
                 if kind not in kinds:
                     continue
                 row: dict[str, Any] = {"tâche": task}
+                covers: list[bool] = []
                 for tool, client in (("nexus", nexus), ("cua", cua)):
                     cover.raise_()
+                    covers.append(covered(app))  # exigé AVANT chaque essai, pas seulement noté après (W16, Codex)
                     try:
                         row[tool] = await run_task(client, tool, task, app, events, sizes[tool])
                     except Exception as exc:  # noqa: BLE001  (banc : une erreur d'un outil n'arrête pas l'autre)
                         row[tool] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
                         print(f"   {tool:5} ERREUR {task} : {exc}")
-                row["recouverte"] = covered(app)
+                covers.append(covered(app))
+                row["recouverte"] = all(covers)
+                # Ligne comptée seulement si la cible était recouverte avant chaque essai et après : sinon à part,
+                # jamais mêlée aux comptes « fenêtre recouverte ».
+                row["comptée"] = row["recouverte"]
+                if not row["comptée"]:
+                    print(f"   HORS COMPTE {task} : cible non recouverte pendant l'essai")
                 report["tâches"].append(row)
     finally:
         app.close()

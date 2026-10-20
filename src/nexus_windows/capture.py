@@ -68,6 +68,9 @@ def _free(hdc, hbitmap, old) -> None:
     w.DeleteDC(hdc)
 
 
+PRINTWINDOW_TIMEOUT_S = 3.0  # rendu normal : quelques dizaines de ms
+
+
 def capture_printwindow(hwnd: int) -> Shot:
     """Demande à la fenêtre de se dessiner dans notre bitmap (fonctionne même recouverte, pas réduite).
 
@@ -90,8 +93,28 @@ def capture_printwindow(hwnd: int) -> Shot:
     if scale != 1.0:
         width, height = max(1, round(win.width / scale)), max(1, round(win.height / scale))
     hdc, hbitmap, old, bits = _dib(width, height)
+    # Borné aussi après un WM_NULL réussi : une application qui se fige entre les deux bloquait le fil du bureau
+    # (W18, Codex). PrintWindow tourne dans un fil à part ; au-delà du délai, ce fil garde le bitmap et le libère
+    # lui-même quand l'application répond enfin (jamais libéré sous ses pieds) ; WGC prend le relais.
+    lock = threading.Lock()
+    state: dict[str, bool] = {}
+
+    def draw() -> None:
+        ok = bool(w.PrintWindow(hwnd, hdc, w.PW_RENDERFULLCONTENT))
+        with lock:
+            state["ok"] = ok
+            if state.get("abandoned"):
+                _free(hdc, hbitmap, old)
+
+    drawer = threading.Thread(target=draw, name="nexus-printwindow", daemon=True)
+    drawer.start()
+    drawer.join(PRINTWINDOW_TIMEOUT_S)
+    with lock:
+        if "ok" not in state:
+            state["abandoned"] = True
+            raise CaptureError("Window stopped responding during PrintWindow.")
     try:
-        if not w.PrintWindow(hwnd, hdc, w.PW_RENDERFULLCONTENT):
+        if not state["ok"]:
             raise CaptureError("PrintWindow failed.")
         image = _to_image(bits, width, height)
     finally:

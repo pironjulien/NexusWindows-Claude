@@ -255,7 +255,8 @@ class ChromiumActions(ExecutorBase):
 
         Shadow DOM traversé (point, ancêtres et focus relu en profondeur) ; dans un éditeur riche, c'est l'hôte
         d'édition le plus extérieur qui est visé et la sélection doit y être : un enfant [tabindex] focalisé ne
-        recevrait pas la frappe (tour 6, Codex). Sinon refus, rien n'est envoyé."""
+        recevrait pas la frappe (tour 6, Codex). Un champ input/textarea au point passe avant l'éditeur qui le contient :
+        sinon tout l'éditeur était remplacé, champ et texte autour compris (W1, Codex). Sinon refus, rien n'est envoyé."""
         wanted = (
             "'input, textarea, [contenteditable]:not([contenteditable=\"false\"])'"
             if editable
@@ -268,16 +269,18 @@ class ChromiumActions(ExecutorBase):
             f" let hit = document.elementFromPoint({cx}, {cy}); if (!hit) return 'none';"
             f" while (hit.shadowRoot) {{ const d = hit.shadowRoot.elementFromPoint({cx}, {cy});"
             " if (!d || d === hit) break; hit = d; }"
-            " let el = null;"
-            " if (hit.isContentEditable) { el = hit; for (let p = up(el); p && p.isContentEditable; p = up(p)) el = p; }"
+            " const box = n => n.tagName === 'INPUT' || n.tagName === 'TEXTAREA';"
+            " let el = null; for (let n = hit; n && !el; n = up(n)) if (box(n)) el = n;"
+            " if (el) {} else if (hit.isContentEditable) {"
+            " el = hit; for (let p = up(el); p && p.isContentEditable; p = up(p)) el = p; }"
             f" else {{ for (let n = hit; n; n = up(n)) if (n.matches && n.matches({wanted})) {{ el = n; break; }} }}"
             " el = el || hit; el.focus();"
             " let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement)"
             " a = a.shadowRoot.activeElement;"
             " if (!a || (a === document.body && !a.isContentEditable) || !within(a, el)) return 'unfocused';"
-            " const field = a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA';"
+            " const field = a.isContentEditable || box(a);"
             + (" if (!field) return 'unfocused';" if editable else "")
-            + " if (a.isContentEditable) { const r = el.getRootNode(); const s = (r.getSelection && r.getSelection())"
+            + " if (a.isContentEditable && !box(a)) { const r = el.getRootNode(); const s = (r.getSelection && r.getSelection())"
             " || document.getSelection(); if (!s || !s.anchorNode || !within(s.anchorNode, el)) return 'unselected'; }"
             " return 'ok'; })()"
         )

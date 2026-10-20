@@ -6,7 +6,23 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.7] - 2026-10-20
+
 ### Fixed
+- Password fields: Shift+letter and shortcuts (Ctrl+V, Ctrl+A then Delete) are refused too; only Tab, Enter and Escape
+  go through.
+- DevTools: an input or textarea inside a rich editor is targeted before the editor around it; replacing its text used
+  to replace the whole editor, surrounding text included. Checked in a real Chromium.
+- Foreground: the holder read by the caller is handed to the give-back (a user switching windows between two reads is
+  no longer covered); the give-back stops when the foreground no longer belongs to the target; an empty foreground
+  followed by a user window counts as the user's choice.
+- Real keyboard: focus read back after Ctrl+A before Delete, then before each 32-character chunk of typing.
+- Simulated keys (Chromium) go to the targeted element's own top-level window (dialog, popup), not the main window.
+- Virtualized lists: an exact name is required once the item is realized, never an approximate namesake.
+- Capture: PrintWindow bounded to 3 s on its own thread even after a successful WM_NULL; WGC takes over.
+- Notifications: a sign-in code is masked even without the word "code" ("Enter 739201 to sign in").
+- Bench against Cua: occlusion required before each attempt; rows where the target was not covered are flagged
+  outside the count.
 - Emergency stop: the remaining time is clamped to [0, hold duration]; floating-point rounding could report 120.00000000000003 s.
 
 ### Changed

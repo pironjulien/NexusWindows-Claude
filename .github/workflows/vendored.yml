@@ -1,5 +1,5 @@
 # Written by the export step (nexus-publish). The shared modules listed in vendored.sha256 are embedded from the
-# author's private shared folder (nexus-shared at a9531f6) and must stay byte-identical to that version: change them
+# author's private shared folder (nexus-shared at 21dfe99) and must stay byte-identical to that version: change them
 # upstream, never here.
 name: Vendored modules
 

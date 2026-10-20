@@ -27,6 +27,8 @@ from .act_base import (
     _top_down,
 )
 
+REAL_TYPING_CHUNK = 32  # caractères tapés au vrai clavier entre deux relectures du focus
+
 
 class PointerActions(ExecutorBase):
     """Clics par point, défilement, glisser, survol."""
@@ -167,12 +169,22 @@ class PointerActions(ExecutorBase):
         # surgissante : Ctrl+A puis Suppr videraient un autre champ (relectures, tours 3 et 4) → rien n'est tapé.
         if e.node is not None and not self._focus_reaches(e, wait_s=0.3, real=True):
             raise ActionError(f"{e.describe()} did not take the focus after the click: nothing was typed.")
+
+        def still_focused(step: str) -> None:
+            # Relu avant CHAQUE envoi, pas seulement après le clic : Ctrl+A peut déplacer le focus (surgissante,
+            # autocomplétion) et Suppr ou le texte partiraient ailleurs (relecture de Codex, W6).
+            if e.node is not None and not self._focus_reaches(e, real=True):
+                raise ActionError(f"{e.describe()} lost the focus before {step}: the typing stopped there.")
+
         if replace:
             realinput.press(keys.parse("ctrl+a"))
+            still_focused("Delete")
             realinput.press(keys.parse("delete"))
         else:
             realinput.press(keys.parse("ctrl+end"))
-        realinput.type_text(text)
+        for start in range(0, len(text), REAL_TYPING_CHUNK):
+            still_focused("typing")
+            realinput.type_text(text[start : start + REAL_TYPING_CHUNK])
 
     # --- Défilement ---------------------------------------------------------------------------------------------
     def _scroll_container_at(self, x: int, y: int) -> uia.Node | None:

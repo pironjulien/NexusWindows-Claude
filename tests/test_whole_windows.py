@@ -472,12 +472,12 @@ def test_real_input_trusts_only_the_real_focus(monkeypatch):
 def test_give_back_never_falls_back_over_the_users_choice(monkeypatch):
     from nexus_windows import foreground
 
-    fronts = iter([20, 20, 20])
+    fronts = iter([20, 20])  # départ (lu une fois), cadre Store ?
     monkeypatch.setattr(w, "foreground", lambda: next(fronts, 30))  # puis l'utilisateur prend 30
     monkeypatch.setattr(w, "window_pid", lambda h: h)
     monkeypatch.setattr(w, "process_name", lambda pid: "cible.exe")
     monkeypatch.setattr(foreground, "_restorable", lambda h: True)
-    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, t, ours=None: False)
+    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, t, ours=None, expected=None: False)
     monkeypatch.setattr(foreground, "_hand_over", lambda *a: pytest.fail("hand-over over the user's choice"))
     monkeypatch.setattr(foreground, "_ask_holder", lambda *a: pytest.fail("ask-holder over the user's choice"))
     monkeypatch.setattr(foreground, "_checkpoint", lambda: None)

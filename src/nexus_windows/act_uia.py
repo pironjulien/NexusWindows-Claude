@@ -32,6 +32,8 @@ from .act_base import (
     framework_of,
 )
 
+SECRET_SAFE_KEYS = frozenset({0x09, 0x0D, 0x1B})  # Tab, Entrée, Échap : seules touches admises dans un mot de passe
+
 
 class UiaActions(ExecutorBase):
     """Actions publiques de l'exécuteur, techniques UI Automation."""
@@ -275,7 +277,9 @@ class UiaActions(ExecutorBase):
         combos = keys.parse_sequence(spec)
         if not combos:
             raise ActionError("No key.")
-        printable = any(c.char and c.char.isprintable() and not c.modifiers for c in combos)
+        # Dans un mot de passe, seules Tab, Entrée et Échap passent (Maj permise) : Maj+lettre écrit aussi, et un
+        # raccourci (Ctrl+V, Ctrl+A puis Suppr) touche au secret (relecture de Codex, W7).
+        printable = any(c.key not in SECRET_SAFE_KEYS or set(c.modifiers) - {0x10} for c in combos)
         element = None
         if target not in (None, ""):
             element = self.resolve_element(target, TEXT_ROLES | LEAF_ROLES, "element")
@@ -333,7 +337,8 @@ class UiaActions(ExecutorBase):
                         sim.check("nothing was sent, the action is cancelled")
 
                     detail = self._watched(
-                        lambda: self._post_combos(combos, fw, sim_sent, simulated=True), prepare_simulated
+                        lambda: self._post_combos(combos, fw, sim_sent, simulated=True, element=element),
+                        prepare_simulated,
                     )()
                 return f"simulated activation, {', '.join(sorted(set(sim_sent)))}; {detail}"
 

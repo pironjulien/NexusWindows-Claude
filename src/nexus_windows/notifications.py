@@ -25,7 +25,7 @@ _TEXT = re.compile(r"<text\b[^>]*>(.*?)</text>", re.DOTALL)
 _CODE_CONTEXT = re.compile(
     r"code|c[óo]digo|codice|otp|v[ée]rif|passcode|mot de passe|password|contrase|s[ée]curit|security|2fa|connexion"
     r"|sign.?in|log.?in|authent|\bpin\b|confirm|apple id|identifiant|one.?time|is your|acc[eè]s|access|do not share"
-    r"|ne (?:le )?partagez",
+    r"|ne (?:le )?partagez|connect|entrez|saisissez|\benter\b|valid",
     re.IGNORECASE,
 )
 _CODE = re.compile(r"(?<!\w)(?:[A-Z]-)?\d(?:[ -]?\d){3,11}(?!\w)")

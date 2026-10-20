@@ -260,9 +260,10 @@ def _in(hwnd: int, windows: set[int]) -> bool:
     return bool(hwnd) and (hwnd in windows or w.root(hwnd) in windows or owned_by(hwnd, windows))
 
 
-def _switch_to(hwnd: int, timeout_s: float, ours: set[int] | None = None) -> bool:
+def _switch_to(hwnd: int, timeout_s: float, ours: set[int] | None = None, expected: int | None = None) -> bool:
     """ours : fenêtres de la cible qui peuvent remplacer celle qui tient le premier plan (écran de démarrage puis
-    fenêtre principale) sans que ce soit un choix de l'utilisateur."""
+    fenêtre principale) sans que ce soit un choix de l'utilisateur. expected : le premier plan tel que l'appelant l'a
+    vu ; relu ici, un changement de l'utilisateur entre les deux lectures passait pour le départ (W4, Codex)."""
     deadline = time.monotonic() + timeout_s
     tries = 0
     ours = ours or set()
@@ -270,7 +271,7 @@ def _switch_to(hwnd: int, timeout_s: float, ours: set[int] | None = None) -> boo
     # essais, c'est l'utilisateur qui a changé de fenêtre ; on abandonne au lieu de la lui reprendre. Comparé fenêtre
     # par fenêtre, jamais par programme : Explorateur et navigateurs ont un seul processus pour toutes leurs fenêtres
     # (tour 7). Un premier plan nul un instant ne compte pas.
-    expected = w.foreground()
+    expected = w.foreground() if expected is None else expected
     while time.monotonic() < deadline:
         current = w.foreground()
         if current == hwnd:
@@ -330,28 +331,32 @@ def give_back(prev: int, timeout_s: float = 0.6, exclude: set[int] | None = None
     """Rend le premier plan à la fenêtre de l'utilisateur `prev` (ou, si elle a disparu ou n'est pas une fenêtre à qui le
     rendre — sélecteur, barre des tâches, fenêtre masquée —, à sa fenêtre suivante). Si Windows refuse (cible Store),
     la fenêtre de la cible au premier plan le rend elle-même (_hand_over)."""
-    if prev and w.foreground() == prev:
+    holder = w.foreground()  # lu une seule fois : c'est lui que _switch_to ménage (W4)
+    if prev and holder == prev:
         return True
+    if holder and exclude and not _in(holder, exclude):
+        # Le premier plan n'est plus à la cible : l'utilisateur a choisi une fenêtre, on ne la lui prend pas.
+        return False
     if not _restorable(prev):
-        prev = _next_user_window((exclude or set()) | {w.foreground()})
+        prev = _next_user_window((exclude or set()) | {holder})
         if not prev:
             return False
     mark_own_input()
     exclude = exclude or set()
     if w.process_name(w.window_pid(w.foreground())).lower() in HOST_PROCESSES and _hand_over(prev, exclude):
         return True  # cadre Store : l'attache serait refusée, inutile de faire attendre Julien 0,6 s
-    start = w.foreground()
-    if _switch_to(prev, timeout_s, exclude):
+    if _switch_to(prev, timeout_s, exclude, expected=holder):
         return True
     # Abandon de _switch_to parce que l'utilisateur a pris une autre fenêtre : aucun repli par-dessus son choix
     # (tour 6, Codex).
-    return False if _user_moved(start, exclude) else _hand_over(prev, exclude)
+    return False if _user_moved(holder, exclude) else _hand_over(prev, exclude)
 
 
 def _user_moved(start: int, ours: set[int]) -> bool:
-    """Le premier plan est-il passé à une autre fenêtre que celle de départ, hors fenêtres de la cible ?"""
+    """Le premier plan est-il passé à une autre fenêtre que celle de départ, hors fenêtres de la cible ? Un départ
+    nul suivi d'une fenêtre hors cible compte aussi : c'est la fenêtre de l'utilisateur (W3, Codex)."""
     current = w.foreground()
-    return bool(current and start and current != start and not _in(current, ours))
+    return bool(current and current != start and not _in(current, ours))
 
 
 def system_foreground() -> str:
@@ -380,7 +385,7 @@ def activate(hwnd: int, timeout_s: float = 0.4) -> bool:
         return False
     mark_own_input()
     start = w.foreground()
-    if _switch_to(hwnd, timeout_s):
+    if _switch_to(hwnd, timeout_s, expected=start):
         return True
     return False if _user_moved(start, {hwnd}) else _ask_holder(hwnd)  # jamais par-dessus un choix de l'utilisateur
 

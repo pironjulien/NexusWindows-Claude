@@ -324,7 +324,14 @@ class ExecutorBase:
         def _win32_item_chain(self, e: snapshot.Element) -> list[tuple[str, Callable[[], Any]]]: ...
         def _ensure_active(self) -> None: ...
         def _keystrokes(self, e: snapshot.Element, text: str, replace: bool, simulated: bool = False) -> str: ...
-        def _post_combos(self, combos: list[keys.Combo], fw: str, sent: list[str], simulated: bool = False) -> None: ...
+        def _post_combos(
+            self,
+            combos: list[keys.Combo],
+            fw: str,
+            sent: list[str],
+            simulated: bool = False,
+            element: snapshot.Element | None = None,
+        ) -> None: ...
 
     @property
     def view(self) -> snapshot.View:
@@ -577,10 +584,12 @@ class ExecutorBase:
             for _ in range(10):
                 time.sleep(0.05)
                 try:
-                    element, _ = snapshot.pick(self._rebuild(), spec, prefer)
+                    element, partial = snapshot.pick(self._rebuild(), spec, prefer)
                 except snapshot.AmbiguousTarget as error:
                     raise ActionError(f"{error} (brought into view from a long list)") from None
                 except snapshot.TargetError:
+                    continue
+                if partial:  # nom exact attendu, comme _scroll_to_named : jamais un homonyme approximatif (W12, Codex)
                     continue
                 return element, f"{element.describe()} out of view in a long list: brought on screen"
         raise ActionError(str(missing)) from None

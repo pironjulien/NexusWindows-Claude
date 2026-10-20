@@ -212,7 +212,9 @@ def test_give_back_never_targets_shell_or_hidden_window(monkeypatch, kind):
     monkeypatch.setattr(foreground.w, "is_cloaked", lambda h: kind == "cloaked")
     monkeypatch.setattr(foreground.w, "class_name", lambda h: "Shell_TrayWnd" if kind == "switcher" else "Fenetre")
     monkeypatch.setattr(foreground, "_next_user_window", lambda exclude: JULIEN)
-    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s, ours=None: calls.append(hwnd) or True)
+    monkeypatch.setattr(
+        foreground, "_switch_to", lambda hwnd, timeout_s, ours=None, expected=None: calls.append(hwnd) or True
+    )
     assert foreground.give_back(OTHER, exclude={TARGET})
     assert calls == [JULIEN]
 
@@ -512,7 +514,9 @@ def test_front_respects_stop_and_typing(monkeypatch):
 def test_stop_checked_right_before_any_activation(monkeypatch):
     desk = Desk(monkeypatch)
     switched: list[int] = []
-    monkeypatch.setattr(foreground, "_switch_to", lambda hwnd, timeout_s, ours=None: switched.append(hwnd) or True)
+    monkeypatch.setattr(
+        foreground, "_switch_to", lambda hwnd, timeout_s, ours=None, expected=None: switched.append(hwnd) or True
+    )
     monkeypatch.setattr(foreground.w, "IsWindow", lambda h: True)
     monkeypatch.setattr(foreground.w, "IsIconic", lambda h: False)
     stop.pressed()
