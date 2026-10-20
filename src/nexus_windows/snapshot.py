@@ -842,7 +842,7 @@ def id_ranges(ids: list[int]) -> str:
 
 # --- OCR en secours ------------------------------------------------------------------------------------------
 OCR_BELOW = 6  # moins d'éléments UIA que cela (Tk, canevas, jeu) : le texte de l'image est lu par OCR
-_TEXT_TYPE = next(k for k, v in uia.CONTROL_TYPES.items() if v == "Text")
+_TEXT_TYPE = 50020  # UIA_TextControlTypeId (constante documentée) : hors Windows, CONTROL_TYPES est vide au chargement
 
 
 def wants_ocr(view: View) -> bool:

@@ -19,7 +19,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 0.13.3 · Windows 10/11 · Python 3.14 · MIT licence
+Version 0.13.4 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
