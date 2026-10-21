@@ -533,6 +533,7 @@ def test_stopped_batch_keeps_its_report(tmp_path, monkeypatch):
 
     def click_then_stop(*args, **kwargs):
         outcome = original(*args, **kwargs)
+        outcome.verified = True  # l'étape simulée est prouvée ; sinon le lot s'arrête déjà sur « ~ »
         stop.pressed()  # Julien appuie sur le raccourci pendant le lot
         return outcome
 
@@ -541,7 +542,7 @@ def test_stopped_batch_keeps_its_report(tmp_path, monkeypatch):
     with pytest.raises(worker.Stopped) as caught:
         server._run_steps(ex, steps, HWND, as_call())
     text = str(caught.value)
-    assert text.startswith("1. ~ click on Button") and "2. ⛔ click interrupted" in text
+    assert text.startswith("1. ✓ click on Button") and "2. ⛔ click interrupted" in text
 
 
 def test_instructions_fit_in_mcp_limit():

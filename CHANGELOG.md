@@ -6,6 +6,35 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.15.9] - 2026-10-21
+
+Measured by the common bench of the three NexusWindows tools (Claude, Codex, Antigravity): same lab apps, same tasks,
+the application itself as the only judge (an effect received twice is a failure), target window covered, independent
+observer of the foreground (Windows events + 1 ms sampling), cursor and clipboard.
+
+### Fixed
+- WinForms buttons (owner-drawn, `BS_OWNERDRAW`): `BN_CLICKED` is posted first, like Win32 push buttons. UI Automation
+  Invoke is synchronous: a button that opens a modal dialog blocked it until the dialog closed (5 s lost, then "~").
+  Modal dialog task: 13.6 s → 0.2 s.
+- Right-click on Win32/WinForms: posted right-click first. It opens a WinForms context menu without touching the
+  foreground (measured), and its command is then chosen by name; UIA ShowContextMenu opened nothing and its "~"
+  stopped the chain. Context menu task: 0/2 → 2/2.
+- Partial name matching never picks a page's root document by its title (the title changes with the page): a field
+  briefly missing from a covered Chromium tree no longer resolves to the document.
+- Wheel at a point over a canvas: when the scroll container is already at its end (nothing moved, no side effect), the
+  wheel message at the point is tried next, then an explicit failure; no more "~" that stopped the chain.
+- Shortcuts by messages: the simulated keyboard state is restored only once the target has processed its input
+  (`WaitForInputIdle`, at most 2 s, at least the usual hold), so a slow target can no longer turn Ctrl+S into S.
+- A batch stops after an action that was sent but could not be verified ("~"): the following steps are not sent, the
+  action is never replayed, and the run cannot be saved as a successful routine. A requested postcondition that cannot
+  be read stays unknown, even when the action itself was read back.
+- `wait` and `expect` tell an incomplete read (unknown outcome, batch stopped) from text proven absent (failure).
+- Two launch tests no longer read the real keyboard and mouse (a real Alt+Tab during the suite could fail them).
+
+### Added
+- Lab (WinForms, WPF): double-click on the list, a "Copier" context menu, a "Dialogue" button opening a real modal
+  dialog, for the common bench.
+
 ## [0.15.8] - 2026-10-20
 
 ### Fixed

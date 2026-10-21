@@ -301,10 +301,12 @@ class PointerActions(ExecutorBase):
                 at_end = after[axis] >= 99.9 if direction in ("down", "right") else after[axis] <= 0.1
                 if at_end and aimed:
                     # Point visé par le modèle (canevas, carte…) : rien n'a bougé et l'élément sous le point n'a reçu
-                    # aucune molette (banc du 20/10 : un « ✓ » ici était un faux succès). Issue inconnue, dite.
-                    return (
-                        f"container already at the end ({after[axis]:.0f} %), nothing moved; what is under the point "
-                        "received no wheel event: check the image"
+                    # aucune molette (banc du 20/10 : un « ✓ » ici était un faux succès). Aucun effet de bord (position
+                    # inchangée, en butée) : la technique suivante (molette par message au point) peut s'appliquer,
+                    # sans risque de double défilement (banc commun du 21/10 : canevas Electron).
+                    raise methods.MethodError(
+                        f"container already at the end ({after[axis]:.0f} %): the wheel must reach what is under "
+                        "the point"
                     )
                 if at_end:
                     return f"read back ✓ already at the end ({after[axis]:.0f} %)"

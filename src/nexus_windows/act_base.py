@@ -79,6 +79,10 @@ class ActionError(RuntimeError):
     pass
 
 
+class IncompleteRead(ActionError):
+    """État illisible : une attente ne permet de conclure ni présence ni absence, sans prouver un échec de l'action."""
+
+
 class NeedsForeground(ActionError):
     pass
 

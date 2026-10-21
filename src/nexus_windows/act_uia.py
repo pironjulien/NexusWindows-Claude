@@ -56,13 +56,20 @@ class UiaActions(ExecutorBase):
         page = self._page_if_free()
 
         if button == "right":
+            right_messages = (
+                "right-click by messages",
+                self._watched(lambda: self._post_click(*self._point_of(e), "right")),
+            )
+            if fw in ("Win32", "WinForms"):
+                # Mesuré le 21/10 (banc commun) : le clic droit posté ouvre le menu contextuel WinForms sans toucher au
+                # premier plan, et sa commande se choisit ensuite par UIA ; UIA ShowContextMenu, lui, n'ouvre rien
+                # (et son « ~ » arrêtait la chaîne avant les messages).
+                chain.append(right_messages)
             chain.append(("UIA context menu", lambda: self.auto.show_context_menu(e.node.element)))
             if page is not None:
                 chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e), "right")))
-            if fw not in NO_MOUSE_MESSAGES:
-                chain.append(
-                    ("right-click by messages", self._watched(lambda: self._post_click(*self._point_of(e), "right")))
-                )
+            if fw not in NO_MOUSE_MESSAGES and fw not in ("Win32", "WinForms"):
+                chain.append(right_messages)
             return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e), "right"))
         if count >= 2:
             if p.get("has_invoke") and role in ITEM_ROLES and not msaa:
@@ -86,7 +93,14 @@ class UiaActions(ExecutorBase):
             return self._try_or_foreground([], what, lambda: realinput.click(*self._point_of(e)))
         if hwnd and methods._is_class(hwnd, methods.BUTTON_CLASSES):
             kind = w.style(hwnd) & methods.BS_TYPEMASK
-            if not winforms or kind in (methods.BS_PUSHBUTTON, methods.BS_DEFPUSHBUTTON):
+            # WinForms : boutons poussoirs dessinés par l'application (BS_OWNERDRAW) compris, mais jamais une case (son
+            # état propre ne suit pas BN_CLICKED, mesuré). BN_CLICKED est POSTÉ : un bouton qui ouvre une boîte modale
+            # ne bloque pas l'appel (UIA Invoke, lui, attend la fermeture de la boîte : 5 s perdues puis échec, banc
+            # commun du 21/10).
+            pushbutton = kind in (methods.BS_PUSHBUTTON, methods.BS_DEFPUSHBUTTON) or (
+                kind == methods.BS_OWNERDRAW and role == "Button"
+            )
+            if not winforms or pushbutton:
                 chain.append(("BN_CLICKED", lambda: methods.win32_button_click(hwnd)))
         combo = self._win32_combo_of(e) if fw in ("Win32", "WinForms") else 0
         if combo:

@@ -749,3 +749,21 @@ def appexec_target(path: str) -> str | None:
         return parts[2] if len(parts) > 2 and parts[2] else ""
     finally:
         CloseHandle(raw_handle)
+
+
+# --- Attente que la cible ait traité ses entrées (banc commun du 21/10, relecture de Codex) -----------------------
+SYNCHRONIZE = 0x00100000
+WaitForInputIdle = _fn(user32, "WaitForInputIdle", w.DWORD, w.HANDLE, w.DWORD)
+
+
+def wait_input_idle(hwnd: int, timeout_ms: int) -> None:
+    """Attend (au plus timeout_ms) que le processus de la fenêtre ait vidé sa file d'entrées : un état clavier
+    simulé n'est restauré qu'après, sinon Ctrl+S traité tard deviendrait S."""
+    pid = window_pid(hwnd)
+    handle = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, False, pid) if pid else None
+    if not handle:
+        return
+    try:
+        WaitForInputIdle(handle, timeout_ms)
+    finally:
+        CloseHandle(handle)

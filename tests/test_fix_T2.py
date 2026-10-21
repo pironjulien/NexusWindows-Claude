@@ -492,9 +492,9 @@ def test_replace_whose_delete_is_ignored_keeps_original(monkeypatch):
     assert not [item for kind, item in sim.log if kind == "post" and item != methods.VK_DELETE]  # aucun caractère
 
 
-def test_partial_typing_fails_the_step_and_stops_the_batch(monkeypatch):
-    """Constat 1, durcissement : texte partiellement tapé → ✗ (Unconfirmed), étapes suivantes non exécutées : un
-    message tronqué n'est jamais envoyé."""
+def test_partial_typing_stays_unknown_and_stops_the_batch(monkeypatch):
+    """Texte partiellement tapé mais devenu illisible → ~ (Unconfirmed), étapes suivantes non exécutées : un
+    message tronqué n'est jamais envoyé ni sa frappe rejouée."""
     desk = Desk(monkeypatch)
     sim = Chromium(monkeypatch, desk)
     send = node("Button", "Envoyer", has_invoke=True)
@@ -505,8 +505,8 @@ def test_partial_typing_fails_the_step_and_stops_the_batch(monkeypatch):
     sim.unreadable_after = 6  # l'élément est recréé pendant la frappe
     steps = [server.Step(do="type", target="Message", text=LONG6), server.Step(do="click", target="Envoyer")]
     report, failed = server._run_steps(ex, steps, HWND, as_call())
-    assert failed and report[0].startswith("1. ✗") and "partially typed" in report[0], report
-    assert "(steps 2 to 2 not run)" in report[1] and auto_calls == []
+    assert not failed and report[0].startswith("1. ~") and "partially typed" in report[0], report
+    assert "(steps 2 to 2 not run)" in report[-1] and auto_calls == []
 
 
 def test_unreadable_field_is_refused_before_typing(monkeypatch):

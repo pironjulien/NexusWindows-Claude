@@ -8,6 +8,21 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
+// Vraie boîte modale (ShowDialog) : la fenêtre principale est désactivée tant qu'elle est ouverte. Affichée sans
+// activation, comme le labo : un vol de premier plan pendant l'essai revient à l'outil, pas à l'application.
+public class LabDialog : Form {
+    public static string Last = "modale fermée";
+    protected override bool ShowWithoutActivation { get { return true; } }
+    public LabDialog() {
+        Text = "Confirmation"; StartPosition = FormStartPosition.CenterParent; ClientSize = new Size(260, 90);
+        FormBorderStyle = FormBorderStyle.FixedDialog; MinimizeBox = false; MaximizeBox = false; Last = "modale fermée";
+        Controls.Add(new Label { Text = "Continuer ?", Location = new Point(12, 12), AutoSize = true });
+        var ok = new Button { Text = "OK", Location = new Point(40, 50), Width = 80 }; ok.Click += (s, e) => { Last = "modale ok"; Close(); };
+        var cancel = new Button { Text = "Annuler", Location = new Point(140, 50), Width = 80 }; cancel.Click += (s, e) => { Last = "modale annulée"; Close(); };
+        Controls.Add(ok); Controls.Add(cancel);
+    }
+}
+
 public class LabForm : Form {
     protected override bool ShowWithoutActivation { get { return true; } }
     Label status; int clicks;
@@ -29,6 +44,15 @@ public class LabForm : Form {
         combo.Items.AddRange(new object[] { "Rouge", "Vert", "Bleu" }); combo.SelectedIndexChanged += (s, e) => Status("couleur " + combo.SelectedItem); Controls.Add(combo);
         label("Liste", top + 176); var list = new ListBox { Location = new Point(100, top + 176), Size = new Size(200, 60), AccessibleName = "Liste" };
         list.Items.AddRange(new object[] { "Alpha", "Bravo", "Charlie" }); list.SelectedIndexChanged += (s, e) => Status("liste " + list.SelectedItem); Controls.Add(list);
+        list.DoubleClick += (s, e) => Status("double " + list.SelectedItem);
+        var context = new ContextMenuStrip(); var copy = new ToolStripMenuItem("Copier"); copy.Click += (s, e) => Status("contexte copier");
+        context.Items.Add(copy); list.ContextMenuStrip = context;
+        var dialog = new Button { Text = "Dialogue", Location = new Point(360, top + 100), Width = 120 }; Controls.Add(dialog);
+        dialog.Click += (s, e) => {
+            Status("modale ouverte");
+            using (var box = new LabDialog()) { box.ShowDialog(this); }
+            Status(LabDialog.Last);
+        };
         label("Lecture", top + 246); Controls.Add(new TextBox { ReadOnly = true, Text = "abc", Location = new Point(100, top + 246), Width = 200, AccessibleName = "Lecture" });
         label("Statut", top + 280); status = new Label { Name = "statut", Text = "prêt", Location = new Point(100, top + 283), AutoSize = true, AccessibleName = "Statut" }; Controls.Add(status);
         var zone = new Panel { Location = new Point(100, top + 310), Size = new Size(430, 110), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White, AccessibleName = "Zone" };

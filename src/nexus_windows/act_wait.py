@@ -10,6 +10,7 @@ from . import win32 as w
 from .act_base import (
     ActionError,
     ExecutorBase,
+    IncompleteRead,
     Outcome,
 )
 
@@ -51,7 +52,7 @@ class WaitActions(ExecutorBase):
             while time.monotonic() < deadline:
                 worker.check_cancelled()
                 time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
-            return Outcome(True, f"waited {timeout_s:.1f} s", "sleep")
+            return Outcome(True, f"waited {timeout_s:.1f} s", "sleep", verified=True)
         start = time.monotonic()
         while True:
             worker.check_cancelled()
@@ -65,6 +66,6 @@ class WaitActions(ExecutorBase):
                 )
             if time.monotonic() - start > timeout_s:
                 if found is None:
-                    raise ActionError(f'"{text}": incomplete window read ({self.unreadable}): check the image.')
+                    raise IncompleteRead(f'"{text}": incomplete window read ({self.unreadable}): check the image.')
                 raise ActionError(f'"{text}" still {"present" if gone else "absent"} after {timeout_s:.0f} s.')
             time.sleep(0.25)

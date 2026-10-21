@@ -61,6 +61,123 @@ def test_check_unreadable_state_is_unknown_not_success():
     assert not failed and symbols == ["~"] and "unknown outcome" in report[0]
 
 
+@pytest.mark.parametrize("single_step", [False, True])
+def test_unknown_action_stops_before_the_next_action_without_replay(single_step):
+    first = node("Button", "Lancer", has_invoke=True)
+    next_button = node("Button", "Continuer", has_invoke=True)
+    auto = FakeAuto()
+    steps = [server.Step(do="click", target="Lancer")]
+    if not single_step:
+        steps.append(server.Step(do="click", target="Continuer"))
+    report, failed, symbols = run(executor(make_view(first, next_button), auto), *steps)
+    assert not failed and symbols == ["~"]  # transmis, pas un échec certain
+    assert auto.calls == [("invoke", first.element)]  # ni second bouton, ni répétition du premier
+    assert any("unknown outcome" in line for line in report)
+    assert not any("✗" in line for line in report)
+    if not single_step:
+        assert "steps 2 to 2 not run" in report[-1]
+    assert "NOT saved" in server._remember("test.exe", FP, "T", "r", steps, symbols, failed)
+    assert routines.names("test.exe") == []
+
+
+def test_unconfirmed_exception_stays_unknown_and_stops_without_replay():
+    first = node("Button", "Lancer", has_invoke=True)
+    next_button = node("Button", "Continuer", has_invoke=True)
+
+    class UnreadableAfterInvoke(FakeAuto):
+        def invoke(self, element):
+            super().invoke(element)
+            raise actions.NoVisibleEffect("sent once, no readable effect")
+
+    auto = UnreadableAfterInvoke()
+    steps = [server.Step(do="click", target="Lancer"), server.Step(do="click", target="Continuer")]
+    report, failed, symbols = run(executor(make_view(first, next_button), auto), *steps)
+    assert not failed and symbols == ["~"]  # l'exception Unconfirmed du moteur n'est pas un échec certain
+    assert auto.calls == [("invoke", first.element)]
+    assert "no readable effect" in report[0] and "not run" in report[-1]
+    assert "NOT saved" in server._remember("test.exe", FP, "T", "r", steps, symbols, failed)
+    assert routines.names("test.exe") == []
+
+
+@pytest.mark.parametrize("with_expect", [False, True])
+def test_unreadable_requested_check_stops_even_after_a_verified_action(with_expect):
+    field = node("Edit", "Nom", has_value=True, value="")
+    label = node("Text", "Statut")  # la propriété « checked » n'est pas publiée
+    auto = FakeAuto()
+    check = server.Check(target="Text:Statut", checked=True)
+    steps = [
+        server.Step(do="set", target="Nom", text="Fini", timeout=0.1, check=check,
+                    expect="Fini" if with_expect else None),  # absent avant, présent après : autre preuve insuffisante
+        server.Step(do="set", target="Nom", text="Suite"),
+    ]  # fmt: skip
+    report, failed, symbols = run(executor(make_view(field, label), auto), *steps)
+    assert not failed and symbols == ["~"]
+    assert auto.calls == [("set_value", "Fini")] and field.element.live["value"] == "Fini"
+    assert "postcondition unreadable" in report[0] and "not run" in report[-1]
+
+
+def test_verified_already_satisfied_and_observer_steps_continue(monkeypatch):
+    monkeypatch.setattr(server.w, "IsWindow", lambda hwnd: True)
+    first = node("Edit", "Nom", has_value=True, value="Julien")
+    second = node("Edit", "Ville", has_value=True, value="")
+    auto = FakeAuto()
+    report, failed, symbols = run(
+        executor(make_view(first, second), auto),
+        server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien")),
+        server.Step(do="wait", timeout=0.1),  # aucune entrée, seule la durée écoulée est prouvée
+        server.Step(do="set", target="Ville", text="Paris"),
+        server.Step(do="set", target="Nom", text="Piron"),
+    )
+    assert not failed and symbols == ["=", "✓", "✓", "✓"]
+    assert auto.calls == [("set_value", "Paris"), ("set_value", "Piron")]
+    assert "waited" in report[1] and not any("stopped" in line for line in report)
+
+
+@pytest.mark.parametrize("with_check", [False, True])
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_expect_distinguishes_an_incomplete_read_from_a_proven_absence(with_check, incomplete):
+    field = node("Edit", "Nom", has_value=True, value="")
+    label = node("Text", "Statut")
+    view = make_view(field, label)
+    view.node_count = 3
+    view.truncated = incomplete
+    auto = FakeAuto()
+    check = server.Check(target="Text:Statut", checked=True) if with_check else None
+    steps = [
+        server.Step(do="set", target="Nom", text="Fini", timeout=0.1, check=check, expect="Pret"),
+        server.Step(do="set", target="Nom", text="Suite"),
+    ]
+    report, failed, symbols = run(executor(view, auto), *steps)
+    assert auto.calls == [("set_value", "Fini")] and field.element.live["value"] == "Fini"
+    assert "not run" in report[-1]
+    if incomplete:
+        assert not failed and symbols == ["~"]
+        assert "EXPECTED TEXT UNREADABLE" in report[0] and not any("✗" in line for line in report)
+    else:
+        assert failed and symbols == ["✗"] and "EXPECTED NOT SEEN" in report[0]
+    assert "NOT saved" in server._remember("test.exe", FP, "T", "r", steps, symbols, failed)
+    assert routines.names("test.exe") == []
+
+
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_wait_step_distinguishes_an_incomplete_read_from_a_proven_absence(incomplete):
+    button = node("Button", "Continuer", has_invoke=True)
+    view = make_view(button)
+    view.node_count = 2
+    view.truncated = incomplete
+    auto = FakeAuto()
+    steps = [server.Step(do="wait", text="Pret", timeout=0.1), server.Step(do="click", target="Continuer")]
+    report, failed, symbols = run(executor(view, auto), *steps)
+    assert auto.calls == [] and "not run" in report[-1]
+    if incomplete:
+        assert not failed and symbols == ["~"]
+        assert "incomplete window read" in report[0] and not any("✗" in line for line in report)
+    else:
+        assert failed and symbols == ["✗"] and "absent" in report[0]
+    assert "NOT saved" in server._remember("test.exe", FP, "T", "r", steps, symbols, failed)
+    assert routines.names("test.exe") == []
+
+
 def test_check_exists_false_waits_for_disappearance():
     button = node("Button", "Fermer", has_invoke=True)
     dialog = node("Text", "Confirmer la suppression")

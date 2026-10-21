@@ -59,7 +59,8 @@ INSTRUCTIONS = """The user's Windows desktop, in the background: they keep worki
 Fast flow: look(window="title or process") → act(steps=[...]) in one call for several actions; each act returns the
 updated list and image. Target: [N] from the last look, visible name ("Save", "button:OK"), or point "x,y" in pixels
 of the window's last image.
-Per-step report: ✓ effect read back, ~ sent without read-back (check the image), ✗ failed or refused.
+Per-step report: ✓ effect read back, ~ sent without read-back (batch stopped; inspect the state, never replay blindly),
+✗ failed or refused.
 The server picks the safe technique for each app (Win32, WinForms, WPF, UWP/WinUI, Chromium/Electron) and gives the
 foreground back to the user if an app takes it. Never the real mouse/keyboard without foreground=true, reserved for
 what the user allowed. Password fields: typing always refused. Password managers and the secure desktop (UAC,
@@ -815,12 +816,12 @@ def _check_of(step: Step) -> dict[str, Any] | None:
     return step.check.model_dump(exclude_none=True) if step.check else None
 
 
-def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcome) -> None:
+def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcome) -> bool | None:
     """Postcondition relue après l'action (lectures seules, jusqu'au délai) : ✓ vraie, ✗ non atteinte, sinon issue
     inconnue (jamais un succès supposé)."""
     check = _check_of(step)
     if check is None:  # étape sans postcondition : rien à relire
-        return
+        return None
     verdict = postcond.wait(executor, check, step.timeout or 3)
     wanted = postcond.describe(check)
     if verdict.state is True:
@@ -830,15 +831,16 @@ def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcom
         outcome.ok = False
         outcome.line += f" — NOT REACHED: {wanted} (read back: {verdict.detail})"
     else:
-        outcome.verified = outcome.verified or None
+        outcome.verified = None
         outcome.line += f" — postcondition unreadable, unknown outcome: {wanted} ({verdict.detail})"
+    return verdict.state
 
 
 def _run_steps(
     executor: actions.Executor, steps: list[Step], hwnd: int, call: log.Call, symbols: list[str] | None = None
 ) -> tuple[list[str], bool]:
-    """Exécute les étapes dans l'ordre ; s'arrête à la première erreur ou si la fenêtre se ferme. symbols : reçoit
-    l'issue de chaque étape (✓ = ~ ✗)."""
+    """Exécute les étapes dans l'ordre ; s'arrête à la première erreur, issue inconnue ou fermeture de fenêtre.
+    symbols : reçoit l'issue de chaque étape (✓ = ~ ✗). Le booléen indique une erreur, pas une issue inconnue."""
     report: list[str] = []
     symbols = symbols if symbols is not None else []
     for index, step in enumerate(steps, 1):
@@ -850,6 +852,7 @@ def _run_steps(
         executor.step_text = (step.text or "") if step.do in ("type", "set") else ""
         executor.approved = set()
         failed = False
+        unknown = False
         try:
             worker.check_cancelled()
             hold = realinput.current_hold()
@@ -873,11 +876,8 @@ def _run_steps(
                 outcome = _dispatch(executor, step)
             except actions.Unconfirmed as error:
                 # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après coup.
-                if not check:
-                    raise
                 outcome = actions.Outcome(True, f"{step.do} sent ({_short(error)})", "messages")
-            if check and outcome.ok:
-                _apply_check(executor, step, outcome)
+            check_unreadable = bool(check and outcome.ok and _apply_check(executor, step, outcome) is None)
             if step.expect and outcome.ok:
                 try:
                     seen = executor.wait(step.expect, False, step.timeout or 3)
@@ -886,8 +886,12 @@ def _run_steps(
                             f' — "{snapshot.clip(step.expect, 40)}" already present before the action (not proof)'
                         )
                     else:
-                        outcome.verified = True
+                        if not check_unreadable:
+                            outcome.verified = True
                         outcome.line += f" — expected {seen.line}"
+                except actions.IncompleteRead as error:
+                    outcome.verified = None
+                    outcome.line += f" — EXPECTED TEXT UNREADABLE, unknown outcome: {_short(error)}"
                 except actions.ActionError as error:
                     outcome.ok = False
                     outcome.line += f" — EXPECTED NOT SEEN: {_short(error)}"
@@ -900,6 +904,13 @@ def _run_steps(
                 method=outcome.method, attempts=outcome.attempts, ms=ms,
             )  # fmt: skip
             failed = not outcome.ok
+            unknown = outcome.symbol == "~"
+        except actions.IncompleteRead as error:
+            ms = round((time.perf_counter() - t0) * 1000)
+            report.append(f"{index}. ~ {step.do}: {_short(error)} [{ms} ms]")
+            symbols.append("~")
+            call.step(n=index, do=step.do, target=step.target, ok=True, verified=None, method="read", ms=ms)
+            unknown = True
         except STEP_ERRORS as error:
             ms = round((time.perf_counter() - t0) * 1000)
             if isinstance(error, cdp.CDPError):
@@ -929,6 +940,12 @@ def _run_steps(
             if index < len(steps):
                 report.append(f"   (steps {index + 1} to {len(steps)} not run)")
             return report, True
+        if unknown:
+            report.append("Batch stopped on an unknown outcome: inspect the current state before planning further actions; "
+                          "do not replay the action blindly.")  # fmt: skip
+            if index < len(steps):
+                report.append(f"   (steps {index + 1} to {len(steps)} not run)")
+            return report, False
         if not w.IsWindow(hwnd):
             report.append("The window closed.")
             SESSION.forget(hwnd)
@@ -1035,9 +1052,9 @@ async def act(
     routine: str | None = None,
     params: dict[str, str] | None = None,
 ) -> list[Any]:
-    """Act in a window in the background: a list of steps run in order (stops at the first error), then the updated
+    """Act in the background: steps run in order (stops at the first error or unknown outcome), then the updated
     state (then: both, image, elements, changes = only what changed since the last list, none). Per-step report:
-    ✓ effect verified, = already done (nothing sent), ~ unknown outcome (not read back: check the image), ✗ failed or
+    ✓ effect verified, = already done (nothing sent), ~ unknown outcome (batch stopped: inspect the state), ✗ failed or
     not reached; then the summary.
     Steps (do): click, double_click, right_click, type (appends text; no target = focused element), set (replaces
     the text), clear, key (keys "ctrl+s", "enter", "alt+f4"), select (option in a list), check, uncheck, toggle,

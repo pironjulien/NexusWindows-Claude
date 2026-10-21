@@ -24,6 +24,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
       <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
         <Button x:Name="Valider" Content="Valider" Width="120" Margin="0,6"/>
         <CheckBox x:Name="Option" Content="Option" Margin="20,10"/>
+        <Button x:Name="Dialogue" Content="Dialogue" Width="120" Margin="10,6"/>
       </StackPanel>
       <Label Grid.Row="3" Content="Couleur"/>
       <ComboBox x:Name="Couleur" Grid.Row="3" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,4" AutomationProperties.Name="Couleur">
@@ -32,6 +33,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
       <Label Grid.Row="4" Content="Liste"/>
       <ListBox x:Name="Liste" Grid.Row="4" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,3" AutomationProperties.Name="Liste">
         <ListBoxItem Content="Alpha"/><ListBoxItem Content="Bravo"/><ListBoxItem Content="Charlie"/>
+        <ListBox.ContextMenu><ContextMenu><MenuItem x:Name="Copier" Header="Copier"/></ContextMenu></ListBox.ContextMenu>
       </ListBox>
       <Label Grid.Row="5" Content="Lecture"/>
       <TextBox Grid.Row="5" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,3" IsReadOnly="True" Text="abc" AutomationProperties.Name="Lecture"/>
@@ -54,6 +56,22 @@ $opt = & $find 'Option'
 $opt.Add_Checked({ Set-Statut 'coche on' }); $opt.Add_Unchecked({ Set-Statut 'coche off' })
 $cb = & $find 'Couleur'; $cb.Add_SelectionChanged({ Set-Statut ("couleur " + $cb.SelectedItem.Content) })
 $lb = & $find 'Liste'; $lb.Add_SelectionChanged({ Set-Statut ("liste " + $lb.SelectedItem.Content) })
+$lb.Add_MouseDoubleClick({ Set-Statut ("double " + $lb.SelectedItem.Content) })
+$lb.ContextMenu.Items[0].Add_Click({ Set-Statut 'contexte copier' })
+# Vraie boîte modale (ShowDialog, propriétaire = la fenêtre du labo), affichée sans activation comme le labo.
+(& $find 'Dialogue').Add_Click({
+    Set-Statut 'modale ouverte'
+    $script:modale = 'modale fermée'
+    $box = New-Object System.Windows.Window -Property @{ Title = 'Confirmation'; Width = 280; Height = 130; ShowActivated = $false;
+        Owner = $window; WindowStartupLocation = 'CenterOwner'; ResizeMode = 'NoResize' }
+    $panel = New-Object System.Windows.Controls.StackPanel -Property @{ Orientation = 'Horizontal'; Margin = '20' }
+    $ok = New-Object System.Windows.Controls.Button -Property @{ Content = 'OK'; Width = 80; Margin = '5' }
+    $cancel = New-Object System.Windows.Controls.Button -Property @{ Content = 'Annuler'; Width = 80; Margin = '5' }
+    $ok.Add_Click({ $script:modale = 'modale ok'; $box.Close() }); $cancel.Add_Click({ $script:modale = 'modale annulée'; $box.Close() })
+    [void]$panel.Children.Add($ok); [void]$panel.Children.Add($cancel); $box.Content = $panel
+    [void]$box.ShowDialog()
+    Set-Statut $script:modale
+})
 $zone = & $find 'Zone'
 $zone.Add_MouseDown({ param($s, $e) $p = $e.GetPosition($zone); $b = if ($e.ChangedButton -eq 'Left') { 'gauche' } else { 'droit' }; Set-Statut ("zone $b {0},{1}" -f [int]$p.X, [int]$p.Y) })
 $zone.Add_MouseWheel({ param($s, $e) Set-Statut ("molette " + $e.Delta) })

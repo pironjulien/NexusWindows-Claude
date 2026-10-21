@@ -388,7 +388,11 @@ def test_open_uri_reports_kept_foreground(monkeypatch):
     monkeypatch.setattr(w, "foreground", lambda: 20)
     monkeypatch.setattr(w, "root", lambda h: h)
     monkeypatch.setattr(w, "owner", lambda h: 0)
-    monkeypatch.setattr(foreground, "user_input_since", lambda *a: False)
+    # UserChoice lit maintenant les touches et la souris : ce scénario sans choix de l'utilisateur
+    # doit rester indépendant des gestes réels sur le bureau pendant la suite.
+    monkeypatch.setattr(foreground, "user_is_switching", lambda: False)
+    monkeypatch.setattr(w, "mouse_button_down", lambda: False)
+    monkeypatch.setattr(w, "class_name", lambda h: "TestWindow")
     monkeypatch.setattr(foreground, "system_foreground", lambda: "")
     result = launcher.open_uri("https://example.com", "https", 1.0, 10, set())
     assert result.returned is False and any("kept the foreground" in n for n in result.notes)
@@ -441,6 +445,9 @@ def test_reused_instance_does_not_claim_foreground_returned(monkeypatch):
     monkeypatch.setattr(w, "root", lambda h: h)
     monkeypatch.setattr(w, "owner", lambda h: 0)
     monkeypatch.setattr(foreground, "system_foreground", lambda: "")
+    monkeypatch.setattr(foreground, "user_is_switching", lambda: False)
+    monkeypatch.setattr(w, "mouse_button_down", lambda: False)
+    monkeypatch.setattr(w, "class_name", lambda h: "TestWindow")
     assert launcher._front_returned(10, 0) is False
     monkeypatch.setattr(w, "foreground", lambda: 10)
     assert launcher._front_returned(10, 0) is True

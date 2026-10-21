@@ -14,9 +14,9 @@ Les clics et la molette par messages vont à la fenêtre de la cible réellement
 Contrat de statut (rapporté au modèle) :
 - verified=True  « ✓ » : l'effet a été relu (valeur, coche, sélection, texte apparu) ;
 - already=True   « = » : état voulu par la postcondition de l'étape (check) déjà vrai : aucune entrée envoyée ;
-- verified=None  « ~ » : action transmise par un canal fiable, effet non relu (issue inconnue : vérifier sur l'image) ;
-- ok=False       « ✗ » : échec, refus, relecture contraire, postcondition non atteinte, ou aucun effet visible après
-  une action par messages.
+- verified=None  « ~ » : action transmise, effet ou état demandé non vérifiable (issue inconnue : lot arrêté,
+  inspecter l'état avant de poursuivre, jamais de rejeu aveugle) ;
+- ok=False       « ✗ » : échec certain, refus, relecture contraire ou postcondition non atteinte.
 
 Contrat de cible :
 - [N] se résout dans la numérotation MONTRÉE au modèle, puis l'élément est relu et son identité contrôlée
@@ -54,6 +54,7 @@ from .act_base import (  # noqa: F401
     UIA_ONLY,
     ActionError,
     ExecutorBase,
+    IncompleteRead,
     NeedsForeground,
     NoEffect,
     NoVisibleEffect,

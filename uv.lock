@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "nexus-windows"
-version = "0.15.8"
+version = "0.15.9"
 source = { editable = "." }
 dependencies = [
     { name = "comtypes", marker = "sys_platform == 'win32'" },

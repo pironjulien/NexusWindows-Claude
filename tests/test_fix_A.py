@@ -720,8 +720,10 @@ def test_scroll_at_a_point_on_a_container_already_at_the_end_is_not_a_success(mo
     ex = executor(make_view(page), AtEndAuto())
     ex._windows, ex.acted = {HWND}, False
     monkeypatch.setattr(ex, "resolve", lambda spec, prefer=None: ("point", (50, 50)))
-    aimed = ex.scroll("50,50", "down", 1)
-    assert aimed.ok and aimed.verified is None and "received no wheel event" in aimed.line
+    # Banc commun du 21/10 : la technique suivante (molette par message au point) est essayée ; sans elle, échec dit,
+    # jamais un « ✓ ».
+    with pytest.raises(actions.ActionError, match="already at the end"):
+        ex.scroll("50,50", "down", 1)
     whole = ex.scroll(None, "down", 1)
     assert whole.verified and "already at the end" in whole.line
 

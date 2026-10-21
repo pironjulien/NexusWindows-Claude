@@ -1129,7 +1129,18 @@ def _matches(view: View, spec: str) -> tuple[list[Element], list[Element]]:
     exact = [e for e in pool if e.name.lower() == wanted]
     if not exact:
         exact = [e for e in pool if str(e.props.get("automation_id") or "").lower() == wanted]
-    partial = [e for e in pool if wanted and wanted in e.name.lower() and e not in exact]
+    # Correspondance partielle : jamais le document racine d'une page désigné par son titre, qui change avec la page
+    # (banc commun du 21/10 : « champ:Nom » absent un instant de l'arbre Chromium, le document « Labo Web — nom … »
+    # était pris à sa place et refusé en lecture seule). Seul son nom exact le désigne.
+    title = norm(w.window_text(view.hwnd)).lower() if view.hwnd else ""
+    partial = [
+        e
+        for e in pool
+        if wanted
+        and wanted in e.name.lower()
+        and e not in exact
+        and not (e.role == "Document" and title and e.name.lower() in title)
+    ]
     if not exact and not partial and wanted:
         # Liste déroulante sans nom (Steam : choix du disque) : désignée par la valeur qu'elle affiche.
         partial = [

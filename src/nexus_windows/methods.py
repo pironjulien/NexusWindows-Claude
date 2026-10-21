@@ -25,6 +25,7 @@ TAB_CLASSES = ("systabcontrol32",)
 TCM_GETITEMCOUNT, TCM_GETCURSEL, TCM_SETCURFOCUS = 0x1304, 0x130B, 0x1330
 
 BS_TYPEMASK = 0xF
+BS_OWNERDRAW = 0xB  # boutons WinForms (FlatStyle par défaut) : dessinés par l'application, poussoirs quand même
 BS_PUSHBUTTON, BS_DEFPUSHBUTTON, BS_CHECKBOX, BS_AUTOCHECKBOX = 0x0, 0x1, 0x2, 0x3
 BS_RADIOBUTTON, BS_3STATE, BS_AUTO3STATE, BS_AUTORADIOBUTTON = 0x4, 0x5, 0x6, 0x9
 CB_GETCOUNT, CB_GETCURSEL, CB_SETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN = 0x146, 0x147, 0x14E, 0x148, 0x149
@@ -361,6 +362,7 @@ class fake_modifiers:
 
     def __init__(self, target: int, vks: list[int], hold_s: float = 0.15) -> None:
         self.hold_s = hold_s  # état tenu après les touches postées, le temps que la cible les traite
+        self.target = target
         self.thread = w.window_thread(target)
         self.own = w.GetCurrentThreadId()
         self.vks = vks
@@ -383,7 +385,14 @@ class fake_modifiers:
 
     def __exit__(self, *exc) -> None:
         if self.attached:
-            time.sleep(self.hold_s)  # laisser la cible traiter les messages pendant que l'état est posé
+            # La cible traite les touches pendant que l'état est posé : file d'entrées vidée (WaitForInputIdle, 2 s
+            # au plus), et au moins hold_s ; restaurer trop tôt changerait Ctrl+S en S (relecture de Codex, 21/10).
+            started = time.monotonic()
+            with contextlib.suppress(OSError):
+                w.wait_input_idle(self.target, 2000)
+            remaining = self.hold_s - (time.monotonic() - started)
+            if remaining > 0:
+                time.sleep(remaining)
             w.SetKeyboardState(ctypes.byref(self.saved))
             w.AttachThreadInput(self.own, self.thread, False)
 
