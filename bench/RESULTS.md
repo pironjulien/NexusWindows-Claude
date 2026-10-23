@@ -410,3 +410,25 @@ ajoutées par les relectures croisées 0.14 à 0.15.7, prix assumé de la sûret
 Correction du huitième passage : Cua y réussissait 6 tâches en premier plan après refus (2 WPF, 2 Tk, 2 éditeurs
 riches web), pas 3 ; le décompte à la main est remplacé par `tally_cua.py`. Sur le relevé 0.13 avec le nouveau
 décompte (37 lignes recouvertes) : 28 contre 15, faux succès 0 contre 3, premier plan pris 1 contre 8.
+
+## Onzième passage — côte à côte avec Cua Driver 0.36.0 (3.0.1, 23 octobre)
+Même banc (`bench/cua_vs_nexus.py`), nexus-windows 3.0.1 (code privé, paquet `nexus-windows-claude`), Cua Driver tel
+qu'installé sur le poste (`cua-driver --version` : 0.36.0 ; la 0.38.0 est sortie le 21/10, non installée sans accord),
+Julien absent. Relevé `results/2026-10-23_1728-cua-vs-nexus.json`, comptes par `bench/tally_cua.py`. Le labo prend
+désormais le Python du système pour l'appli Tk (sous `uv run`, le PATH donnait le Python de l'environnement, sans Tk).
+
+| Bilan en arrière-plan, cible recouverte (32 essais chacun) | nexus-windows 3.0.1 | Cua Driver 0.36.0 |
+|---|---|---|
+| Effet prouvé | 23 | 13 (+5 en premier plan) |
+| Faux succès | 0 | 3 |
+| Effet non prouvé, dit par l'outil (~) | 2 | 2 |
+| Premier plan pris | 2 | 6 |
+| Curseur réel déplacé | 0 | 0 |
+| Durée médiane d'une action réussie | 379 ms | 718 ms |
+
+Toutes lignes comprises (48 essais) : effet prouvé 39 contre 27 (+1 par clics, +6 en premier plan), faux succès 0
+contre 3, premier plan pris 2 contre 8, curseur déplacé 0 contre 1, médiane 413 ms contre 709 ms. Hors compte (cible
+pas encore recouverte au début de WinForms, WPF et Electron) : 16 lignes, contre 10 au dixième passage ; la fenêtre
+opaque du banc se pose trop tard sur ces trois familles (à corriger dans le banc avant le prochain passage). Écarts
+avec le dixième passage : durée médiane plus longue (379 ms contre 211, relectures ajoutées en 0.16) ; dans Edge, la
+molette d'une page recouverte est refusée (✗, aucune technique d'arrière-plan) au lieu d'être envoyée sans effet (~).

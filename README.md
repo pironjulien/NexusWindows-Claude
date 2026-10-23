@@ -342,26 +342,28 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 
 Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
-## Side by side with Cua Driver (October 20, 2026)
+## Side by side with Cua Driver (October 23, 2026)
 
-[Cua Driver](https://github.com/trycua/cua) 0.37.0 is the closest other tool: it also works in the background by
-default. Both were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab window, covered by
-an opaque window, nobody at the PC; Cua was used the way its own agent guide says (background first, then clicks, then
-its foreground fallback after a refusal). The effect is judged by the application (event received or value read
-back), never by the tool's report. 48 tasks each across Win32, WinForms, WPF, Tk, Electron and Edge; only the 38
-where the target was really covered before and after each attempt are counted (`bench/tally_cua.py` computes the
-counts from the raw results).
+[Cua Driver](https://github.com/trycua/cua) is the closest other tool: it also works in the background by default.
+Both were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab windows, covered by an opaque
+window, nobody at the PC; Cua was used the way its own agent guide says (background first, then clicks, then its
+foreground fallback after a refusal). The effect is judged by the application (event received or value read back),
+never by the tool's report. 48 tasks each across Win32, WinForms, WPF, Tk, Electron and Edge; the main table counts
+the 32 where the target was really covered before and after each attempt (`bench/tally_cua.py` computes the counts
+from the raw results in `bench/results/2026-10-23_1728-cua-vs-nexus.json`).
 
-| In the background, target covered (38 tasks each) | nexus-windows 0.15.7 | Cua Driver 0.37.0 |
+| In the background, target covered (32 tasks each) | nexus-windows 3.0.1 | Cua Driver 0.36.0 |
 |---|---|---|
-| Effect proven | 29 | 17 (+2 by clicks, +5 after taking the foreground) |
+| Effect proven | 23 | 13 (+5 after taking the foreground) |
 | False success (reported done, the app got nothing) | 0 | 3 |
-| Foreground taken | 1 (Edge raw click, handed back) | 7 |
+| Foreground taken | 2 | 6 |
 | Real cursor moved | 0 | 0 |
-| Median time of a successful action | 211 ms | 706 ms |
+| Median time of a successful action | 379 ms | 718 ms |
 
-All 48 tasks: 39 proven against 25, false successes 0 against 3, foreground taken 1 against 8. nexus-windows is slower
-than in 0.13 (138 ms): the focus and foreground read-backs added by the cross reviews are the price of safety.
+All 48 tasks: 39 proven against 27, false successes 0 against 3, foreground taken 2 against 8, real cursor moved 0
+against 1. Cua Driver 0.38.0 was released on October 21 and is not measured here. The October 20 run (nexus-windows
+0.15.7, 38 covered tasks: 29 proven against 17) is kept in `bench/RESULTS.md`; nexus-windows is slower since then
+(211 ms then): the read-backs added in 0.16 are the price of safety.
 
 Taken from Cua: reading only what changed (`then="changes"`). Not taken, with the measurement in `RESULTS.md`: its
 injected WPF click (moves the user's real cursor), CDP clicks in an already open Chrome (turns on remote debugging in

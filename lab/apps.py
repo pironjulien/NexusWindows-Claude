@@ -26,7 +26,20 @@ from pathlib import Path
 LAB = Path(__file__).resolve().parent
 STATE = Path.home() / ".claude" / "nexus-claude" / "lab"
 PYTHON = sys.executable
-TK_PYTHON = shutil.which("python.exe") or sys.executable  # Python système : Tcl/Tk complet
+
+
+def _system_python() -> str:
+    """Python système (Tcl/Tk complet) : le premier python.exe du PATH hors de l'environnement actif. Lancé par
+    `uv run`, le PATH commence par l'environnement de test, dont le Python géré par uv n'a pas Tk (banc du 23/10)."""
+    venv = str(Path(sys.prefix).resolve()).lower()
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        exe = Path(folder) / "python.exe"
+        if folder and exe.is_file() and not str(exe.resolve()).lower().startswith(venv):
+            return str(exe)
+    return shutil.which("python.exe") or sys.executable
+
+
+TK_PYTHON = _system_python()
 POWERSHELL = shutil.which("powershell.exe") or r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 ELECTRON = STATE / "electron" / "node_modules" / "electron" / "dist" / "electron.exe"
 EDGE_CANDIDATES = [
