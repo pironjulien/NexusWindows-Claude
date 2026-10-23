@@ -78,7 +78,15 @@ follow only the user.
 The user's emergency stop: Ctrl+Alt+Shift+Esc (every action refused for 2 min); never work around it.
 Debugging: logs."""
 
-mcp = MCPServer("nexus-windows", instructions=INSTRUCTIONS, version=__version__, log_level="WARNING")
+# Nom et titre de la famille NexusWindows (nexus-windows-claude / -codex / -antigravity) ; la clé du serveur dans la
+# configuration de Claude (« nexus-windows ») ne dépend pas de ce nom.
+mcp = MCPServer(
+    "nexus-windows-claude",
+    title="NexusWindows for Claude",
+    instructions=INSTRUCTIONS,
+    version=__version__,
+    log_level="WARNING",
+)
 WORKER = Worker()
 SESSION = Session()
 ALWAYS = {"anthropic/alwaysLoad": True}

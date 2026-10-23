@@ -6,6 +6,19 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-23 — Family naming
+
+### Changed
+- Published on PyPI as `nexus-windows-claude` (`uvx --python 3.14 nexus-windows-claude`), like `nexus-windows-codex`
+  and `nexus-windows-antigravity`; the server announces itself as `nexus-windows-claude`, titled "NexusWindows for
+  Claude". Official MCP registry name: `io.github.pironjulien/nexus-windows-claude`.
+- The former PyPI name `nexus-windows` stays available: version 3.0.1 only installs `nexus-windows-claude`, and the
+  `nexus-windows` command still starts the server, so existing configurations keep working. The former registry
+  entry `io.github.pironjulien/nexus-windows` is marked deprecated and points to the new name.
+
+### Fixed
+- README: the `claude mcp add` commands put `-e` before the server name (the variadic option swallowed it).
+
 ## [3.0.0] - 2026-10-23 — Common milestone of the NexusWindows family
 
 The three NexusWindows tools (Claude, Codex, Antigravity) move to 3.0.0 together: one-command install from a package

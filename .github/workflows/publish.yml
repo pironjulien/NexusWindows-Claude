@@ -33,12 +33,15 @@ jobs:
           if [ "$EVENT_NAME" = "release" ] && [ "$TAG" != "v$version" ]; then
             echo "Tag $TAG does not match v$version"; exit 1
           fi
-          grep -q 'mcp-name: io.github.pironjulien/nexus-windows' README.md
+          grep -q 'mcp-name: io.github.pironjulien/nexus-windows-claude' README.md
+          grep -q "nexus-windows-claude==$version" legacy/nexus-windows/pyproject.toml
       - run: uv build
+      # Former PyPI name nexus-windows: a package that only installs nexus-windows-claude at the same version.
+      - run: uv build legacy/nexus-windows --out-dir dist
       - name: Startup check from the built wheel
         run: |
           uv sync --frozen --quiet
-          uv pip install --quiet --reinstall dist/*.whl
+          uv pip install --quiet --reinstall dist/nexus_windows_claude-*.whl
           uv run --frozen --no-sync pytest -q --noconftest tests/test_startup.py
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
@@ -51,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/nexus-windows/
+      url: https://pypi.org/project/nexus-windows-claude/
     permissions:
       id-token: write
     steps:
@@ -81,10 +84,10 @@ jobs:
         run: |
           version=$(python3 -c "import json; print(json.load(open('server.json'))['version'])")
           for i in $(seq 1 30); do
-            curl -fsS "https://pypi.org/pypi/nexus-windows/$version/json" >/dev/null && exit 0
+            curl -fsS "https://pypi.org/pypi/nexus-windows-claude/$version/json" >/dev/null && exit 0
             sleep 20
           done
-          echo "nexus-windows $version is not on PyPI"; exit 1
+          echo "nexus-windows-claude $version is not on PyPI"; exit 1
       - name: Install mcp-publisher (pinned, checksum verified)
         shell: bash
         run: |
@@ -94,3 +97,8 @@ jobs:
           tar xzf mcp-publisher.tar.gz mcp-publisher
       - run: ./mcp-publisher login github-oidc
       - run: ./mcp-publisher publish server.json
+      # Former registry name, before the family naming: every version marked deprecated, pointing to the new one.
+      - run: >-
+          ./mcp-publisher status --status deprecated --all-versions --yes
+          --message "Renamed to io.github.pironjulien/nexus-windows-claude (PyPI: nexus-windows-claude)"
+          io.github.pironjulien/nexus-windows

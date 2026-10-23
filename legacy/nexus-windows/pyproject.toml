@@ -1,0 +1,28 @@
+# Former PyPI name of NexusWindows for Claude, kept so that `uvx nexus-windows` and existing configurations keep
+# working: it only installs nexus-windows-claude at the same version, which provides the `nexus-windows` command.
+[project]
+name = "nexus-windows"
+version = "3.0.1"
+description = "Former name of nexus-windows-claude (NexusWindows for Claude): installs it"
+authors = [{ name = "Julien Piron" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = ["nexus-windows-claude==3.0.1"]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.14",
+]
+
+[project.urls]
+Homepage = "https://julienpiron.fr/nexuswindows/claude/"
+Repository = "https://github.com/pironjulien/NexusWindows-Claude"
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true

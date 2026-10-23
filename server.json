@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.pironjulien/nexus-windows",
+  "name": "io.github.pironjulien/nexus-windows-claude",
   "title": "NexusWindows for Claude",
   "description": "Windows computer use in the background: UI Automation and Win32 messages, every action read back.",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "websiteUrl": "https://julienpiron.fr/nexuswindows/claude/",
   "repository": {
     "url": "https://github.com/pironjulien/NexusWindows-Claude",
@@ -13,8 +13,8 @@
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
-      "identifier": "nexus-windows",
-      "version": "3.0.0",
+      "identifier": "nexus-windows-claude",
+      "version": "3.0.1",
       "runtimeHint": "uvx",
       "runtimeArguments": [
         {

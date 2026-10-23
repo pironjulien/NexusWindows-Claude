@@ -28,7 +28,8 @@ def test_initialize_and_list_tools(tmp_path):
     async def session_check():
         async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
             init = await session.initialize()
-            assert init.server_info.name == "nexus-windows"
+            assert init.server_info.name == "nexus-windows-claude"
+            assert init.server_info.title == "NexusWindows for Claude"
             assert init.server_info.version == __version__
             tools = {tool.name: tool for tool in (await session.list_tools()).tools}
             assert set(tools) == TOOLS

@@ -1,6 +1,6 @@
 [project]
-name = "nexus-windows"
-version = "3.0.0"
+name = "nexus-windows-claude"
+version = "3.0.1"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"
@@ -38,12 +38,17 @@ Changelog = "https://github.com/pironjulien/NexusWindows-Claude/blob/main/CHANGE
 Issues = "https://github.com/pironjulien/NexusWindows-Claude/issues"
 
 [project.scripts]
+nexus-windows-claude = "nexus_windows.reloader:main"
 nexus-windows = "nexus_windows.reloader:main"
 claude-windows-computer-use = "nexus_windows.reloader:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.14.0"]
 build-backend = "uv_build"
+
+# Paquet nexus-windows-claude, module Python nexus_windows (nom d'import inchangé depuis 0.x).
+[tool.uv.build-backend]
+module-name = "nexus_windows"
 
 [dependency-groups]
 dev = [

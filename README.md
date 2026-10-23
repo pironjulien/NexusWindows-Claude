@@ -1,9 +1,9 @@
 # NexusWindows for Claude
 
-<!-- mcp-name: io.github.pironjulien/nexus-windows -->
+<!-- mcp-name: io.github.pironjulien/nexus-windows-claude -->
 
 [![Release](https://img.shields.io/github/v/release/pironjulien/NexusWindows-Claude)](https://github.com/pironjulien/NexusWindows-Claude/releases)
-[![PyPI](https://img.shields.io/pypi/v/nexus-windows)](https://pypi.org/project/nexus-windows/)
+[![PyPI](https://img.shields.io/pypi/v/nexus-windows-claude)](https://pypi.org/project/nexus-windows-claude/)
 [![Tests](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/pironjulien/NexusWindows-Claude/badge)](https://scorecard.dev/viewer/?uri=github.com/pironjulien/NexusWindows-Claude)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/pironjulien/NexusWindows-Claude/blob/main/LICENSE)
@@ -15,11 +15,11 @@
 
 ![NexusWindows: an AI agent fills and submits a form in a window that stays behind another one, then reports five verified steps](https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/docs/assets/demo.webp)
 
-**Windows computer use for Claude, in the background.** An MCP server (`nexus-windows`) that lets Claude Desktop
+**Windows computer use for Claude, in the background.** An MCP server (`nexus-windows-claude`) that lets Claude Desktop
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 3.0.0 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.0.1 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -50,8 +50,8 @@ promise: the user keeps their mouse, keyboard and foreground window, and every a
 
 | | Claude | Codex | Antigravity |
 |---|---|---|---|
-| Install | `uvx --python 3.14 nexus-windows` | `npx -y nexus-windows-codex` | `uvx --python 3.14 nexus-windows-antigravity` |
-| Package | [PyPI](https://pypi.org/project/nexus-windows/) | [npm](https://www.npmjs.com/package/nexus-windows-codex) | [PyPI](https://pypi.org/project/nexus-windows-antigravity/) |
+| Install | `uvx --python 3.14 nexus-windows-claude` | `npx -y nexus-windows-codex` | `uvx --python 3.14 nexus-windows-antigravity` |
+| Package | [PyPI](https://pypi.org/project/nexus-windows-claude/) | [npm](https://www.npmjs.com/package/nexus-windows-codex) | [PyPI](https://pypi.org/project/nexus-windows-antigravity/) |
 | Tools | `windows` `look` `act` `launch` `window`, plus `notifications` and `logs` | `windows` `look` `act` `launch` `window` | `windows` `look` `act` `launch` `window` |
 | Repository | [NexusWindows-Claude](https://github.com/pironjulien/NexusWindows-Claude) | [NexusWindows-Codex](https://github.com/pironjulien/NexusWindows-Codex) | [NexusWindows-Antigravity](https://github.com/pironjulien/NexusWindows-Antigravity) |
 
@@ -63,11 +63,13 @@ bench.
 
 Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
 
-From [PyPI](https://pypi.org/project/nexus-windows/), with Claude Code (no clone needed):
+From [PyPI](https://pypi.org/project/nexus-windows-claude/), with Claude Code (no clone needed):
 
 ```powershell
-claude mcp add --scope user --transport stdio -e PYTHONUTF8=1 nexus-windows -- uvx --python 3.14 nexus-windows
+claude mcp add --scope user -e PYTHONUTF8=1 --transport stdio nexus-windows -- uvx --python 3.14 nexus-windows-claude
 ```
+
+Until 3.0.0 the package was named `nexus-windows`; that name still works and installs `nexus-windows-claude`.
 
 For Claude Desktop, in `claude_desktop_config.json`:
 
@@ -76,7 +78,7 @@ For Claude Desktop, in `claude_desktop_config.json`:
   "mcpServers": {
     "nexus-windows": {
       "command": "uvx",
-      "args": ["--python", "3.14", "nexus-windows"],
+      "args": ["--python", "3.14", "nexus-windows-claude"],
       "env": { "PYTHONUTF8": "1" }
     }
   }
@@ -95,9 +97,9 @@ uv sync --frozen
 Register it with Claude Code (user scope):
 
 ```powershell
-claude mcp add --scope user --transport stdio `
+claude mcp add --scope user `
   -e "UV_PROJECT_ENVIRONMENT=$env:LOCALAPPDATA\claude-windows-computer-use\venv" -e PYTHONUTF8=1 `
-  nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
+  --transport stdio nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
 ```
 
 For Claude Desktop from a clone:
