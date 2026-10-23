@@ -19,7 +19,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 0.13.4 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.0.0 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -43,9 +43,81 @@ window messages, modern frameworks expose UI Automation, and Chromium can be rea
 This server picks, per UI family, a technique that was **measured** not to steal focus, reads the effect back, and
 only falls back to the real mouse or keyboard when the user explicitly allows it.
 
-## What it does
+## NexusWindows family
 
-### Tools
+Three MCP servers, one per agent, built separately because each model needs its tools shaped for it, with the same
+promise: the user keeps their mouse, keyboard and foreground window, and every action is read back.
+
+| | Claude | Codex | Antigravity |
+|---|---|---|---|
+| Install | `uvx --python 3.14 nexus-windows` | `npx -y nexus-windows-codex` | `uvx --python 3.14 nexus-windows-antigravity` |
+| Package | [PyPI](https://pypi.org/project/nexus-windows/) | [npm](https://www.npmjs.com/package/nexus-windows-codex) | [PyPI](https://pypi.org/project/nexus-windows-antigravity/) |
+| Tools | `windows` `look` `act` `launch` `window`, plus `notifications` and `logs` | `windows` `look` `act` `launch` `window` | `windows` `look` `act` `launch` `window` |
+| Repository | [NexusWindows-Claude](https://github.com/pironjulien/NexusWindows-Claude) | [NexusWindows-Codex](https://github.com/pironjulien/NexusWindows-Codex) | [NexusWindows-Antigravity](https://github.com/pironjulien/NexusWindows-Antigravity) |
+
+Every step reports ✓ verified, = already done, ~ unknown (never replayed) or ✗ failed or refused. The three share the
+guardrail policy, the foreground token, the emergency stop (Ctrl+Alt+Shift+Esc), a common journal format and a common
+bench.
+
+## Installation
+
+Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
+
+From [PyPI](https://pypi.org/project/nexus-windows/), with Claude Code (no clone needed):
+
+```powershell
+claude mcp add --scope user --transport stdio -e PYTHONUTF8=1 nexus-windows -- uvx --python 3.14 nexus-windows
+```
+
+For Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "nexus-windows": {
+      "command": "uvx",
+      "args": ["--python", "3.14", "nexus-windows"],
+      "env": { "PYTHONUTF8": "1" }
+    }
+  }
+}
+```
+
+From a clone (development):
+
+```powershell
+git clone https://github.com/pironjulien/NexusWindows-Claude.git
+cd NexusWindows-Claude
+$env:UV_PROJECT_ENVIRONMENT = "$env:LOCALAPPDATA\claude-windows-computer-use\venv"   # optional: venv outside the clone
+uv sync --frozen
+```
+
+Register it with Claude Code (user scope):
+
+```powershell
+claude mcp add --scope user --transport stdio `
+  -e "UV_PROJECT_ENVIRONMENT=$env:LOCALAPPDATA\claude-windows-computer-use\venv" -e PYTHONUTF8=1 `
+  nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
+```
+
+For Claude Desktop from a clone:
+
+```json
+{
+  "mcpServers": {
+    "nexus-windows": {
+      "command": "uv",
+      "args": ["run", "--project", "C:/path/to/NexusWindows-Claude", "--frozen", "python", "-m", "nexus_windows"],
+      "env": { "PYTHONUTF8": "1" }
+    }
+  }
+}
+```
+
+Local state (logs, routines) lives in `%USERPROFILE%\.claude\nexus-claude\`; set
+`NEXUS_WINDOWS_HOME` to use another folder.
+
+## Tools
 
 | Tool | Purpose |
 |---|---|
@@ -61,6 +133,23 @@ Step actions: `click`, `double_click`, `right_click`, `type`, `set`, `clear`, `k
 `toggle`, `expand`, `collapse`, `scroll`, `focus`, `menu`, `wait`, `drag`, `hover`. A target is an `[N]` from the last
 `look`, a visible name (`"OK"`), a role-qualified name (`"button:OK"`, `"edit:Name"`, `"checkbox:Subscribe"`) or an
 `x,y` point in the last image.
+
+## Usage
+
+Typical flow: `look(window="Notepad")`, then one `act` with all the steps, then read the per-step report.
+
+```text
+act(window="Settings form", steps=[
+  {"do": "set",   "target": "edit:Name", "text": "Ada",
+   "check": {"target": "Name", "value": "Ada"}},
+  {"do": "check", "target": "Subscribe"},
+  {"do": "click", "target": "button:Save", "expect": "Saved"}
+], remember="save-form")
+```
+
+Later: `act(window="Settings form", routine="save-form")`.
+
+## What it does
 
 ### Only what changed (`then="changes"`, `show="changes"`)
 
@@ -233,79 +322,6 @@ bench/   technique benchmarks and raw results
 tests/   unit tests (pytest) and end-to-end tests (pytest -m live)
 ```
 
-## Installation
-
-Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
-
-From [PyPI](https://pypi.org/project/nexus-windows/), with Claude Code (no clone needed):
-
-```powershell
-claude mcp add --scope user --transport stdio -e PYTHONUTF8=1 nexus-windows -- uvx --python 3.14 nexus-windows
-```
-
-For Claude Desktop, in `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "nexus-windows": {
-      "command": "uvx",
-      "args": ["--python", "3.14", "nexus-windows"],
-      "env": { "PYTHONUTF8": "1" }
-    }
-  }
-}
-```
-
-From a clone (development):
-
-```powershell
-git clone https://github.com/pironjulien/NexusWindows-Claude.git
-cd NexusWindows-Claude
-$env:UV_PROJECT_ENVIRONMENT = "$env:LOCALAPPDATA\claude-windows-computer-use\venv"   # optional: venv outside the clone
-uv sync --frozen
-```
-
-Register it with Claude Code (user scope):
-
-```powershell
-claude mcp add --scope user --transport stdio `
-  -e "UV_PROJECT_ENVIRONMENT=$env:LOCALAPPDATA\claude-windows-computer-use\venv" -e PYTHONUTF8=1 `
-  nexus-windows '--' uv run --project "$PWD" --frozen python -m nexus_windows
-```
-
-For Claude Desktop from a clone:
-
-```json
-{
-  "mcpServers": {
-    "nexus-windows": {
-      "command": "uv",
-      "args": ["run", "--project", "C:/path/to/NexusWindows-Claude", "--frozen", "python", "-m", "nexus_windows"],
-      "env": { "PYTHONUTF8": "1" }
-    }
-  }
-}
-```
-
-Local state (logs, routines) lives in `%USERPROFILE%\.claude\nexus-claude\`; set
-`NEXUS_WINDOWS_HOME` to use another folder.
-
-## Usage
-
-Typical flow: `look(window="Notepad")`, then one `act` with all the steps, then read the per-step report.
-
-```text
-act(window="Settings form", steps=[
-  {"do": "set",   "target": "edit:Name", "text": "Ada",
-   "check": {"target": "Name", "value": "Ada"}},
-  {"do": "check", "target": "Subscribe"},
-  {"do": "click", "target": "button:Save", "expect": "Saved"}
-], remember="save-form")
-```
-
-Later: `act(window="Settings form", routine="save-form")`.
-
 ## Measurements
 
 All figures come from [`bench/RESULTS.md`](https://github.com/pironjulien/NexusWindows-Claude/blob/main/bench/RESULTS.md) and the raw files in `bench/results/` (measured on one
@@ -402,25 +418,6 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 - **Timeouts**: an abandoned call is cancelled at its next checkpoint instead of finishing later.
 - **Clipboard**: never used.
 
-## Limits
-
-- Code comments are in French. Everything an MCP client receives (instructions, tool descriptions, step reports,
-  refusal messages) is in English.
-- Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
-  been checked.
-- Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
-  approval and the foreground; the OCR fallback finds their text but does not make background input possible.
-- WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF ignores posted
-  mouse input and takes the foreground when activated); controls with UI Automation patterns work.
-- A mouse wheel on a point of a covered Chromium page has no effect (no `wheel` event; 8 variants measured); it is
-  reported as `~`, never as a success.
-- Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);
-  one that Windows still does not render can only be shown by taking the foreground; this is reported.
-- In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.
-- An effect with nothing readable (a file written by a button, for example) stays `~`; add a `check` that observes it.
-- The end-to-end suite (`pytest -m live`) drives real windows and refuses to start if the PC was used less than
-  2 minutes ago.
-
 ## Privacy
 
 NexusWindows for Claude runs entirely on your PC. It has no account, no telemetry, no analytics and makes no network
@@ -445,6 +442,25 @@ requests of its own (DevTools connections stay on `127.0.0.1`).
 - **Removing it**: remove the server from Claude (`claude mcp remove nexus-windows`), then delete those folders (and `%LOCALAPPDATA%\NexusJournal`).
 
 Questions or concerns: open an issue on this repository.
+
+## Limits
+
+- Code comments are in French. Everything an MCP client receives (instructions, tool descriptions, step reports,
+  refusal messages) is in English.
+- Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
+  been checked.
+- Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
+  approval and the foreground; the OCR fallback finds their text but does not make background input possible.
+- WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF ignores posted
+  mouse input and takes the foreground when activated); controls with UI Automation patterns work.
+- A mouse wheel on a point of a covered Chromium page has no effect (no `wheel` event; 8 variants measured); it is
+  reported as `~`, never as a success.
+- Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);
+  one that Windows still does not render can only be shown by taking the foreground; this is reported.
+- In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.
+- An effect with nothing readable (a file written by a button, for example) stays `~`; add a `check` that observes it.
+- The end-to-end suite (`pytest -m live`) drives real windows and refuses to start if the PC was used less than
+  2 minutes ago.
 
 ## Development
 

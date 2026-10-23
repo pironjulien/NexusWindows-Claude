@@ -152,3 +152,14 @@ def test_log_roundtrip(tmp_path, monkeypatch):
     assert log.tail(10, errors_only=True)[0]["tool"] == "look"
     line = next(tmp_path.glob("*.jsonl")).read_text(encoding="utf-8").splitlines()[0]
     assert json.loads(line)["steps"][0]["do"] == "click"
+
+
+def test_log_never_writes_an_error_message_body(tmp_path, monkeypatch):
+    """Erreur qui remonte (refus cité le texte saisi) : type et premiers mots, pile sans message."""
+    monkeypatch.setattr(log, "LOG_DIR", tmp_path)
+    secret = "SENT" + "INEL"
+    with pytest.raises(RuntimeError), log.Call("act", {}):
+        raise RuntimeError("Refused: typed: " + secret)  # la pile cite ce code, jamais la valeur
+    record = log.tail(1)[0]
+    assert record["error"] == "RuntimeError: Refused"
+    assert "SENTINEL" not in json.dumps(record)

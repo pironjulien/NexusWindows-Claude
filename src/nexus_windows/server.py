@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 from typing import Any, Literal
 
 if sys.platform != "win32":  # annuaires MCP (conteneur Linux) : démarrer et lister les outils, sans rien piloter
@@ -34,6 +35,7 @@ from . import (
     cdp,
     foreground,
     freshness,
+    journal,
     keys,
     log,
     methods,
@@ -798,12 +800,49 @@ STEP_ERRORS = (
 )
 
 
+def _private_texts(step: Step) -> list[str]:
+    """Textes saisis ou attendus d'une étape (text, expect, check.value, check.contains) : jamais écrits au journal."""
+    check = step.check
+    values = [step.text, step.expect, check.value if check else None, check.contains if check else None]
+    return [v for v in values if v]
+
+
 def _logged_step(step: Step) -> dict[str, Any]:
-    """Étape pour le journal : le texte saisi n'y est jamais conservé (seulement sa longueur)."""
+    """Étape pour le journal : texte saisi ou attendu jamais conservé, seulement sa longueur (relecture de Codex)."""
     data = step.model_dump(exclude_none=True, exclude_defaults=True, exclude={"accord"})
-    if "text" in data and step.do in ("type", "set"):
-        data["text"] = {"chars": len(step.text or "")}
+    for key in ("text", "expect"):
+        if key in data:
+            data[key] = {"chars": len(data[key])}
+    for key in ("value", "contains"):
+        if key in data.get("check", {}):
+            data["check"][key] = {"chars": len(data["check"][key])}
     return data
+
+
+def _redacted(step: Step, message: str) -> str:
+    """Message d'erreur pour le journal : chaque texte saisi ou attendu de l'étape remplacé par sa longueur (un refus
+    d'accord résume le texte saisi, un wait non atteint cite le texte attendu). La forme normalisée par les garde-fous
+    (NFC, blancs et sauts de ligne réduits à une espace) est masquée aussi (relecture de Codex du 23/10)."""
+    forms = set()
+    for value in _private_texts(step):
+        forms.add(value)
+        forms.add(" ".join(unicodedata.normalize("NFC", value).split()))
+    for value in sorted((f for f in forms if f), key=len, reverse=True):
+        message = message.replace(value, f"<{len(value)} chars>")
+    return message
+
+
+def _logged_error(step: Step, error: BaseException) -> str | None:
+    """Erreur d'étape telle qu'écrite au journal détaillé : ses premiers mots seulement, coupés avant tout guillemet,
+    deux-points ou crochet, comme le journal commun. Un refus d'accord cite le texte saisi et le contenu des champs,
+    tronqué ou normalisé : aucun remplacement de chaînes ne peut garantir de tout retrouver, la coupure si (relecture
+    de Codex du 23/10). Les textes connus de l'étape sont masqués d'abord, par prudence."""
+    return journal.erreur_propre(_redacted(step, _short(error)))
+
+
+def _logged_trace(error: BaseException) -> str:
+    """Trace d'une erreur interne pour le journal : pile et type seulement, jamais le message (il peut citer du texte)."""
+    return "".join(traceback.format_tb(error.__traceback__, limit=6)) + type(error).__name__
 
 
 def _gesture_of(step: Step) -> str:
@@ -986,7 +1025,7 @@ def _run_steps(
             report.append(f"{index}. ✗ {step.do}: {_short(error)} [{ms} ms]")
             symbols.append("✗")
             call.step(
-                n=index, do=step.do, target=step.target, ok=False, error=_short(error), ms=ms,
+                n=index, do=step.do, target=step.target, ok=False, error=_logged_error(step, error), ms=ms,
                 error_type=type(error).__name__,
             )  # fmt: skip
             failed = True
@@ -1001,10 +1040,12 @@ def _run_steps(
             raise  # appel abandonné (délai dépassé) : plus rien ne doit être fait, pas même le rendu
         except Exception as error:  # noqa: BLE001 - bogue interne : rapporté et journalisé, l'outil reste debout
             ms = round((time.perf_counter() - t0) * 1000)
-            trace = traceback.format_exc(limit=6)
             report.append(f"{index}. ✗ {step.do}: internal error {type(error).__name__}: {_short(error)} [{ms} ms]")
             symbols.append("✗")
-            call.step(n=index, do=step.do, target=step.target, ok=False, error=_short(error), trace=trace, ms=ms)
+            call.step(
+                n=index, do=step.do, target=step.target, ok=False, error=_logged_error(step, error),
+                trace=_logged_trace(error), ms=ms,
+            )  # fmt: skip
             failed = True
         executor.acted = True  # l'interface a pu changer : la prochaine cible par nom relira l'instantané
         if failed:
@@ -1215,7 +1256,11 @@ async def act(
                         if w.IsWindow(hwnd):
                             out = render(auto, hwnd, then, extra=report, call=call)
             if failed:
-                call.error = next(line for line in reversed(report) if not line.startswith("   ("))
+                # Ligne d'échec du rapport réduite à ses premiers mots (« 3. ✗ type ») : le rapport rendu à l'agent cite
+                # l'erreur entière, texte saisi compris ; le journal jamais (relecture de Codex du 23/10).
+                call.error = journal.erreur_propre(
+                    next(line for line in reversed(report) if not line.startswith("   ("))
+                )
             if watch.note():
                 report.append(watch.note())
                 call.note(stolen=watch.stolen)

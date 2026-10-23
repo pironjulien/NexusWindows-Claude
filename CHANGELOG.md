@@ -6,6 +6,24 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-23 — Common milestone of the NexusWindows family
+
+The three NexusWindows tools (Claude, Codex, Antigravity) move to 3.0.0 together: one-command install from a package
+registry, the same five tool names (`windows`, `look`, `act`, `launch`, `window`), the same step outcomes
+(✓ verified, = already done, ~ unknown, ✗ failed or refused), and from now on one version number for the family.
+
+### Changed
+- Version 3.0.0, shared with NexusWindows for Codex and NexusWindows for Antigravity.
+- README: the same plan as the two other tools, with a "NexusWindows family" section.
+
+### Fixed
+- Detailed log: expected text (`check.value`, `check.contains`, `expect`, `wait` text) and step error messages that
+  quote typed or expected text are now replaced by their length, as the Privacy section promises; before, a
+  postcondition could leave the typed text in the log.
+- Detailed log: a step or call error is written as its first words only (cut before any quote, colon or bracket, as
+  in the common journal) and a traceback without its message, so a refusal quoting typed text or field contents
+  (truncated or normalized) never reaches the disk.
+
 ## [0.16.1] - 2026-10-23
 
 ### Security

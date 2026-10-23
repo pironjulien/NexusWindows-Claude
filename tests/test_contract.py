@@ -234,6 +234,44 @@ def test_typed_text_never_logged():
     assert "secret" not in str(logged)
 
 
+def test_expected_text_never_logged():
+    """check.value, check.contains, expect et le texte d'un wait : remplacés par leur longueur, comme le texte saisi."""
+    step = server.Step(
+        do="set", target="Nom", text="SENTINEL", expect="SENTINEL-E",
+        check=server.Check(target="Nom", value="SENTINEL", contains="SENTI"),
+    )  # fmt: skip
+    logged = server._logged_step(step)
+    assert "SENTI" not in str(logged)
+    assert logged["check"]["value"] == {"chars": 8}
+    assert logged["check"]["contains"] == {"chars": 5}
+    assert logged["expect"] == {"chars": 10}
+    assert logged["check"]["target"] == "Nom"
+    wait = server._logged_step(server.Step(do="wait", text="SENTINEL"))
+    assert "SENTINEL" not in str(wait)
+
+
+def test_step_error_logged_without_typed_or_expected_text():
+    """Erreur d'étape (refus d'accord qui résume le texte saisi, wait non atteint) : texte masqué dans le journal."""
+    step = server.Step(do="set", target="Nom", text="SENTINEL", check=server.Check(target="Nom", value="ATTENDU"))
+    message = server._redacted(step, 'Refused: typed: SENTINEL ; "ATTENDU" still absent after 5 s.')
+    assert "SENTINEL" not in message and "ATTENDU" not in message
+    assert "<8 chars>" in message and "<7 chars>" in message
+    # Ce qui est écrit au journal : premiers mots seulement. Texte saisi tronqué (> 600 car.) ou contenu d'un champ cité
+    # par un refus d'accord sur une étape key : rien n'en reste.
+    long_text = "SENTINEL-" + "x" * 700
+    step = server.Step(do="type", text=long_text)
+    logged = server._logged_error(step, server.actions.ActionError("Refused: typed: " + long_text[:600] + "…"))
+    assert logged == "Refused"
+    logged = server._logged_error(
+        server.Step(do="key", keys="enter"), server.actions.ActionError("Accord required. content: Message: SENTINEL")
+    )
+    assert "SENTINEL" not in logged
+    # Texte multiligne normalisé par les garde-fous (« typed: A B ») : masqué aussi.
+    step = server.Step(do="type", text="SENTINEL-A\nSENTINEL-B")
+    message = server._redacted(step, "Refused: typed: SENTINEL-A SENTINEL-B")
+    assert "SENTINEL" not in message
+
+
 def test_excluded_windows_refused(monkeypatch):
     monkeypatch.setattr(server.w, "class_name", lambda h: "ConsoleWindowClass")
     monkeypatch.setattr(server.foreground, "app_pid", lambda h: 1)

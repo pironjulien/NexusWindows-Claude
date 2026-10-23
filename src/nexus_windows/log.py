@@ -17,7 +17,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from . import indicator
+from . import indicator, journal
 
 ROOT = Path(os.environ.get("NEXUS_WINDOWS_HOME", Path.home() / ".claude" / "nexus-claude"))
 LOG_DIR = ROOT / "logs"
@@ -120,8 +120,10 @@ class Call:
             self._busy = False
             indicator.end()
         if exc is not None and self.error is None:
-            self.error = f"{exc_type.__name__}: {exc}"
-            self.notes["trace"] = "".join(traceback.format_exception(exc_type, exc, _tb, limit=8))[-3000:]
+            # Type et premiers mots seulement, pile sans message : un refus (accord, confirmation) cite le texte saisi
+            # et le contenu des champs, jamais écrits sur disque (relecture de Codex du 23/10).
+            self.error = f"{exc_type.__name__}: {journal.erreur_propre(exc) or ''}".rstrip(": ")
+            self.notes["trace"] = ("".join(traceback.format_tb(_tb, limit=8)) + exc_type.__name__)[-3000:]
         try:
             write(
                 {
