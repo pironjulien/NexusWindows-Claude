@@ -342,28 +342,29 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 
 Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
-## Side by side with Cua Driver (October 23, 2026)
+## Side by side with Cua Driver and Windows-MCP (October 23, 2026)
 
-[Cua Driver](https://github.com/trycua/cua) is the closest other tool: it also works in the background by default.
-Both were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab windows, covered by an opaque
-window, nobody at the PC; Cua was used the way its own agent guide says (background first, then clicks, then its
-foreground fallback after a refusal). The effect is judged by the application (event received or value read back),
-never by the tool's report. 48 tasks each across Win32, WinForms, WPF, Tk, Electron and Edge; the main table counts
-the 32 where the target was really covered before and after each attempt (`bench/tally_cua.py` computes the counts
-from the raw results in `bench/results/2026-10-23_1728-cua-vs-nexus.json`).
+[Cua Driver](https://github.com/trycua/cua) 0.38.0 is the closest other tool: it also works in the background by
+default. [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) 0.8.8 is the most used Windows MCP server; it has no
+background mode. All three were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab
+windows, covered by an opaque window, nobody at the PC; each was used the way its own guide tells an agent (Cua:
+background first, then clicks, then its foreground fallback; Windows-MCP: bring the window forward, then act on the
+screen). The effect is judged by the application (event received or value read back), never by the tool's report.
+48 tasks across Win32, WinForms, WPF, Tk, Electron and Edge; the table counts the 45 where the target was really
+covered before and after each attempt (`bench/tally_cua.py`, raw results in
+`bench/results/2026-10-23_1815-cua-vs-nexus.json`).
 
-| In the background, target covered (32 tasks each) | nexus-windows 3.0.1 | Cua Driver 0.36.0 |
+| Target covered (45 tasks each) | nexus-windows 3.0.1 | Cua Driver 0.38.0 |
 |---|---|---|
-| Effect proven | 23 | 13 (+5 after taking the foreground) |
-| False success (reported done, the app got nothing) | 0 | 3 |
-| Foreground taken | 2 | 6 |
+| Effect proven in the background | 35 | 23 (+1 by clicks, +6 after taking the foreground) |
+| False success (reported done, the app got nothing) | 0 | 4 |
+| Foreground taken | 0 | 6 |
 | Real cursor moved | 0 | 0 |
-| Median time of a successful action | 379 ms | 718 ms |
+| Median time of a successful action | 433 ms | 750 ms |
 
-All 48 tasks: 39 proven against 27, false successes 0 against 3, foreground taken 2 against 8, real cursor moved 0
-against 1. Cua Driver 0.38.0 was released on October 21 and is not measured here. The October 20 run (nexus-windows
-0.15.7, 38 covered tasks: 29 proven against 17) is kept in `bench/RESULTS.md`; nexus-windows is slower since then
-(211 ms then): the read-backs added in 0.16 are the price of safety.
+Windows-MCP works on the screen with the real mouse and keyboard, which this bench is designed to avoid: its window
+switch failed on 39 of 42 covered windows, it reached the effect 12 times, always by taking the foreground, and moved
+the real cursor 30 times. Its counts are kept in `bench/RESULTS.md`, not compared line by line here.
 
 Taken from Cua: reading only what changed (`then="changes"`). Not taken, with the measurement in `RESULTS.md`: its
 injected WPF click (moves the user's real cursor), CDP clicks in an already open Chrome (turns on remote debugging in

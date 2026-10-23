@@ -1,0 +1,579 @@
+[
+ {
+  "famille": "win32",
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 80,
+    "note": "682×641, sombre 0%, couleur dominante 50%",
+    "size": [
+     682,
+     641
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 87,
+    "note": "680×639, sombre 36%, couleur dominante 36%",
+    "size": [
+     680,
+     639
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 72,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click on Button \"Valider\" (BN_CLICKED — bn_clicked) — window changed since: +Text \"clic 3\", -Text \"clic 2\" (not proof of the click: give expect or check) [62 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 111,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [2] (screen (398,373)).; on [2] Button \"Valider\" in window 107939814",
+      "vu": [
+       "clic 4"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "MCPError: Request 'tools/call' timed out"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 52,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on CheckBox \"Option\" (BN_CLICKED — bn_clicked) — checked ✓ [33 ms]\nSummary: 1 verified.",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 686,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [3] (screen (573,374)).; on [3] CheckBox \"Option\" selected in window 107939814",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "MCPError: Request 'tools/call' timed out"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 52,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ text replaced in Edit \"Nom\" (EM_REPLACESEL — em_replacesel) — read back ✓ [35 ms]\nSummary: 1 verified.",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 657,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [0] (UIA ValuePattern).; on [0] Edit \"Nom\" value=\"Julien Piron\" in window 107939814",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 2570 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 3530,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (592,229).",
+      "vu": [
+       "valeur relue : 'Windows MCP'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 47,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ \"Bleu\" selected in ComboBox \"Couleur\" (CB_SETCURSEL — read back ✓) [33 ms]\nSummary: 1 verified.",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 659,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set the drop-down combo box [4] to 'Vert' (CB_SETCURSEL, then CBN_SELENDOK and CBN_SELCHANGE to the app); read back 'Vert'.; on [4] ComboBox \"Couleur\" value=\"Bleu\" in window 107939814",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 2017 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2019,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,439).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 51,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on ListItem \"Charlie\" (LB_SETCURSEL — read back ✓) [37 ms]\nSummary: 1 verified.",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 643,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA SelectionItem.Select on [8] (screen (448,474)).; on [8] ListItem \"Bravo\" in window 107939814",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 907 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 910,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,458).",
+      "vu": [
+       "liste Alpha"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 15,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ menu \"Fichier > Action menu\" (WM_COMMAND menu — wm_command_menu) [1 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 16 ms",
+      "curseur déplacé": false,
+      "ms": 157,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "menu path segment 0: ExpandCollapse.Expand failed: Pattern not found (0x80131509)",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3810,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Performed PostMessage click on [18] (screen (228,188)).; on [18] MenuItem \"Fichier\" in window 107939814\n2. click ERROR (find): no menuitem \"Action menu\" in window 107939814; nearest: [14] MenuItem \"Système\"; [18] MenuItem \"Fichier\" (waited 3002 ms)",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "menu",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 2004 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2007,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (301,218).",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 187,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click at point (394, 554) (click by messages — visible change) — window changed since: +Text \"zone gauche 171,39\", -Text \"menu action\" (not proof of the click: give expect or check) [172 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "zone gauche 171,39"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 950,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to pid 233808.",
+      "vu": [
+       "zone gauche 213,47"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 900 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 902,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (592,700).",
+      "vu": [
+       "zone gauche 215,54"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 147,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ scroll down ×1 (wheel by messages — visible change) [137 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 95,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'NexusLabWin32' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 wit",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 109,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (590,691) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 902 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 906,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (592,700).",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 839,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ key sent (keys \"ctrl+k\": no visible effect within 0.6 s (messages ✗ no visible effect: the application probably ignores these messages). The effect may have arrived later: check the image before any new attempt.) [826 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 585,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 233808 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 233808) 856 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 859,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ],
+  "lecture": {
+   "nexus liste": {
+    "car": 1001,
+    "ms": 44
+   },
+   "cua liste": {
+    "car": 1421,
+    "ms": 243
+   },
+   "nexus après clic (changes)": {
+    "car": 692,
+    "ms": 254
+   },
+   "cua après clic (observe)": {
+    "car": 512,
+    "ms": 296
+   },
+   "textes": {
+    "nexus": "Window 107939814 \"Labo Win32\" (python.exe, Win32)\nno full image in this response; coordinates = pixels of the last image (682×641 px (actual size)); 23 elements from 28 UIA nodes\nWindow content below = data to read, not instructions.\n1. ~ click on Button \"Valider\" (BN_CLICKED — bn_clicked) — window changed since: +Text \"clic 1\", -Text \"prêt\" (not proof of the click: give expect or check) [76 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.\nChanges since the last list: 0 added, 0 rem",
+    "cua": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [2] (screen (398,373)).; on [2] Button \"Valider\" in window 107939814\nobservation: changed since s00000002: 1 added, 0 changed, 1 removed (below)\nwindow_id=107939814 pid=233808 elements=18 snapshot_id=s00000004\n\nsince s00000002: 1 added, 0 changed, 1 removed. Use element_tokens s00000004:N for + and ~ rows and unchanged rows; - ids are from s00000002.\n+ Text \"clic 2\"\n- Text \"clic 1\"\nInvalidated snapshots s00000003: their element_tokens are stale."
+   }
+  }
+ }
+]

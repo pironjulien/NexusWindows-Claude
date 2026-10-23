@@ -25,21 +25,25 @@ def tally(rows: list[dict], tool: str) -> dict[str, Any]:
     durations: list[int] = []
     for row in rows:
         runs = row.get(tool) or {}
+        # Outil sans arrière-plan (Windows-MCP) : son seul essai, au premier plan, sert aux comptes de sûreté.
         background = runs.get(BACKGROUND)
-        if not background:
+        first = background or runs.get(FRONT)
+        if not first:
             continue
         out["essais"] += 1
-        out["faux succès"] += bool(background.get("faux succès"))
-        out["non prouvé dit"] += background.get("déclaré") == "incertain" and not background.get("effet")
-        out["premier plan pris"] += background.get("premier plan") != "intact"
-        out["curseur déplacé"] += bool(background.get("curseur déplacé"))
-        if background.get("effet"):
+        out["faux succès"] += bool(first.get("faux succès"))
+        out["non prouvé dit"] += first.get("déclaré") == "incertain" and not first.get("effet")
+        out["premier plan pris"] += first.get("premier plan") != "intact"
+        out["curseur déplacé"] += bool(first.get("curseur déplacé"))
+        if background and background.get("effet"):
             out["effet"] += 1
             durations.append(background["ms"])
         elif (runs.get(CLICKS) or {}).get("effet"):
             out["par clics"] += 1
         elif (runs.get(FRONT) or {}).get("effet"):
             out["premier plan"] += 1
+            if not background:  # outil sans arrière-plan : sa durée est celle de son premier plan
+                durations.append(runs[FRONT]["ms"])
     out["médiane ms"] = round(statistics.median(durations)) if durations else None
     return out
 
@@ -50,7 +54,7 @@ def report(path: Path) -> str:
     lines = [f"Relevé {path.name} : {len(rows)} tâches, {sum(map(counted, rows))} comptées (cible recouverte)."]
     for label, subset in (("comptées", [r for r in rows if counted(r)]), ("toutes", rows)):
         lines.append(f"\n{label} :")
-        for tool in ("nexus", "cua"):
+        for tool in ("nexus", "cua", "wmcp"):
             lines.append(f"  {tool:5} {json.dumps(tally(subset, tool), ensure_ascii=False)}")
     off = [f"{family['famille']}/{row['tâche']}" for family in families for row in family.get("tâches", [])]
     off = [name for name, row in zip(off, rows, strict=True) if not counted(row)]

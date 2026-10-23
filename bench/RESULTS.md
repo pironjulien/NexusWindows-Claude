@@ -432,3 +432,30 @@ pas encore recouverte au début de WinForms, WPF et Electron) : 16 lignes, contr
 opaque du banc se pose trop tard sur ces trois familles (à corriger dans le banc avant le prochain passage). Écarts
 avec le dixième passage : durée médiane plus longue (379 ms contre 211, relectures ajoutées en 0.16) ; dans Edge, la
 molette d'une page recouverte est refusée (✗, aucune technique d'arrière-plan) au lieu d'être envoyée sans effet (~).
+
+## Douzième passage — trois outils : Cua Driver 0.38.0 et Windows-MCP 0.8.8 (3.0.1, 23 octobre, soir)
+Même banc, étendu à Windows-MCP (CursorTouch, PyPI `windows-mcp` 0.8.8, serveur 4.1.3, télémétrie coupée, outils
+système exclus). Cua Driver 0.38.0 : release officielle trycua/cua du 21/10, empreinte SHA-256 égale à celle de GitHub,
+signature Sigstore du flux `cd-rust-cua-driver.yml` vérifiée, télémétrie coupée, installé à part
+(`NEXUS_CUA_DRIVER`). Julien absent. Relevé `results/2026-10-23_1815-cua-vs-nexus.json`, comptes `bench/tally_cua.py`.
+Windows-MCP n'a pas de mode d'arrière-plan : il passe après le contrôle de couverture de chaque ligne et fait ce que son
+guide demande à un agent (App switch, puis Click, Type, Scroll ou Shortcut à l'écran, à la position de l'élément).
+
+| Cible recouverte (45 essais chacun) | nexus-windows 3.0.1 | Cua Driver 0.38.0 |
+|---|---|---|
+| Effet prouvé en arrière-plan | 35 | 23 (+1 par clics, +6 en premier plan) |
+| Faux succès | 0 | 4 |
+| Effet non prouvé, dit par l'outil (~) | 3 | 2 |
+| Premier plan pris | 0 | 6 |
+| Curseur réel déplacé | 0 | 0 |
+| Durée médiane d'une action réussie | 433 ms | 750 ms |
+
+Toutes lignes (48) : 38 contre 26 (+1 par clics, +6 en premier plan), faux succès 0 contre 4, premier plan pris 0
+contre 6. Hors compte : les trois « bouton » de WinForms, WPF et Electron (couverture posée trop tard).
+
+Windows-MCP (42 essais, 6 erreurs de l'adaptateur sur des éléments de menus ou listes ouverts) : son `App switch`
+a échoué 39 fois sur cette fenêtre recouverte (« Invalid window handle » 30 fois, « Application … not found » 9 fois),
+et ses actions à l'écran ont alors visé la fenêtre de couverture. Effet obtenu 12 fois, toujours au premier plan ;
+fenêtre passée devant 11 fois sans être rendue ; curseur réel déplacé 30 fois ; médiane 1,6 s. Ses comptes de « faux
+succès » du tableau brut viennent de cet échec de bascule (il rapporte le clic, jamais l'effet) : non comparables,
+non publiés comme tels. Il affiche pendant chaque action un contour bleu et « AI is controlling this computer ».

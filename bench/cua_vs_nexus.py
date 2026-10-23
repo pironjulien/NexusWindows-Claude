@@ -43,7 +43,20 @@ from mcp import Client, StdioServerParameters  # noqa: E402
 from nexus_windows import foreground, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
 
-CUA = Path.home() / ".claude" / "nexus-claude" / "lab" / "cua" / "bin" / "cua-driver.exe"
+CUA = Path(
+    os.environ.get(
+        "NEXUS_CUA_DRIVER", Path.home() / ".claude" / "nexus-claude" / "lab" / "cua" / "bin" / "cua-driver.exe"
+    )
+)
+# Windows-MCP (CursorTouch, PyPI windows-mcp), installé hors OneDrive par `uv tool install`, télémétrie coupée
+# (ANONYMIZED_TELEMETRY=false), outils système exclus (PowerShell, fichiers, registre...). Il n'a pas de mode
+# d'arrière-plan : un agent met la fenêtre devant (App switch), puis clique, tape ou fait défiler à l'écran.
+WMCP = Path(
+    os.environ.get(
+        "NEXUS_WINDOWS_MCP",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "nexus-lab-windows-mcp" / "bin" / "windows-mcp.exe",
+    )
+)
 WEB = drive.WEB
 DESKTOP = ("win32", "winforms", "wpf")
 Expect = Callable[[str], bool]
@@ -110,6 +123,14 @@ def nexus_params() -> StdioServerParameters:
 
 def cua_params() -> StdioServerParameters:
     return StdioServerParameters(command=str(CUA), args=["mcp"], env=dict(os.environ))
+
+
+def wmcp_params() -> StdioServerParameters:
+    config = WMCP.parent.parent / "config.toml"
+    config.touch()
+    excluded = "PowerShell,FileSystem,Registry,Process,Scrape,Clipboard,Notification"
+    args = ["serve", "--transport", "stdio", "--config", str(config), "--exclude-tools", excluded]
+    return StdioServerParameters(command=str(WMCP), args=args, env={**os.environ, "ANONYMIZED_TELEMETRY": "false"})
 
 
 def text_of(result: Any) -> str:
@@ -254,6 +275,7 @@ TASKS: list[tuple[str, tuple[str, ...]]] = [
 VALUES = {
     "nexus": {"nom": "Julien Piron", "couleur": "Bleu", "item": "Charlie", "edit": "Bonjour"},
     "cua": {"nom": "Cua Driver", "couleur": "Vert", "item": "Bravo", "edit": "Salut"},
+    "wmcp": {"nom": "Windows MCP", "couleur": "Rouge", "item": "Alpha", "edit": "Hello"},
 }
 
 
@@ -421,6 +443,67 @@ async def capture(client: Client, tool: str, app: apps.LabApp) -> dict:
     return {"ok": ok, "ms": round(ms), "note": note, "size": (image.width, image.height)}
 
 
+def element_center(app: apps.LabApp, name: str, types: tuple[str, ...] = (), popups: bool = False) -> list[int]:
+    """Centre écran d'un élément par son nom (et son type UIA) : ce que la capture annotée de Windows-MCP donne à
+    l'agent. `popups` : cherche aussi dans les autres fenêtres visibles du processus (liste ouverte, menu déroulé)."""
+    uia.com_init()
+    auto = uia.Automation(auto_set_focus=False)
+    pid = w.window_pid(app.hwnd)
+    hwnds = [app.hwnd]
+    if popups:
+        hwnds += [h for h in w.enum_windows() if h != app.hwnd and w.IsWindowVisible(h) and w.window_pid(h) == pid]
+    for hwnd in hwnds:
+        for node in auto.tree(hwnd).walk():
+            rect = node.rect
+            if node.name == name and (not types or node.control_type in types) and rect and rect.width and rect.height:
+                return [rect.center[0], rect.center[1]]
+    raise RuntimeError(f"élément introuvable : {name}")
+
+
+async def wmcp_run(client: Client, task: str, app: apps.LabApp) -> tuple[Any, list[str]]:
+    """Ce qu'un agent fait avec Windows-MCP : mettre la fenêtre devant (App switch), puis agir à l'écran sur la
+    position de l'élément (Click, Type, Scroll, Shortcut)."""
+    v = VALUES["wmcp"]
+    names: list[str] = []
+
+    async def call(name: str, args: dict) -> Any:
+        names.append(name)
+        return await client.call_tool(name, args)
+
+    await call("App", {"mode": "switch", "name": w.window_text(app.hwnd)})
+    await asyncio.sleep(0.3)
+    if task == "bouton":
+        result = await call("Click", {"loc": element_center(app, "Valider", ("Button",))})
+    elif task == "case":
+        result = await call("Click", {"loc": element_center(app, "Option", ("CheckBox",))})
+    elif task == "champ":
+        loc = element_center(app, "Nom", ("Edit",))
+        result = await call("Type", {"loc": loc, "text": v["nom"], "clear": True})
+    elif task == "éditeur riche":
+        result = await call("Type", {"loc": element_center(app, "Éditeur"), "text": v["edit"]})
+    elif task == "liste déroulante":
+        await call("Click", {"loc": element_center(app, "Couleur", ("ComboBox",))})
+        await asyncio.sleep(0.5)
+        result = await call("Click", {"loc": element_center(app, v["couleur"], ("ListItem", "MenuItem"), popups=True)})
+    elif task == "élément de liste":
+        result = await call("Click", {"loc": element_center(app, v["item"], ("ListItem",))})
+    elif task == "menu":
+        await call("Click", {"loc": element_center(app, "Fichier", ("MenuItem",))})
+        await asyncio.sleep(0.5)
+        result = await call("Click", {"loc": element_center(app, "Action menu", ("MenuItem",), popups=True)})
+    elif task in ("clic brut", "molette"):
+        point = zone_screen(app)
+        if point is None:
+            raise RuntimeError("zone introuvable")
+        if task == "clic brut":
+            result = await call("Click", {"loc": list(point)})
+        else:
+            result = await call("Scroll", {"loc": list(point), "direction": "down", "wheel_times": 1})
+    else:
+        result = await call("Shortcut", {"shortcut": "ctrl+k"})
+    return result, names
+
+
 async def run_task(
     client: Client, tool: str, task: str, app: apps.LabApp, events: drive.Events, size: tuple[int, int]
 ) -> dict:
@@ -428,19 +511,25 @@ async def run_task(
     out: dict[str, Any] = {"tâche": task}
     by_clicks = tool == "cua" and task in ("menu", "liste déroulante")
     attempts = ["arrière-plan"] + (["par clics"] if by_clicks else []) + ["premier plan"]
+    if tool == "wmcp":
+        attempts = ["premier plan"]  # aucun mode d'arrière-plan : la fenêtre est mise devant, à l'écran
     for attempt in attempts:
         if tool == "nexus" and attempt != "arrière-plan":
             break  # nexus choisit seul sa technique ; aucun premier plan sans l'accord de Julien
         events.reset()
+        calls: list[tuple[str, dict]] = []
         if tool == "nexus":
             calls = [nexus_call(task, app, size)]
-        else:
+        elif tool == "cua":
             calls = cua_calls(task, app, size, attempt)
         mouse0 = cursor()
         with Foreground() as fg:
             t0 = time.perf_counter()
             result: Any = None
-            for name, args in calls:
+            if tool == "wmcp":
+                result, names = await wmcp_run(client, task, app)
+                calls = [(name, {}) for name in names]
+            for name, args in calls if tool != "wmcp" else []:
                 result = await client.call_tool(name, args)
             ms = (time.perf_counter() - t0) * 1000
         text = text_of(result)
@@ -451,7 +540,7 @@ async def run_task(
             value = name_value(app)
             seen = [f"valeur relue : {value!r}"]
             effect = value == VALUES[tool]["nom"]
-        claim = claim_of(result, text) if tool == "cua" else nexus_claim(text)
+        claim = nexus_claim(text) if tool == "nexus" else claim_of(result, text)
         row = {
             "effet": effect,
             "déclaré": claim,
@@ -466,7 +555,7 @@ async def run_task(
         out[attempt] = row
         flag = "OK " if effect else "NON"
         print(f"   {tool:5} {attempt:12} {flag} {task:18} {ms:6.0f} ms  {fg.summary()[:70]}  {text[:90]!r}")
-        if tool == "nexus" or effect:
+        if tool in ("nexus", "wmcp") or effect:
             break
         if attempt == "arrière-plan" and by_clicks:
             continue  # invoke_menu en échec, ou valeur posée sans sélection : l'agent essaie les clics par nom
@@ -502,7 +591,7 @@ async def reading_sizes(nexus: Client, cua: Client, app: apps.LabApp) -> dict:
     return out
 
 
-async def bench_app(kind: str, nexus: Client, cua: Client | None) -> dict:
+async def bench_app(kind: str, nexus: Client, cua: Client | None, wmcp: Client | None = None) -> dict:
     app = apps.launch(kind, x=150, y=110)
     events = drive.Events(app)
     report: dict[str, Any] = {"famille": kind, "recouverte": None, "capture": {}, "tâches": []}
@@ -536,6 +625,14 @@ async def bench_app(kind: str, nexus: Client, cua: Client | None) -> dict:
                         row[tool] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
                         print(f"   {tool:5} ERREUR {task} : {exc}")
                 covers.append(covered(app))
+                if wmcp is not None:
+                    # Après le contrôle de couverture : Windows-MCP met la fenêtre devant par construction.
+                    cover.raise_()
+                    try:
+                        row["wmcp"] = await run_task(wmcp, "wmcp", task, app, events, (1, 1))
+                    except Exception as exc:  # noqa: BLE001
+                        row["wmcp"] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
+                        print(f"   wmcp  ERREUR {task} : {exc}")
                 row["recouverte"] = all(covers)
                 # Ligne comptée seulement si la cible était recouverte avant chaque essai et après : sinon à part,
                 # jamais mêlée aux comptes « fenêtre recouverte ».
@@ -555,11 +652,14 @@ async def main(kinds: list[str], wait_s: float, nexus_only: bool = False) -> Non
     async with contextlib.AsyncExitStack() as stack:
         nexus = await stack.enter_async_context(Client(nexus_params(), read_timeout_seconds=120))
         cua = None if nexus_only else await stack.enter_async_context(Client(cua_params(), read_timeout_seconds=120))
+        wmcp = None
+        if not nexus_only and WMCP.exists():
+            wmcp = await stack.enter_async_context(Client(wmcp_params(), read_timeout_seconds=120))
         deadline = time.monotonic() + wait_s
         for kind in kinds:
             while True:
                 try:
-                    results.append(await bench_app(kind, nexus, cua))
+                    results.append(await bench_app(kind, nexus, cua, wmcp))
                     break
                 except apps.JulienActive as exc:
                     print(f"== {kind} : {exc}", flush=True)
