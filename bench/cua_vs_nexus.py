@@ -117,6 +117,34 @@ def text_of(result: Any) -> str:
 
 
 # --- Géométrie : point de la zone (canevas) en pixels d'image de chaque outil -----------------------------------
+def visible_area(app: apps.LabApp) -> w.Rect:
+    """Partie de l'écran où la fenêtre affiche réellement son contenu : zone CLIENTE (jamais le décor ni la barre de
+    titre) ; web : la zone de rendu de la page (fenêtre Chrome_RenderWidgetHostHWND visible, une seule), à défaut la
+    zone cliente (relecture de Codex, 22/10 06:37 : le rectangle extérieur menait un point dans la barre de titre)."""
+    if app.kind in WEB:
+        views = [c for c in w.enum_children(app.hwnd)
+                 if w.class_name(c) == "Chrome_RenderWidgetHostHWND" and w.IsWindowVisible(c)]  # fmt: skip
+        if len(views) == 1:
+            return w.window_rect(views[0])
+    return w.client_rect_screen(app.hwnd)
+
+
+def visible_center(
+    rect: tuple[int, int, int, int], area: tuple[int, int, int, int], min_size: int = 20
+) -> tuple[int, int] | None:
+    """Centre de la partie de `rect` (gauche, haut, droite, bas) visible dans `area` ; moins de min_size px de côté
+    visibles : None (rien à viser, jamais un point hors du contenu)."""
+    left, top = max(rect[0], area[0]), max(rect[1], area[1])
+    right, bottom = min(rect[2], area[2]), min(rect[3], area[3])
+    if right - left < min_size or bottom - top < min_size:
+        return None
+    return ((left + right) // 2, (top + bottom) // 2)
+
+
+def _box(r: w.Rect) -> tuple[int, int, int, int]:
+    return r.left, r.top, r.right, r.bottom
+
+
 def zone_screen(app: apps.LabApp) -> tuple[int, int] | None:
     """Centre de la zone (canevas) en pixels d'écran. Page web : amenée dans la vue d'abord (ScrollIntoView par le
     banc, pour les deux outils) ; WPF (Border sans pair UIA) : sous le statut ; Tk : donné par l'application."""
@@ -135,7 +163,9 @@ def zone_screen(app: apps.LabApp) -> tuple[int, int] | None:
                 except uia.UIAError, StopIteration:
                     pass
             assert node.rect is not None
-            return node.rect.center
+            # partie VISIBLE de la zone dans le contenu affiché (22/10 : au 2e tour web, son centre tombait sous la
+            # fenêtre ; puis, ScrollIntoView raté, dans la barre de titre) ; rien de visible : None
+            return visible_center(_box(node.rect), _box(visible_area(app)))
     statut = next((n for n in tree.walk() if n.control_type == "Text" and n.name == "Statut" and n.rect), None)
     if statut is not None and statut.rect is not None:
         return statut.rect.left + 160, statut.rect.bottom + 60

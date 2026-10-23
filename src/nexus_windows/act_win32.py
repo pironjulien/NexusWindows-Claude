@@ -14,6 +14,7 @@ from . import win32 as w
 from .act_base import (
     EXPECTED,
     NATIVE_PROXY_CLASSES,
+    ActionError,
     ExecutorBase,
     Unconfirmed,
     _short,
@@ -242,6 +243,15 @@ class Win32Actions(ExecutorBase):
             raise Unconfirmed(f"text partially typed: {typed.detail()}. Check the target (look) before completing it")
         return typed.detail()
 
+    def _own_edit_hwnd(self, element: snapshot.Element) -> int:
+        """Fenêtre Edit Win32 propre au champ désigné (dans la cible), sinon 0. Ses touches lui sont postées directement,
+        sans activation : passe 2 du 23/10, l'activation brève avant Entrée dans le champ de renommage de l'Explorateur
+        faisait valider le nom ET ouvrir le dossier ; postée au seul champ, Entrée valide sans rien ouvrir (mesuré)."""
+        own, cls = self._element_hwnd_class(element)
+        if own and cls.lower() in methods.EDIT_CLASSES and (w.root(own) in self.windows or w.IsChild(self.hwnd, own)):
+            return own
+        return 0
+
     def _post_combos(
         self,
         combos: list[keys.Combo],
@@ -249,23 +259,53 @@ class Win32Actions(ExecutorBase):
         sent: list[str],
         simulated: bool = False,
         element: snapshot.Element | None = None,
+        own: int = 0,
     ) -> None:
         """simulated : Chromium en activation simulée (clavier à sa fenêtre de premier plan, raccourcis avec état
         clavier simulé : mesuré, Ctrl+K reçu par la page). element : la cible désignée ; ses touches vont à SA fenêtre
         de premier niveau, celle que l'activation simulée vise (dialogue, surgissante : relecture de Codex, W14)."""
         target_hwnd = self._sim_top(element) if simulated else methods.keyboard_target(self.hwnd, self.windows)
-        for combo in combos:
-            if combo.modifiers and (fw != "Chromium" or simulated):
-                hold = methods.SIM_MODIFIERS_HOLD_S if simulated else 0.15
-                methods.post_combo(target_hwnd, [combo.key], list(combo.modifiers), hold_s=hold)
-                sent.append("simulated keyboard state")
-            elif combo.modifiers:  # Maj seule en Chromium (les raccourcis Ctrl/Alt ont été refusés plus haut)
-                for vk in combo.modifiers:
-                    methods.post(target_hwnd, w.WM_KEYDOWN, vk, methods._key_lparam(vk, False))
-                methods.post_key(target_hwnd, combo.key)
-                for vk in reversed(combo.modifiers):
-                    methods.post(target_hwnd, w.WM_KEYUP, vk, methods._key_lparam(vk, True))
-                sent.append("messages")
-            else:
-                methods.post_key(target_hwnd, combo.key)
-                sent.append("messages")
+        if own:
+            # Champ Win32 désigné qui a SA fenêtre, décidé UNE fois par l'appelant (route sans activation) : ses touches
+            # vont à lui ; disparu entre-temps, rien n'est envoyé, jamais au focus d'un autre contrôle (relecture de Codex).
+            # Relu juste avant l'envoi : vivant, toujours un champ Edit, toujours DANS la cible (reparenté : rien).
+            still = (
+                w.IsWindow(own)
+                and methods.win_class(own) in methods.EDIT_CLASSES
+                and (w.root(own) in self.windows or w.IsChild(self.hwnd, own))
+            )
+            if not still:
+                raise ActionError(
+                    "The targeted field disappeared or left the window before the keys: nothing was sent."
+                )
+            target_hwnd = own
+        before = methods.accepted_posts()
+        for index, combo in enumerate(combos):
+            try:
+                _post_one(target_hwnd, combo, fw, sent, simulated)
+            except methods.MethodError as error:
+                # Un message déjà accepté, même au milieu de la première touche (WM_KEYDOWN parti, WM_KEYUP refusé) :
+                # issue inconnue (relecture de Codex).
+                if index or methods.accepted_posts() != before:
+                    # Touches déjà parties : issue inconnue, jamais rejouée au vrai clavier par-dessus (relecture de Codex :
+                    # « delete ctrl+a » donnait Suppr postée puis Suppr réelle).
+                    raise Unconfirmed(f"keys partly sent ({index}/{len(combos)}), then: {_short(error)}") from None
+                raise
+
+
+def _post_one(target_hwnd: int, combo: keys.Combo, fw: str, sent: list[str], simulated: bool) -> None:
+    """Une touche ou un raccourci, par messages."""
+    if combo.modifiers and (fw != "Chromium" or simulated):
+        hold = methods.SIM_MODIFIERS_HOLD_S if simulated else 0.15
+        methods.post_combo(target_hwnd, [combo.key], list(combo.modifiers), hold_s=hold)
+        sent.append("simulated keyboard state")
+    elif combo.modifiers:  # Maj seule en Chromium (les raccourcis Ctrl/Alt ont été refusés plus haut)
+        for vk in combo.modifiers:
+            methods.post(target_hwnd, w.WM_KEYDOWN, vk, methods._key_lparam(vk, False))
+        methods.post_key(target_hwnd, combo.key)
+        for vk in reversed(combo.modifiers):
+            methods.post(target_hwnd, w.WM_KEYUP, vk, methods._key_lparam(vk, True))
+        sent.append("messages")
+    else:
+        methods.post_key(target_hwnd, combo.key)
+        sent.append("messages")

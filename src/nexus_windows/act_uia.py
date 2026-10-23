@@ -38,6 +38,37 @@ SECRET_SAFE_KEYS = frozenset({0x09, 0x0D, 0x1B})  # Tab, Entrée, Échap : seule
 class UiaActions(ExecutorBase):
     """Actions publiques de l'exécuteur, techniques UI Automation."""
 
+    def _right_click_proven(self, e: snapshot.Element) -> Callable[[], str]:
+        """Clic droit par messages, PROUVÉ par l'ouverture d'un menu (voir _menu_proven) ; sinon « changement visible »."""
+        return self._menu_proven(self._watched(lambda: self._post_click(*self._point_of(e), "right")))
+
+    def _menu_proven(self, action: Callable[[], Any], wait_s: float = 0.6) -> Callable[[], Any]:
+        """Geste qui ouvre un menu contextuel, PROUVÉ par une nouvelle surgissante de la cible (snapshot.popups_of) dont
+        l'arbre UI Automation contient un menu, relue jusqu'à wait_s. Sans elle, le compte rendu du geste est gardé (non
+        relu) : banc commun du 22/10, un clic droit resté « ~ » arrêtait le lot avant le choix de la commande."""
+
+        def opened(before: set[int]) -> bool:
+            for popup in [h for h in snapshot.popups_of(self.hwnd) if h not in before]:
+                try:
+                    if any(n.control_type == "Menu" for n in self.auto.tree(popup).walk()):
+                        return True
+                except EXPECTED:
+                    continue
+            return False
+
+        def run() -> Any:
+            before = set(snapshot.popups_of(self.hwnd))
+            detail = action()
+            deadline = time.monotonic() + wait_s
+            while True:
+                if opened(before):
+                    return "read back ✓ context menu opened"
+                if time.monotonic() >= deadline:
+                    return detail
+                time.sleep(0.06)
+
+        return run
+
     def click_element(
         self, e: snapshot.Element, button: str = "left", count: int = 1, close_list: bool = True
     ) -> Outcome:
@@ -56,21 +87,26 @@ class UiaActions(ExecutorBase):
         page = self._page_if_free()
 
         if button == "right":
-            right_messages = (
-                "right-click by messages",
-                self._watched(lambda: self._post_click(*self._point_of(e), "right")),
-            )
+            right_messages = ("right-click by messages", self._right_click_proven(e))
             if fw in ("Win32", "WinForms"):
                 # Mesuré le 21/10 (banc commun) : le clic droit posté ouvre le menu contextuel WinForms sans toucher au
                 # premier plan, et sa commande se choisit ensuite par UIA ; UIA ShowContextMenu, lui, n'ouvre rien
                 # (et son « ~ » arrêtait la chaîne avant les messages).
                 chain.append(right_messages)
-            chain.append(("UIA context menu", lambda: self.auto.show_context_menu(e.node.element)))
+            # UIA ShowContextMenu : seulement quand la vraie souris n'est pas permise. Accepté puis menu non relu ne prouve
+            # pas un refus (menu retardé) : aucune autre entrée ne suit ; la vraie souris, permise, est donc PRÉFÉRÉE
+            # (relecture de Codex du 22/10 15:39 : second clic droit possible après un ShowContextMenu lent).
+            if not self.allow_foreground:
+                chain.append(
+                    ("UIA context menu", self._menu_proven(lambda: self.auto.show_context_menu(e.node.element)))
+                )
             if page is not None:
                 chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e), "right")))
             if fw not in NO_MOUSE_MESSAGES and fw not in ("Win32", "WinForms"):
                 chain.append(right_messages)
-            return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e), "right"))
+            return self._try_or_foreground(
+                chain, what, self._menu_proven(lambda: realinput.click(*self._point_of(e), "right"))
+            )
         if count >= 2:
             if p.get("has_invoke") and role in ITEM_ROLES and not msaa:
                 chain.append(("UIA Invoke (open)", lambda: self.auto.invoke(e.node.element)))
@@ -287,6 +323,11 @@ class UiaActions(ExecutorBase):
         return self.write_element(element, text, replace)
 
     # --- Touches ------------------------------------------------------------------------------------------------
+    def _close_target(self, what: str) -> Outcome:
+        """Demande de fermeture de la fenêtre cible (comme Alt+F4), relue : fermée, ou encore là (« Enregistrer ? »)."""
+        state, how, detail = request_close(self.auto, self.hwnd)
+        return Outcome(True, f"{what} ({how}): {detail}", how, verified=True if state else None)
+
     def press(self, spec: str, target: Any = None) -> Outcome:
         combos = keys.parse_sequence(spec)
         if not combos:
@@ -364,6 +405,16 @@ class UiaActions(ExecutorBase):
                     raise
                 except ActionError:
                     pass  # l'application ne s'y prête pas : refus (ou vrai clavier autorisé) ci-dessous
+        if (
+            element is None
+            and fw in UIA_ONLY
+            and len(combos) == 1
+            and combos[0].key == 0x73
+            and combos[0].modifiers == (0x12,)
+        ):
+            # Alt+F4 sur WPF/UWP/WinUI : la touche est ignorée par messages, mais la fermeture qu'elle demande passe par
+            # WindowPattern.Close sans premier plan (passe 2 du 22/10 : refus sur la Calculatrice et les Paramètres).
+            return self._close_target(what)
         # Raccourcis (Ctrl/Alt/Win) : WPF/UWP les ignorent par messages, Chromium lit l'état réel du clavier.
         if (shortcut and (fw in UIA_ONLY or fw in ("Chromium", "Tk"))) or fw in NO_KEYBOARD_MESSAGES:
             hint = " (or relaunch the application with launch and devtools=true)" if fw == "Chromium" else ""
@@ -387,16 +438,19 @@ class UiaActions(ExecutorBase):
                 self._ensure_active()
 
         def run() -> str:
-            if fw == "Chromium" or element is not None:
+            # Route décidée UNE fois : champ Win32 désigné qui a sa fenêtre → ses touches lui sont postées, sans activation
+            # (relecture de Codex : relue après la capture, elle basculait au focus d'un autre contrôle).
+            own = self._own_edit_hwnd(element) if element is not None and fw != "Chromium" else 0
+            if fw == "Chromium" or (element is not None and not own):
                 with foreground.brief_activation(self.hwnd, self.windows) as activation:
 
                     def checked() -> None:
                         prepare()
                         activation.check("nothing was sent, the action is cancelled")
 
-                    detail = self._watched(lambda: self._post_combos(combos, fw, sent), checked)()
+                    detail = self._watched(lambda: self._post_combos(combos, fw, sent, element=element), checked)()
             else:
-                detail = self._watched(lambda: self._post_combos(combos, fw, sent))()
+                detail = self._watched(lambda: self._post_combos(combos, fw, sent, element=element, own=own))()
             return f"{', '.join(sorted(set(sent)))}; {detail}"
 
         return self._try_or_foreground([*simulated, ("messages", run)], what, real)
@@ -765,3 +819,40 @@ class UiaActions(ExecutorBase):
             if not clicked and item.props.get("has_legacy") and not native:
                 with contextlib.suppress(*EXPECTED):
                     self.auto.legacy_default_action(item.node.element)
+
+
+def request_close(auto: uia.Automation, hwnd: int) -> tuple[bool | None, str, str]:
+    """Demande de fermeture d'une fenêtre, relue. Rend (état, technique, détail) ; état True = fermée (détruite, ou
+    visible avant et masquée après : cadre UWP), False = encore là (« Enregistrer ? »), None = issue inconnue.
+
+    Motif Window absent, attesté AVANT tout appel : WM_CLOSE. Close() lancé puis réponse perdue : jamais de WM_CLOSE
+    en plus, la fermeture est seulement relue. Fenêtre déjà masquée avant la demande : rester masquée ne prouve rien
+    (relecture de Codex du 22/10)."""
+    visible_before = bool(w.IsWindowVisible(hwnd))
+    try:
+        pattern = auto.pattern(auto.element_from_hwnd(hwnd), "window")
+    except Exception:  # noqa: BLE001 - pas de motif Window : demande classique
+        pattern = None
+    lost = ""
+    if pattern is not None:
+        how = "UIA WindowPattern.Close"
+        try:
+            pattern.Close()
+        except Exception as error:  # noqa: BLE001 - issue incertaine : relue, jamais rejouée
+            lost = str(error).splitlines()[0][:120] if str(error) else type(error).__name__
+    else:
+        how = "WM_CLOSE"
+        methods.post(hwnd, w.WM_CLOSE, 0, 0)
+    deadline = time.monotonic() + 2.0
+    while True:
+        gone = not w.IsWindow(hwnd)
+        if gone or (visible_before and not w.IsWindowVisible(hwnd)):
+            return True, how, "window closed" if gone else "window closed (hidden by Windows)"
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.05)
+    if lost:
+        return None, how, f"reply lost ({lost}), the window is still there: look before trying again"
+    if not visible_before:
+        return None, how, "the window was already hidden before the request: closing not proven, look"
+    return False, how, 'close requested, the window is still there (a "Save?" dialog?)'

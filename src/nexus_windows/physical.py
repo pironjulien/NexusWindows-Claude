@@ -73,7 +73,9 @@ _ready = threading.Event()
 _last = 0.0  # time.monotonic() de la dernière entrée physique (0 : aucune vue depuis le démarrage)
 _listening_since = 0.0  # time.monotonic() du début de l'écoute
 _ok = False
-counts = {"physical": 0, "injected": 0}  # diagnostic : nombre d'événements, jamais leur contenu
+# diagnostic : nombre d'événements, jamais leur contenu ; « moves » : déplacements PHYSIQUES de la souris (le banc commun
+# s'en sert pour ne pas compter comme intrusion d'un outil un curseur bougé par la vraie souris, 22/10)
+counts = {"physical": 0, "injected": 0, "moves": 0}
 
 
 @WNDPROC
@@ -98,6 +100,8 @@ def _proc(hwnd, msg, wparam, lparam):
                 if buttons:
                     _last = time.monotonic()
                     counts["physical"] += 1
+                else:
+                    counts["moves"] += 1
     return _user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 

@@ -30,6 +30,11 @@ from .act_base import (
 REAL_TYPING_CHUNK = 32  # caractères tapés au vrai clavier entre deux relectures du focus
 
 
+class ProofMarkerLeft(Unconfirmed):
+    """La preuve DevTools a pu laisser son marqueur dans le titre de la page, ou sa remise n'a pas été vue dans la
+    fenêtre : aucune autre technique, ni la vraie souris, par-dessus."""
+
+
 class PointerActions(ExecutorBase):
     """Clics par point, défilement, glisser, survol."""
 
@@ -187,6 +192,89 @@ class PointerActions(ExecutorBase):
             realinput.type_text(text[start : start + REAL_TYPING_CHUNK])
 
     # --- Défilement ---------------------------------------------------------------------------------------------
+    def _proven_wheel(self, aim: tuple[int, int], delta: int, horizontal: bool) -> str:
+        """Molette DevTools dans une fenêtre Chromium que l'outil n'a pas lancée (banc commun du 21/10, recette B de
+        Codex) : port déclaré par le processus de la fenêtre et écouté par lui seul, page désignée par son titre puis
+        prouvée par un titre aléatoire vu dans CETTE fenêtre, rapport de pixels lisible. Toute preuve manquante : rien
+        n'est envoyé (MethodError). Un seul envoi ; sans accusé : issue inconnue, jamais rejouée ni suivie d'une autre
+        technique."""
+        from . import cdp, launch
+
+        pid = w.window_pid(self.hwnd)
+        port = cdp.port_from_command_line(cdp.process_command_line(pid))
+        if port is None:
+            raise methods.MethodError("no DevTools port declared by the window's process")
+        if not cdp.owner_proven(pid, port, launch.listeners()):
+            raise methods.MethodError(f"DevTools port {port} is not listened to by the window's own process alone")
+        try:
+            target = cdp.proven_page(cdp.targets(port), w.window_text(self.hwnd), port)
+            page = cdp.Page(port, target=target, timeout_s=2.0)
+        except cdp.CDPError as error:
+            raise methods.MethodError(str(error)) from None
+        try:
+            try:
+                cdp.prove_window(
+                    page,
+                    lambda: w.window_text(self.hwnd),
+                    reconnect=lambda: cdp.Page(port, target=target, timeout_s=2.0),
+                )
+            except cdp.MarkerLeft as error:
+                # titre peut-être resté marqué, ou remise non vue : terminal aux DEUX niveaux, ni technique suivante ni
+                # vraie souris (Unconfirmed : _try et _try_or_foreground le laissent remonter ; relecture de Codex)
+                raise ProofMarkerLeft(str(error)) from error
+            metrics = page.evaluate("[window.devicePixelRatio, window.innerWidth, window.innerHeight]")
+            if not isinstance(metrics, list) or len(metrics) != 3:
+                raise methods.MethodError("page metrics unreadable: nothing was sent")
+            ratio, inner_w, inner_h = metrics
+            if isinstance(ratio, bool) or not isinstance(ratio, int | float) or not 0.1 < float(ratio) < 16:
+                raise methods.MethodError("devicePixelRatio unreadable: nothing was sent")  # jamais 1 supposé
+            rect, measured = self._proven_viewport(aim, float(ratio), inner_w, inner_h)
+            cx, cy = (aim[0] - rect.left) / float(ratio), (aim[1] - rect.top) / float(ratio)
+            worker.check_cancelled()
+            try:
+                page.wheel(cx, cy, -delta if not horizontal else 0, -delta if horizontal else 0)
+            except cdp.CDPError as error:
+                raise Unconfirmed(
+                    f"DevTools wheel sent without acknowledgement ({error}): outcome unknown, check the image before any "
+                    "new attempt."
+                ) from None
+        finally:
+            page.close()
+        return f"proven page, port {port}; {measured}"
+
+    def _proven_viewport(self, aim: tuple[int, int], ratio: float, inner_w: Any, inner_h: Any) -> tuple[w.Rect, str]:
+        """Zone de rendu de la page PROUVÉE (règle commune aux trois NexusWindows, relecture de Codex du 21/10) :
+        exactement UNE zone Chrome_RenderWidgetHostHWND VISIBLE dans toute la fenêtre, le point dedans, taille physique
+        = round(innerWidth × DPR) × round(innerHeight × DPR) à ceil(DPR) px près. Plusieurs zones visibles (vues
+        multiples, Steam…) : refus, hors périmètre. Rend la zone et le relevé (innerWidth/innerHeight, DPR, rectangle,
+        écart) pour le compte rendu ; sinon rien n'est envoyé."""
+        import math
+
+        if not all(isinstance(v, int | float) and not isinstance(v, bool) and v > 0 for v in (inner_w, inner_h)):
+            raise methods.MethodError("page size unreadable: nothing was sent")
+        visible = [
+            c
+            for c in w.enum_children(self.hwnd)
+            if w.class_name(c) == "Chrome_RenderWidgetHostHWND" and w.IsWindowVisible(c)
+        ]
+        if len(visible) != 1:
+            raise methods.MethodError(
+                f"{len(visible)} visible render areas in the window (exactly one required): nothing was sent"
+            )
+        r = w.window_rect(visible[0])
+        want_w, want_h = round(inner_w * ratio), round(inner_h * ratio)
+        gap = max(abs(r.width - want_w), abs(r.height - want_h))
+        measured = (
+            f"page {inner_w}×{inner_h} CSS, DPR {ratio:g}, area ({r.left},{r.top},{r.right},{r.bottom}) "
+            f"{r.width}×{r.height} px, gap {gap} px"
+        )
+        x, y = aim
+        if not (r.left <= x < r.right and r.top <= y < r.bottom):
+            raise methods.MethodError(f"the point is outside the page's render area ({measured}): nothing was sent")
+        if gap > math.ceil(ratio):
+            raise methods.MethodError(f"render area does not match the proven page ({measured}): nothing was sent")
+        return r, measured
+
     def _scroll_container_at(self, x: int, y: int) -> uia.Node | None:
         """Conteneur défilable de la CIBLE au point : jamais celui d'une fenêtre de l'utilisateur qui la recouvre, ni celui
         d'une fenêtre de la cible SOUS une de ses surgissantes."""
@@ -211,6 +299,18 @@ class PointerActions(ExecutorBase):
                 return node
             node = node.parent
         return None
+
+    def _covered_blind(self, view: snapshot.View, x: int, y: int) -> bool:
+        """Le point est sous une fenêtre étrangère à la cible, aucune autre fenêtre de la cible (surgissante, palette)
+        ne le contient, et l'arbre de la cible n'y trouve aucun élément : la cible n'y montre rien de lisible."""
+        if w.window_at(x, y) in self.windows:
+            return False
+        for other in self.windows:
+            if other != self.hwnd and w.IsWindowVisible(other):
+                r = w.window_rect(other)
+                if r.left <= x < r.right and r.top <= y < r.bottom:
+                    return False
+        return self._hit(view, x, y) is None
 
     def _main_scroll_container(self, view: snapshot.View) -> uia.Node | None:
         """À défaut de conteneur sous le centre : le plus grand conteneur défilable visible de la fenêtre principale."""
@@ -259,6 +359,14 @@ class PointerActions(ExecutorBase):
                 probe = probe.parent
         elif point is not None:
             container = self._scroll_container_at(*point)
+            if container is None and self._covered_blind(view, *point):
+                # Point recouvert par une fenêtre ÉTRANGÈRE à la cible et rien de la cible lu sous lui (Paramètres masqués
+                # derrière la fenêtre de Julien, passe 2 du 23/10) : le grand conteneur défilable s'il contient le point.
+                # Jamais sous une surface de la cible (palette, voile, surgissante) : relecture de Codex.
+                main = self._main_scroll_container(view)
+                rect = main.rect if main is not None else None
+                if rect is not None and rect.left <= point[0] < rect.right and rect.top <= point[1] < rect.bottom:
+                    container = main
         else:
             # Sans cible : le conteneur sous le centre de la fenêtre, là où visent aussi DevTools et la molette (pas le
             # premier de l'arbre, souvent un panneau latéral) ; à défaut le plus grand, et la molette vise son centre.
@@ -297,7 +405,7 @@ class PointerActions(ExecutorBase):
                 if after is None or after[axis] < 0:
                     return "position not read back"
                 if after != before:
-                    return f"read back ✓ position {after[axis]:.0f} %"
+                    return f"read back ✓ position {before[axis] if before else 0:.1f} % → {after[axis]:.1f} %"
                 at_end = after[axis] >= 99.9 if direction in ("down", "right") else after[axis] <= 0.1
                 if at_end and aimed:
                     # Point visé par le modèle (canevas, carte…) : rien n'a bougé et l'élément sous le point n'a reçu
@@ -332,6 +440,10 @@ class PointerActions(ExecutorBase):
                 page.wheel(cx, cy, -delta if not horizontal else 0, -delta if horizontal else 0)
 
             chain.append(("DevTools wheel", scroll_cdp))
+        elif view.framework == "Chromium":
+            # Fenêtre Chromium lancée par un autre avec un port de débogage : page PROUVÉE d'abord (recette B de Codex) ;
+            # non prouvée : rien n'est envoyé, le défilement sémantique suit.
+            chain.append(("DevTools wheel (proven page)", lambda: self._proven_wheel(aim, delta, horizontal)))
         if scroll_uia is not None:
             chain.append(("UIA Scroll", scroll_uia))
         process = w.process_name(w.window_pid(self.hwnd)).lower()

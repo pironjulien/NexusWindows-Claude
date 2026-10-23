@@ -6,6 +6,42 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-23
+
+Second round of the common bench of the three NexusWindows tools (Claude, Codex, Antigravity): 7/7 tasks for each,
+twice, target window covered.
+
+### Added
+- Common journal shared by the three NexusWindows tools: one short line per batch step (app executable, framework,
+  action, technique, outcome, duration, foreground used), never any screen text, typed text, label, title or path.
+  Local only, under `%LOCALAPPDATA%\NexusJournal\windows\claude\` (one file per month), for a monthly review.
+- Mouse wheel over a Chromium/Electron/Edge window the tool did not launch, through DevTools: the port is read from the
+  window's own process command line and used only when that exact process listens on it; the target page is proven
+  by a random title seen in that window within 0.5 s (original title restored); no proof, nothing sent.
+
+### Fixed
+- Alt+F4 on WPF/UWP/WinUI windows in the background: closed through UI Automation WindowPattern.Close (WM_CLOSE only
+  when the pattern is missing), read back; a close whose answer was lost is never replayed.
+- A click that cannot be read back ("~") now reports what changed in the window within 0.8 s, never as a proof; only
+  `expect` or `check` prove it. With `expect` on each step, a series of clicks runs in one call (~50 ms per click).
+- Enter in a Win32 edit field that has its own window (Explorer rename): posted to the field without any brief
+  activation, so it validates the name without also opening the folder.
+- Window titles with non-breaking spaces match (exact title tried first).
+- Wheel at a point covered by another app's window: the target window's scroll container under that point is used,
+  only under a foreign window and never under the target's own popups.
+- A key sequence only partly posted is reported as unknown and never replayed with the real keyboard.
+- Posted click and double-click in DPI-virtualized windows: the point is converted to logical pixels (at 125 %, a
+  double-click on a WinForms list landed one row too low).
+- Posted double-click on a covered WinForms control is refused before sending (WinForms ignores it); the real mouse
+  takes over only when allowed.
+- Right-click is proven by a context menu actually opening; otherwise unknown. UIA ShowContextMenu with no menu
+  opened falls back to the real mouse when allowed (WPF).
+- Win32/WinForms: a posted mouse message with no visible effect is never replayed with the real mouse.
+
+### Changed
+- The "agent at work" indicator no longer has a halo: only the logo turns.
+- Lab apps: horizontally scrolling areas, nested WPF scroll viewers, every web wheel event logged, for the bench.
+
 ## [0.15.9] - 2026-10-21
 
 Measured by the common bench of the three NexusWindows tools (Claude, Codex, Antigravity): same lab apps, same tasks,

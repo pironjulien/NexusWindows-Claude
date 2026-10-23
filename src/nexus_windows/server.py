@@ -51,6 +51,7 @@ from . import (
 from . import launch as launcher
 from . import notifications as notices
 from . import win32 as w
+from .act_uia import request_close
 from .foreground import Watch
 from .session import Session, WindowError
 from .worker import Worker
@@ -812,6 +813,51 @@ def _gesture_of(step: Step) -> str:
     return step.do
 
 
+Fingerprint = dict[tuple[str, str, str], int]
+SEEN_WINDOW_S = 0.8  # relecture après un clic sans preuve propre
+
+
+def _complete(view: snapshot.View) -> bool:
+    """Lecture entière : une absence dans un arbre coupé ou illisible ne dit rien (relecture de Codex)."""
+    return not (view.truncated or view.unreadable or view.web_missing)
+
+
+def _fingerprint(view: snapshot.View) -> Fingerprint:
+    """Ce que la fenêtre montre (rôle, nom, valeur de chaque élément), sans le focus ni les positions."""
+    out: Fingerprint = {}
+    for e in view.elements:
+        key = (e.role, e.name, snapshot.norm(str(e.props.get("value") or "")))
+        out[key] = out.get(key, 0) + 1
+    return out
+
+
+def _seen_change(executor: actions.Executor, before: Fingerprint, hwnd: int) -> str:
+    """Après un clic sans preuve propre (UIA Invoke) : ce qui a changé dans la fenêtre en SEEN_WINDOW_S (élément apparu,
+    disparu, valeur changée), pour le compte rendu. Ce n'est JAMAIS une preuve : une horloge ou une réponse tardive
+    change aussi la fenêtre (relecture de Codex du 22/10) ; seule une postcondition (expect, check) prouve le clic."""
+    deadline = time.monotonic() + SEEN_WINDOW_S
+    while True:
+        if not w.IsWindow(hwnd):
+            return ""
+        view = executor._rebuild()
+        if _complete(view):
+            after = _fingerprint(view)
+            added = [k for k in after if after[k] > before.get(k, 0)]
+            removed = [k for k in before if before[k] > after.get(k, 0)]
+            if added or removed:
+
+                def show(k: tuple[str, str, str]) -> str:
+                    label = k[2] or k[1]
+                    return f'{k[0]} "{snapshot.clip(label, 40)}"' if label else k[0]
+
+                parts = [f"+{show(k)}" for k in added[:2]] + [f"-{show(k)}" for k in removed[:2]]
+                more = len(added) + len(removed) - len(parts)
+                return ", ".join(parts) + (f" (+{more})" if more > 0 else "")
+        if time.monotonic() >= deadline:
+            return ""
+        time.sleep(0.15)
+
+
 def _check_of(step: Step) -> dict[str, Any] | None:
     return step.check.model_dump(exclude_none=True) if step.check else None
 
@@ -836,6 +882,18 @@ def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcom
     return verdict.state
 
 
+def _journal_context(executor: actions.Executor, hwnd: int) -> dict[str, Any]:
+    """Application (exécutable du contenu : l'appli Store, pas ApplicationFrameHost) et cadre, pour le journal commun."""
+    app = cadre = None
+    try:
+        pids = sorted(executor.target_pids) or [w.window_pid(hwnd)]
+        app = w.process_name(pids[0]).lower() or None
+        cadre = executor.view.framework or None
+    except Exception:  # noqa: BLE001 - journal : jamais bloquant
+        pass
+    return {"app": app, "cadre": cadre}
+
+
 def _run_steps(
     executor: actions.Executor, steps: list[Step], hwnd: int, call: log.Call, symbols: list[str] | None = None
 ) -> tuple[list[str], bool]:
@@ -843,6 +901,8 @@ def _run_steps(
     symbols : reçoit l'issue de chaque étape (✓ = ~ ✗). Le booléen indique une erreur, pas une issue inconnue."""
     report: list[str] = []
     symbols = symbols if symbols is not None else []
+    if isinstance(call, log.Call) and call.journal is None:
+        call.journal = _journal_context(executor, hwnd)
     for index, step in enumerate(steps, 1):
         t0 = time.perf_counter()
         executor.notes.clear()
@@ -872,11 +932,19 @@ def _run_steps(
                     continue
             # expect ne prouve l'effet que si le texte était ABSENT avant l'action.
             expected_before = executor.present(step.expect) if step.expect else False
+            shown_before: Fingerprint | None = None
+            if step.do in ("click", "double_click") and not check and not step.expect:
+                view = executor._rebuild() if executor.acted else executor.view
+                shown_before = _fingerprint(view) if _complete(view) else None
             try:
                 outcome = _dispatch(executor, step)
             except actions.Unconfirmed as error:
                 # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après coup.
                 outcome = actions.Outcome(True, f"{step.do} sent ({_short(error)})", "messages")
+            if shown_before is not None and outcome.ok and outcome.symbol == "~":
+                change = _seen_change(executor, shown_before, hwnd)
+                if change:  # observation seulement : l'issue reste inconnue
+                    outcome.line += f" — window changed since: {change} (not proof of the click: give expect or check)"
             check_unreadable = bool(check and outcome.ok and _apply_check(executor, step, outcome) is None)
             if step.expect and outcome.ok:
                 try:
@@ -917,7 +985,10 @@ def _run_steps(
                 SESSION.page_failed(hwnd)
             report.append(f"{index}. ✗ {step.do}: {_short(error)} [{ms} ms]")
             symbols.append("✗")
-            call.step(n=index, do=step.do, target=step.target, ok=False, error=_short(error), ms=ms)
+            call.step(
+                n=index, do=step.do, target=step.target, ok=False, error=_short(error), ms=ms,
+                error_type=type(error).__name__,
+            )  # fmt: skip
             failed = True
         except worker.Stopped as error:
             # Arrêt d'urgence : rien de plus, pas même le rendu ; mais le compte rendu des étapes faites est rendu.
@@ -1269,17 +1340,12 @@ async def window(
                         f"{label} holds {len(tabs)} tabs ({', '.join(snapshot.clip(t, 40) for t in tabs[:5])}): "
                         "window NOT closed. Close only the wanted tab (act: key ctrl+w on that tab)."
                     )
-                try:  # UWP/WinUI ignorent souvent WM_CLOSE sur leur cadre : WindowPattern.Close d'abord
-                    auto.pattern(auto.element_from_hwnd(hwnd), "window").Close()
-                except Exception:  # noqa: BLE001 - pas de motif Window : demande classique
-                    methods.post(hwnd, w.WM_CLOSE, 0, 0)
-                deadline = time.monotonic() + 2.0
-                while w.IsWindow(hwnd) and w.IsWindowVisible(hwnd) and time.monotonic() < deadline:
-                    time.sleep(0.05)
-                if not w.IsWindow(hwnd) or not w.IsWindowVisible(hwnd):
+                # UWP/WinUI ignorent souvent WM_CLOSE sur leur cadre : WindowPattern.Close d'abord, jamais rejoué.
+                state, _how, detail = request_close(auto, hwnd)
+                if state:
                     SESSION.forget(hwnd)
                     return f"{label}: closed."
-                return f'{label}: close requested, the window is still there (probably a "Save?" dialog: look).'
+                return f"{label}: {detail}."
             if action == "bottom":
                 w.SetWindowPos(hwnd, w.HWND_BOTTOM, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
                 return f"{label}: at the bottom of the z-order."

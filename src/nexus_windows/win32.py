@@ -622,6 +622,15 @@ def screen_to_client(hwnd: int, x: int, y: int) -> tuple[int, int]:
     return p.x, p.y
 
 
+def message_point(hwnd: int, x: int, y: int) -> tuple[int, int]:
+    """Point client d'un message souris posté, dans le repère où la fenêtre le lit : pixels logiques pour une fenêtre
+    non adaptée au DPI (ou au DPI système), car Windows ne convertit jamais un message posté. Banc commun du 22/10 :
+    à 125 %, le double clic posté sur « Charlie » (3e ligne d'une ListBox WinForms) tombait une ligne plus bas."""
+    cx, cy = screen_to_client(hwnd, x, y)
+    scale = window_dpi_scale(hwnd)
+    return (cx, cy) if abs(scale - 1.0) < 0.01 else (round(cx / scale), round(cy / scale))
+
+
 def window_at(x: int, y: int) -> int:
     """Fenêtre de premier niveau réellement visible au point écran (celle qui recevrait un vrai clic)."""
     return root(handle(WindowFromPoint(POINT(x, y))))

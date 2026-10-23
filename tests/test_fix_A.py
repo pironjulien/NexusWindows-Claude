@@ -823,3 +823,13 @@ def test_default_desktop_refused_is_harmless(monkeypatch):
     monkeypatch.setattr(w, "OpenDesktopW", lambda *a: None)  # accès refusé : rien à rattacher
     monkeypatch.setattr(w, "SetThreadDesktop", lambda h: pytest.fail("rattachement sans bureau"))
     assert w.ensure_default_desktop() is False
+
+
+def test_posted_click_uses_the_logical_client_point_of_a_dpi_virtualized_window(monkeypatch):
+    """Banc commun du 22/10 : à 125 %, une fenêtre non adaptée au DPI lit le message posté en pixels logiques ; le point
+    physique (ScreenToClient d'un processus par moniteur) visait une ligne plus bas dans une ListBox WinForms."""
+    monkeypatch.setattr(methods.w, "screen_to_client", lambda h, x, y: (125, 50))
+    monkeypatch.setattr(methods.w, "window_dpi_scale", lambda h: 1.25)
+    assert methods.w.message_point(1, 0, 0) == (100, 40)
+    monkeypatch.setattr(methods.w, "window_dpi_scale", lambda h: 1.0)
+    assert methods.w.message_point(1, 0, 0) == (125, 50)

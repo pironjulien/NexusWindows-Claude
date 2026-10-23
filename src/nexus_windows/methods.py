@@ -67,6 +67,14 @@ _BUTTONS = {
 ERROR_ACCESS_DENIED = 5
 
 
+_ACCEPTED = [0]  # messages acceptés par PostMessage depuis le lancement (un envoi partiel se voit à son écart)
+
+
+def accepted_posts() -> int:
+    """Nombre de messages postés acceptés : avant/après une séquence, dit si quelque chose est déjà parti."""
+    return _ACCEPTED[0]
+
+
 def post(target: int, msg: int, wparam: int, lparam: int) -> None:
     """PostMessage vérifié : un refus (fenêtre disparue, application élevée bloquée par UIPI) n'est jamais un succès."""
     if not w.PostMessageW(target, msg, wparam, lparam):
@@ -74,12 +82,20 @@ def post(target: int, msg: int, wparam: int, lparam: int) -> None:
         if error == ERROR_ACCESS_DENIED:
             raise MethodError("Windows blocks messages to this application (elevated, UIPI).")
         raise MethodError(f"PostMessage refused (error {error}).")
+    _ACCEPTED[0] += 1
 
 
 def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1) -> int:
     """Clic par messages à la fenêtre enfant la plus profonde sous (x, y) écran. Renvoie le HWND visé."""
     target = w.deepest_child_at(top, x, y)
-    cx, cy = w.screen_to_client(target, x, y)
+    # WinForms ne lève DoubleClick que si la fenêtre au point (hit-test) est le contrôle lui-même : point recouvert, double clic posté sans effet (banc commun du 22/10, les trois outils) ; rien n'est envoyé, la technique suivante (vraie souris, premier plan bref) s'en charge si elle est permise.
+    if (
+        count >= 2
+        and win_class(target).startswith("windowsforms")
+        and w.handle(w.WindowFromPoint(w.POINT(x, y))) != target
+    ):
+        raise MethodError("WinForms double click at a covered point has no effect by messages: nothing was sent.")
+    cx, cy = w.message_point(target, x, y)
     lp = w.make_lparam(cx, cy)
     down, up, mk, dbl = _BUTTONS[button]
     post(target, w.WM_MOUSEMOVE, 0, lp)

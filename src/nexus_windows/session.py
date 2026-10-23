@@ -110,10 +110,15 @@ class Session:
             self.target = surface
             return surface
         candidates = snapshot.app_windows()
+        # Titre littéral d'abord ; puis espaces insécables ou doubles comparées comme des espaces (« Propriétés de :
+        # note », passe 2 du 23/10), jamais avant un titre exact (relecture de Codex). Le processus, lui, tel quel.
+        loose = snapshot.norm(text)
         exact = [c for c in candidates if c.title.lower() == text]
+        exact_loose = [c for c in candidates if snapshot.norm(c.title).lower() == loose]
         by_process = [c for c in candidates if c.process.lower() in (text, text + ".exe")]
         partial = [c for c in candidates if text in c.title.lower()]
-        for group in (exact, by_process, partial):
+        partial_loose = [c for c in candidates if loose in snapshot.norm(c.title).lower()]
+        for group in (exact, exact_loose, by_process, partial, partial_loose):
             if group:
                 self.target = group[0].hwnd  # le plus haut dans l'empilement
                 return self.target

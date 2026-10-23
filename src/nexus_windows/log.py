@@ -90,9 +90,17 @@ class Call:
         self.start = time.perf_counter()
         self.error: str | None = None
         self._busy = False
+        self.journal: dict[str, Any] | None = None  # app et cadre de la fenêtre : étapes aussi au journal commun
 
     def step(self, **fields: Any) -> None:
         self.steps.append(_short(fields))
+        if self.journal is not None:
+            try:
+                from . import journal
+
+                journal.etape(self.id, self.journal, fields)
+            except Exception:  # noqa: BLE001 - journal commun : jamais bloquant
+                pass
 
     def note(self, **fields: Any) -> None:
         self.notes.update(_short(fields))

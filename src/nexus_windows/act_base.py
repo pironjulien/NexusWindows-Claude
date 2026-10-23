@@ -300,6 +300,7 @@ class ExecutorBase:
         def _page_if_free(self) -> cdp.Page | None: ...
         def _cdp_click(self, page: cdp.Page, x: int, y: int, button: str = "left", count: int = 1) -> str: ...
         def _css_point(self, page: cdp.Page, x: int, y: int) -> tuple[float, float]: ...
+        def _web_viewport(self) -> w.Rect: ...
         @staticmethod
         def _cdp_focus_at(page: cdp.Page, cx: float, cy: float, editable: bool = False) -> None: ...
         @staticmethod
@@ -319,6 +320,7 @@ class ExecutorBase:
 
         # act_win32
         def _element_hwnd_class(self, e: snapshot.Element) -> tuple[int, str]: ...
+        def _own_edit_hwnd(self, element: snapshot.Element) -> int: ...
         def _ancestor_hwnd(self, e: snapshot.Element, classes: tuple[str, ...]) -> int: ...
         @staticmethod
         def _sibling_index(e: snapshot.Element, role: str) -> int | None: ...
@@ -336,6 +338,7 @@ class ExecutorBase:
             sent: list[str],
             simulated: bool = False,
             element: snapshot.Element | None = None,
+            own: int = 0,
         ) -> None: ...
 
     @property
@@ -400,7 +403,10 @@ class ExecutorBase:
                 return Outcome(False, f"{what} ({name} — READ-BACK FAILED: {_short(error)})", name, attempts, False)
             except NoVisibleEffect as error:
                 attempts.append(f"{name} ✗ {_short(error)}")
-                if self.allow_foreground:
+                # Win32/WinForms traitent les messages souris postés (mesuré) : un effet sans trace à l'écran (molette
+                # d'une zone sans défilement visible) n'est pas un refus ; jamais de vraie souris par-dessus (banc
+                # physique du 22/10 : molette Win32 reçue deux fois).
+                if self.allow_foreground and self.view.framework not in ("Win32", "WinForms"):
                     # Fenêtre gardée devant (dessinée, publiée) : relue une seconde fois. Toujours rien → messages
                     # ignorés, pas retardés : la vraie souris/le vrai clavier autorisés prennent le relais.
                     if error.still_unchanged():
@@ -661,7 +667,7 @@ class ExecutorBase:
             raise ActionError(f'No "{what}" element of the window under this point: target by [N] or by name.')
         return element
 
-    def _foreground_or_fail(self, what: str, fn: Callable[[], None]) -> Outcome:
+    def _foreground_or_fail(self, what: str, fn: Callable[[], Any]) -> Outcome:
         if not self.allow_foreground:
             raise NeedsForeground(
                 f"{what}: impossible in the background for {self.view.framework}. With the user's consent, run again "
@@ -669,7 +675,12 @@ class ExecutorBase:
             )
         worker.check_cancelled()
         with realinput.borrowed(self.hwnd, self.windows):
-            fn()
+            detail = fn()
+        # Effet relu par le geste lui-même (menu contextuel ouvert, act_uia._menu_proven) : vérifié, pas seulement envoyé.
+        if isinstance(detail, str) and detail.startswith("read back ✓"):
+            return Outcome(
+                True, f"{what} (real mouse/keyboard, {detail[len('read back ✓ ') :]})", "foreground", verified=True
+            )
         return Outcome(True, f"{what} (real mouse/keyboard, foreground given back)", "foreground")
 
     def _try_or_foreground(self, chain, what: str, real: Callable[[], None]) -> Outcome:

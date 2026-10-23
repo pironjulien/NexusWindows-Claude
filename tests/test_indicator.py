@@ -78,12 +78,9 @@ def test_animation_curves():
     assert indicator.angle_at(0) == pytest.approx(0, abs=0.5)
     assert indicator.angle_at(0.5) == pytest.approx(180, abs=1)
     assert indicator.angle_at(0.999) == pytest.approx(360, abs=1)
-    assert indicator.breath_at(0) == pytest.approx(0, abs=0.01)
-    assert indicator.breath_at(0.5) == pytest.approx(1, abs=0.01)
-    assert indicator.breath_at(0.25) == pytest.approx(0.5, abs=0.02)
 
 
-def test_frames_render_logo_and_halo():
+def test_frames_render_logo_without_halo():
     started = time.perf_counter()
     frames = indicator.render_frames(72, count=8)
     assert time.perf_counter() - started < 10
@@ -99,13 +96,13 @@ def test_frames_render_logo_and_halo():
         return sum(alpha(frame, x, row) > 200 for x in range(side))
 
     assert alpha(first, side // 2, side // 2) == 255  # logo plein au centre
-    assert alpha(first, 0, 0) == 0  # coins transparents : seul le logo et son halo se voient
+    assert alpha(first, 0, 0) == 0  # coins transparents : seul le logo se voit
     assert 60 <= opaque_columns(first) <= 80  # diamètre ~72 px
     assert opaque_columns(quarter) < opaque_columns(first)  # il tourne sur lui-même
-    # Halo bleu-violet autour du logo, au-dessus (loin de l'ombre portée) ; BGRA prémultiplié : bleu dominant.
+    # Plus de halo bleu-violet (Julien, 22/10) : au-dessus du logo, au plus l'ombre noire, jamais de couleur.
     at = ((side // 2 - 40) * side + side // 2) * 4
     b, g, r, a = first[at : at + 4]
-    assert 0 < a < 255 and b > r
+    assert b == g == r == 0
 
 
 def test_logo_asset_shipped():

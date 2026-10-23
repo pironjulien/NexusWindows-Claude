@@ -334,6 +334,8 @@ def _wait_window(app: LabApp, ready: queue.Queue, timeout_s: float) -> None:
         app.hwnd = int(data["top"])
         if "zone_hwnd" in data:  # Tk : aucun élément UI Automation, fenêtre de la zone donnée par l'application
             app.extra["zone_hwnd"] = int(data["zone_hwnd"])
+        if "wheel_lines" in data:  # WPF : lignes par cran de molette (banc commun : déplacement d'un cran)
+            app.extra["wheel_lines"] = int(data["wheel_lines"])
     else:
         title = "Labo Web"
         app.hwnd = _find_window(app.pids, title, timeout_s)  # fenêtre du navigateur, même relancé

@@ -1,5 +1,5 @@
 """Indicateur « agent au travail » : le logo π de Julien tourne sur lui-même en bas à droite de l'écran de la fenêtre
-pilotée, comme un écran de chargement de jeu, avec un halo bleu-violet qui respire (même rendu que NexusBrowser 2.17).
+pilotée, comme un écran de chargement de jeu, sans halo (le logo seul, avec son ombre).
 
 Affiché dès qu'une action démarre (act, launch, window ; jamais les simples lectures), retiré 1,618 s après la
 dernière. Fenêtre en couches toujours au premier plan, sans bordure, transparente aux clics, jamais activée, absente
@@ -19,12 +19,12 @@ from ctypes import wintypes as w
 from pathlib import Path
 
 LINGER_S = 1.618  # retrait après la dernière action (nombre d'or)
-PERIOD_S = 1.618  # un tour du logo ; le halo respire deux fois dans ce temps (aller-retour de 809 ms)
+PERIOD_S = 1.618  # un tour du logo
 FRAMES = 48  # images par tour (~30 par seconde)
 FADE_S = 0.3
 SIZE = 72  # diamètre du logo à 100 % (pixels logiques)
 MARGIN = 28  # distance aux bords de la zone de travail
-CANVAS = 2.0  # côté de la fenêtre / diamètre du logo : place pour le halo et l'ombre
+CANVAS = 2.0  # côté de la fenêtre / diamètre du logo : place pour l'ombre
 TOOLS = {"act", "launch", "window"}  # outils qui agissent ; windows, look, notifications et logs ne font que lire
 LOGO = Path(__file__).with_name("assets") / "logo.png"
 CLASS_NAME = "NexusWindowsBusyIndicator"
@@ -51,39 +51,13 @@ def angle_at(phase: float) -> float:
     return 360.0 * _bezier(0.45, 0.0, 0.55, 1.0, phase % 1.0)
 
 
-def breath_at(phase: float) -> float:
-    """Souffle du halo (0 → 1 → 0 sur un tour), ease-in-out en aller-retour."""
-    p = (phase % 1.0) * 2
-    return _bezier(0.42, 0.0, 0.58, 1.0, p if p <= 1 else 2 - p)
-
-
 def render_frames(diameter: int, count: int = FRAMES) -> list[bytes]:
     """Images BGRA prémultipliées (côté = diameter × CANVAS), une par fraction de tour."""
     from PIL import Image, ImageDraw, ImageFilter
 
     side = round(diameter * CANVAS)
     center = side / 2
-    # Halo : disque débordant de 10/72 du logo (inset -10px de NexusBrowser), dégradé radial CSS « circle » (rayon
-    # jusqu'au coin de sa boîte) bleu (66,133,244 ; 0,55) → violet (155,114,203 ; 0,25) à 55 % → transparent à 72 %.
-    disc_r = diameter / 2 * (92 / 72)
-    halo_r = disc_r * math.sqrt(2)
-    stops = [(0.0, (66, 133, 244, 0.55)), (0.55, (155, 114, 203, 0.25)), (0.72, (155, 114, 203, 0.0))]
-    halo_side = math.ceil(disc_r * 2)
-    halo = Image.new("RGBA", (halo_side, halo_side))
-    pixels = halo.load()
-    assert pixels is not None
-    for y in range(halo_side):
-        for x in range(halo_side):
-            r = math.hypot(x + 0.5 - halo_side / 2, y + 0.5 - halo_side / 2)
-            d = r / halo_r  # 0 au centre, 1 au coin de la boîte
-            if r > disc_r or d >= stops[-1][0]:  # border-radius: 50%
-                continue
-            for (a, ca), (b, cb) in zip(stops, stops[1:], strict=False):
-                if a <= d <= b:
-                    k = (d - a) / (b - a)
-                    rgba = [ca[i] + (cb[i] - ca[i]) * k for i in range(4)]
-                    pixels[x, y] = (round(rgba[0]), round(rgba[1]), round(rgba[2]), round(rgba[3] * 255))
-                    break
+    # Sans halo (demande de Julien du 22/10 : le fond bleu-violet faisait « moche ») : la pièce et son ombre seules.
     # Pièce : logo rond, liseré blanc 0,18 sur 2 px, ombre portée (0 8px 22px noir 0,55).
     scale = diameter / 72
     supersample = 4
@@ -114,11 +88,6 @@ def render_frames(diameter: int, count: int = FRAMES) -> list[bytes]:
     for i in range(count):
         phase = i / count
         canvas = Image.new("RGBA", (side, side))
-        breath = breath_at(phase)
-        h_size = max(1, round(halo_side * (0.92 + 0.16 * breath)))
-        h = halo.resize((h_size, h_size), Image.Resampling.BILINEAR)
-        h.putalpha(h.getchannel("A").point(_ramp(0.55 + 0.45 * breath)))
-        canvas.alpha_composite(h, (round(center - h_size / 2), round(center - h_size / 2)))
         cos = math.cos(math.radians(angle_at(phase)))
         width = max(1, round(coin.width * abs(cos)))
         s_w = max(1, round(shadow_rgba.width * abs(cos)))

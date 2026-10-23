@@ -3,7 +3,7 @@
   "name": "io.github.pironjulien/nexus-windows",
   "title": "NexusWindows for Claude",
   "description": "Windows computer use in the background: UI Automation and Win32 messages, every action read back.",
-  "version": "0.15.9",
+  "version": "0.16.0",
   "websiteUrl": "https://julienpiron.fr/nexuswindows/claude/",
   "repository": {
     "url": "https://github.com/pironjulien/NexusWindows-Claude",
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "nexus-windows",
-      "version": "0.15.9",
+      "version": "0.16.0",
       "runtimeHint": "uvx",
       "runtimeArguments": [
         {

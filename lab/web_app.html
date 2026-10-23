@@ -16,6 +16,8 @@
   [role=option] { padding: 2px 6px; cursor: pointer; }
   [role=option][aria-selected=true] { background: #cde; }
   #statut { font-weight: bold; }
+  .defil { border: 1px solid #888; background: #fff; width: 210px; height: 90px; overflow: auto; display: inline-block; vertical-align: top; }
+  .defil p { margin: 0; height: 18px; width: 600px; white-space: nowrap; } /* plus large que la zone : défilement X aussi */
 </style>
 </head>
 <body>
@@ -41,6 +43,9 @@
 <div class="row"><label>Paragraphes</label><div id="paragraphes" contenteditable="true" aria-label="Paragraphes" role="textbox" aria-multiline="true"><p><br></p></div></div>
 <div class="row"><label>Statut</label><span id="statut" role="status" aria-live="polite">prêt</span></div>
 <canvas id="zone" width="430" height="110" aria-label="Zone"></canvas>
+<div class="row"><label>Défilement</label></div>
+<div class="row"><div id="defil" class="defil" data-nom="A" role="region" aria-label="Défilement" tabindex="0"></div>
+<div id="defil2" class="defil" data-nom="B" role="region" aria-label="Défilement voisin" tabindex="0"></div></div>
 <ol id="journal" aria-label="Journal" style="font-size:9px;color:#999;max-height:60px;overflow:auto;margin:4px 0"></ol>
 <script>
   let clics = 0;
@@ -115,6 +120,26 @@
   zone.addEventListener('contextmenu', (e) => e.preventDefault());
   zone.addEventListener('wheel', (e) => { e.preventDefault(); statut('molette ' + Math.round(-e.deltaY)); }, { passive: false });
   document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); statut('raccourci ctrl+k'); } });
+  // Deux vraies zones à défilement voisines (A visée par le banc, B à côté : une erreur de point se voit). Chaque
+  // évènement « wheel » reçu est écrit tel quel (« roue A <deltaY> <deltaX> », jamais regroupé : deux crans = deux
+  // évènements) ; la position est écrite une fois stable depuis 150 ms (« defil A bas <amplitude> <position> » ; un
+  // défilement fluide envoie plusieurs « scroll »). Le banc juge un seul wheel du bon signe ET le déplacement réel.
+  for (const zoneDefil of document.querySelectorAll('.defil')) {
+    const nom = zoneDefil.dataset.nom;
+    for (let i = 1; i <= 600; i++) { const p = document.createElement('p'); p.textContent = nom + ' ligne ' + i; zoneDefil.appendChild(p); }
+    zoneDefil.addEventListener('wheel', (e) => statut('roue ' + nom + ' ' + Math.round(e.deltaY) + ' ' + Math.round(e.deltaX)));
+    let depart = 0, minuterie = null;
+    zoneDefil.addEventListener('scroll', () => {
+      if (minuterie === null) depart = zoneDefil.dataset.pos ? Number(zoneDefil.dataset.pos) : 0;
+      clearTimeout(minuterie);
+      minuterie = setTimeout(() => {
+        minuterie = null;
+        const pos = Math.round(zoneDefil.scrollTop), ecart = pos - depart;
+        zoneDefil.dataset.pos = String(pos);
+        if (ecart !== 0) statut('defil ' + nom + ' ' + (ecart > 0 ? 'bas' : 'haut') + ' ' + Math.abs(ecart) + ' ' + pos);
+      }, 150);
+    });
+  }
   const ctx = zone.getContext('2d'); ctx.fillStyle = '#eef'; ctx.fillRect(0, 0, 430, 110); ctx.fillStyle = '#336'; ctx.fillText('Zone (canevas)', 8, 16);
 </script>
 </body>

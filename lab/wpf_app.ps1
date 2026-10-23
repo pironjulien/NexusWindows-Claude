@@ -6,7 +6,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 [xml]$xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Labo WPF" Width="580" Height="560" ShowActivated="False" WindowStartupLocation="Manual">
+        Title="Labo WPF" Width="580" Height="660" ShowActivated="False" WindowStartupLocation="Manual">
   <DockPanel>
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="Fichier"><MenuItem x:Name="Action" Header="Action menu"/></MenuItem>
@@ -16,6 +16,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
       <Grid.RowDefinitions>
         <RowDefinition Height="32"/><RowDefinition Height="70"/><RowDefinition Height="40"/><RowDefinition Height="34"/>
         <RowDefinition Height="74"/><RowDefinition Height="32"/><RowDefinition Height="30"/><RowDefinition Height="*"/>
+        <RowDefinition Height="96"/>
       </Grid.RowDefinitions>
       <Label Content="Nom" Target="{Binding ElementName=Nom}"/>
       <TextBox x:Name="Nom" Grid.Column="1" Margin="0,3" AutomationProperties.Name="Nom"/>
@@ -40,6 +41,18 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
       <Label Grid.Row="6" Content="Statut"/>
       <TextBlock x:Name="Statut" Grid.Row="6" Grid.Column="1" Margin="0,6" Text="prêt" AutomationProperties.Name="Statut"/>
       <Border x:Name="Zone" Grid.Row="7" Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Background="White" AutomationProperties.Name="Zone"/>
+      <!-- Vraie zone à défilement (ScrollPattern UIA) : le banc y prouve une molette par la position relue. -->
+      <Label Grid.Row="8" Content="Défilement"/>
+      <!-- Deux ScrollViewer imbriqués de même taille : l'intérieur (« Défilement », visé par le banc) remplit la vue de
+           l'extérieur ; seul l'intérieur doit bouger (relecture de Codex : un outil qui fait défiler le mauvais
+           conteneur se voit). -->
+      <ScrollViewer x:Name="DefilExt" Grid.Row="8" Grid.Column="1" Margin="0,4" Height="88" VerticalScrollBarVisibility="Visible" CanContentScroll="False" AutomationProperties.Name="Défilement extérieur">
+        <StackPanel x:Name="DefilExtContenu">
+          <ScrollViewer x:Name="Defil" Height="80" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto" CanContentScroll="False" AutomationProperties.Name="Défilement">
+            <StackPanel x:Name="DefilContenu"/>
+          </ScrollViewer>
+        </StackPanel>
+      </ScrollViewer>
     </Grid>
   </DockPanel>
 </Window>
@@ -75,9 +88,34 @@ $lb.ContextMenu.Items[0].Add_Click({ Set-Statut 'contexte copier' })
 $zone = & $find 'Zone'
 $zone.Add_MouseDown({ param($s, $e) $p = $e.GetPosition($zone); $b = if ($e.ChangedButton -eq 'Left') { 'gauche' } else { 'droit' }; Set-Statut ("zone $b {0},{1}" -f [int]$p.X, [int]$p.Y) })
 $zone.Add_MouseWheel({ param($s, $e) Set-Statut ("molette " + $e.Delta) })
+# Défilement : un évènement par changement de position verticale de CHAQUE ScrollViewer (A = intérieur, visé ; B =
+# extérieur), avec le sens, l'amplitude et la position. ScrollChanged remonte (routé) : seul l'émetteur réel compte.
+# La construction du contenu ne bouge aucune position, donc n'écrit rien.
+$contenu = & $find 'DefilContenu'
+# Lignes plus larges que la zone : elle défile aussi en X (preuve B des quatre sens, 22/10) ; l'extérieur reste vertical.
+1..400 | ForEach-Object { [void]$contenu.Children.Add((New-Object System.Windows.Controls.TextBlock -Property @{ Text = "Ligne $_"; Width = 600 })) }
+$contenuExt = & $find 'DefilExtContenu'
+1..200 | ForEach-Object { [void]$contenuExt.Children.Add((New-Object System.Windows.Controls.TextBlock -Property @{ Text = "Extérieur $_" })) }
+$defil = & $find 'Defil'; $defilExt = & $find 'DefilExt'
+foreach ($pair in @(@($defil, 'A'), @($defilExt, 'B'))) {
+    $viewer = $pair[0]; $nom = $pair[1]
+    $viewer.Add_ScrollChanged({ param($s, $e)
+        if ($e.OriginalSource -ne $s) { return }
+        # Horizontal (preuve des quatre sens) : « defilx A droite <amplitude> <position> », hors de la famille « defil ».
+        if ($e.HorizontalChange -ne 0) {
+            $sensX = if ($e.HorizontalChange -gt 0) { 'droite' } else { 'gauche' }
+            Set-Statut ("defilx {0} $sensX {1} {2}" -f $s.Tag, [int][math]::Round([math]::Abs($e.HorizontalChange)), [int][math]::Round($e.HorizontalOffset))
+        }
+        if ($e.VerticalChange -eq 0) { return }
+        $sens = if ($e.VerticalChange -gt 0) { 'bas' } else { 'haut' }
+        Set-Statut ("defil {0} $sens {1} {2}" -f $s.Tag, [int][math]::Round([math]::Abs($e.VerticalChange)), [int][math]::Round($e.VerticalOffset))
+    })
+    $viewer.Tag = $nom
+}
 $window.Add_KeyDown({ param($s, $e) if (($e.Key -eq 'K') -and ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control)) { Set-Statut 'raccourci ctrl+k'; $e.Handled = $true } })
 $window.Add_ContentRendered({
     $h = (New-Object System.Windows.Interop.WindowInteropHelper $window).Handle
-    [Console]::WriteLine('{"ready":true,"top":' + $h.ToInt64() + '}')
+    # Lignes par cran de molette (réglage Windows) : le banc en déduit le déplacement d'un cran, jamais supposé à 3.
+    [Console]::WriteLine('{"ready":true,"top":' + $h.ToInt64() + ',"wheel_lines":' + [System.Windows.SystemParameters]::WheelScrollLines + '}')
 })
 [void]$window.ShowDialog()

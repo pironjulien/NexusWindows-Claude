@@ -438,8 +438,11 @@ requests of its own (DevTools connections stay on `127.0.0.1`).
   14 days (tools, techniques, durations, errors; typed text is replaced by its length), the routines you chose to
   remember, and throwaway browser profiles created by `devtools=true` (deleted afterwards). Images are written to the
   log only if you set `NEXUS_WINDOWS_DEBUG_IMAGES=1`. Under `%USERPROFILE%\.nexus\`: the shared foreground token and
-  emergency-stop state.
-- **Removing it**: remove the server from Claude (`claude mcp remove nexus-windows`), then delete those folders.
+  emergency-stop state. Under `%LOCALAPPDATA%\NexusJournal\windows\claude\` (or `NEXUS_JOURNAL_HOME`): a short
+  monthly JSONL journal, in the same format as the other NexusWindows tools (app executable name, framework, action,
+  technique, outcome, duration, whether the foreground was used, and the first words of an error, cut before any
+  quote, colon or bracket); never typed text, screen text, labels, titles or paths. The server never deletes it.
+- **Removing it**: remove the server from Claude (`claude mcp remove nexus-windows`), then delete those folders (and `%LOCALAPPDATA%\NexusJournal`).
 
 Questions or concerns: open an issue on this repository.
 
