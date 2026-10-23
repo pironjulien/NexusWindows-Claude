@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-23
+
+### Security
+- Pillow raised to 13.0.0 (minimum and lock): fixes the advisories reported against Pillow 12.3.0
+  (one critical, six high).
+
 ## [0.16.0] - 2026-10-23
 
 Second round of the common bench of the three NexusWindows tools (Claude, Codex, Antigravity): 7/7 tasks for each,

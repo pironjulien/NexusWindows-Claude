@@ -1,6 +1,6 @@
 [project]
 name = "nexus-windows"
-version = "0.16.0"
+version = "0.16.1"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"
@@ -18,7 +18,7 @@ dependencies = [
     # Bureau Windows seulement : ailleurs, le serveur démarre et liste ses outils (offwindows) sans ces dépendances.
     "comtypes>=1.4.17; sys_platform == 'win32'",
     "mcp>=2.3.0",
-    "pillow>=12.3.0",
+    "pillow>=13.0.0",
     "websockets>=17.2",
     "windows-capture>=2.0.1; sys_platform == 'win32'",
     # OCR Windows natif en secours d'une fenêtre sans arbre UI Automation (Tk, canevas) : moteur du système, local.
