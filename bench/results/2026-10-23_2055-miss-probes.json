@@ -1,0 +1,62 @@
+{
+ "defil-electron": [
+  {
+   "essai": "UIA ScrollPattern.Scroll petite avance (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA SetScrollPercent +10 % (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA ScrollItem.ScrollIntoView d'une ligne cachée",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "molette postée au point de la région (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "defil-edge": [
+  {
+   "essai": "UIA ScrollPattern.Scroll petite avance (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA SetScrollPercent +10 % (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA ScrollItem.ScrollIntoView d'une ligne cachée",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "molette postée au point de la région (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ]
+}

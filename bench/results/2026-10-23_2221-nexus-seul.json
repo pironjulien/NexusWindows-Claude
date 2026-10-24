@@ -1,0 +1,595 @@
+[
+ {
+  "famille": "tk",
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 85,
+    "note": "702×690, sombre 0%, couleur dominante 68%",
+    "size": [
+     702,
+     690
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1022,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click at point (337, 252) (click by messages — visible change) [1006 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "zone gauche 173,44"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 31,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✗ scroll: scroll down ×1: no technique worked (scroll bar lines ✗ no native scroll bar drives what is under the point). [23 ms]\nSummary: 1 failed.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 637,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ keys \"ctrl+k\" (messages with simulated focus — simulated focus, simulated keyboard state; visible change) [628 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 84,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ scroll down ×1 (scroll bar lines — read back ✓ position 0 → 150) [74 ms]\nSummary: 1 verified.",
+      "vu": [
+       "defil liste bas 0.005",
+       "defil liste bas 0.010",
+       "defil liste bas 0.015"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "electron",
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 560,
+    "note": "742×800, sombre 0%, couleur dominante 54%",
+    "size": [
+     742,
+     800
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 653,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click on Button \"Valider\" (UIA Invoke — effect observed: window \"Labo Web — clic 1\") — window changed since: +Document \"file:///~/OneDrive/Documen…\", +Text \"clic 1\", -Document \"file:///~/OneDrive/Documen…\", -Text \"prêt\" (not proof of the click: give expect or check) [643 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further action",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 396,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on CheckBox \"Option\" (UIA Toggle — read back ✓ checked) — checked ✓ [384 ms]\nSummary: 1 verified.",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 327,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ text replaced in Edit \"Nom\" (UIA Value) — read back ✓ [319 ms]\nSummary: 1 verified.",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 247564) 11 ms",
+      "curseur déplacé": false,
+      "ms": 504,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ text typed in Edit \"Éditeur\" (keystrokes without activation — WM_CHAR keystrokes without activation (activation simulated by messages, the user's foreground intact)) — read back ✓ [495 ms]\nSummary: 1 verified.\nThe app took the foreground (once): given back to the user at once.",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 518,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ \"Bleu\" chosen in ComboBox \"Couleur\" (keystrokes without activation — without activation (simulated activation) 139 ms) — read back ✓ [506 ms]\nSummary: 1 verified.",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 428,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on ListItem \"Charlie\" (UIA Invoke — read back ✓ selected) [419 ms]\nSummary: 1 verified.",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1514,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click on ListItem \"couleur Bleu\" (click by messages — visible change) at point (289, 778) [1503 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2257,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ scroll sent (scroll down ×1 of Document \"Labo Web — liste Charlie\": no visible effect within 0.6 s (DevTools wheel (proven page) ✗ no DevTools port declared by the window's process; UIA ScrollItem ✗ no area under the point has hidden lines in this direction; UIA Scroll ✗ container already at the end (100 %): the wheel must reach what is under the point; wheel by messages ✗ no visible effect: ",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 971,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ keys \"ctrl+k\" (messages without activation — simulated activation, simulated keyboard state; visible change) [951 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2194,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ scroll sent (scroll down ×1 of Document \"Labo Web — raccourci ctrl+k\": no visible effect within 0.6 s (DevTools wheel (proven page) ✗ no DevTools port declared by the window's process; UIA ScrollItem ✗ no area under the point has hidden lines in this direction; UIA Scroll ✗ container already at the end (100 %): the wheel must reach what is under the point; wheel by messages ✗ no visible effec",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "edge",
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 344,
+    "note": "734×792, sombre 0%, couleur dominante 55%",
+    "size": [
+     734,
+     792
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 754,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click on Button \"Valider\" (UIA Invoke — effect observed: visible change) — window changed since: +Pane \"Labo Web — clic 1\", +Document \"file:///~/OneDrive/Documen…\", -Document \"file:///~/OneDrive/Documen…\", -Text \"prêt\" (+1) (not proof of the click: give expect or check) [745 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further ac",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 457,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on CheckBox \"Option\" (UIA Toggle — read back ✓ checked) — checked ✓ [448 ms]\nSummary: 1 verified.",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 378,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ text replaced in Edit \"Nom\" (UIA Value) — read back ✓ [366 ms]\nSummary: 1 verified.",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 551,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ text typed in Edit \"Éditeur\" (keystrokes without activation — WM_CHAR keystrokes without activation (activation simulated by messages, the user's foreground intact)) — read back ✓ [542 ms]\nSummary: 1 verified.",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 420,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ \"Bleu\" chosen in ComboBox \"Couleur\" (keystrokes without activation — without activation (simulated activation) 88 ms) — read back ✓ [407 ms]\nSummary: 1 verified.",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 429,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✓ click on ListItem \"Charlie\" (UIA Invoke — read back ✓ selected) [420 ms]\nSummary: 1 verified.",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 761,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ click at point (289, 466) (click by messages — visible change) — window changed since: +Pane \"Labo Web — zone gauche 218,50\", +Document \"file:///~/OneDrive/Documen…\", -Document \"file:///~/OneDrive/Documen…\", -Text \"liste Charlie\" (+1) (not proof of the click: give expect or check) [747 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning",
+      "vu": [
+       "zone gauche 218,50"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1666,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✗ scroll: scroll down ×1 of Document \"Labo Web — zone gauche 218,50\": no technique worked (DevTools wheel (proven page) ✗ no DevTools port declared by the window's process; UIA ScrollItem ✗ no area under the point has hidden lines in this direction; UIA Scroll ✗ container already at the end (100 %): the wheel must reach what is under the point). [1653 ms]\nSummary: 1 failed.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 991,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ~ keys \"ctrl+k\" (messages without activation — simulated activation, simulated keyboard state; visible change) [979 ms]\nBatch stopped on an unknown outcome: inspect the current state before planning further actions; do not replay the action blindly.\nSummary: 1 unknown outcome.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1646,
+      "appels": [
+       "act"
+      ],
+      "réponse": "1. ✗ scroll: scroll down ×1 of Document \"Labo Web — raccourci ctrl+k\": no technique worked (DevTools wheel (proven page) ✗ no DevTools port declared by the window's process; UIA ScrollItem ✗ no area under the point has hidden lines in this direction; UIA Scroll ✗ container already at the end (100 %): the wheel must reach what is under the point). [1633 ms]\nSummary: 1 failed.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ }
+]

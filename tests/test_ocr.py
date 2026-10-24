@@ -88,7 +88,8 @@ def test_windows_ocr_reads_a_rendered_word():
 
 def test_tk_button_is_never_clicked_by_ignored_messages(monkeypatch):
     """Banc du 20/10 : un bouton Tk publié en « Button » Win32 recevait BN_CLICKED, que Tk ignore (« ~ » sans effet,
-    même avec foreground=true). Arrière-plan : refus franc ; foreground=true : vraie souris."""
+    même avec foreground=true). Depuis le 23/10 (bench/miss_probes.py) : clic posté avec le bouton simulé pour le seul
+    fil de Tk, jamais BN_CLICKED, Invoke ni action MSAA ; messages refusés et foreground=true : vraie souris."""
     from test_contract import FakeAuto, executor, make_view, node
 
     button = node("Button", "Valider", framework="Win32", has_invoke=True, has_legacy=True)
@@ -97,9 +98,17 @@ def test_tk_button_is_never_clicked_by_ignored_messages(monkeypatch):
     auto = FakeAuto()
     ex = executor(view, auto)
     monkeypatch.setattr(actions.methods, "win32_button_click", lambda hwnd: pytest.fail("BN_CLICKED envoyé à Tk"))
-    with pytest.raises(actions.NeedsForeground, match="impossible in the background for Tk"):
+    held = []
+
+    def refused(*a, **k):
+        held.append(k.get("held"))
+        raise actions.methods.MethodError("PostMessage refused")
+
+    monkeypatch.setattr(actions.methods, "post_click", refused)
+    with pytest.raises(actions.ActionError, match="click by messages"):
         ex.click("Valider")
-    assert auto.calls == []  # ni Invoke, ni action par défaut MSAA, ni message
+    assert held == [True]  # bouton simulé pour le fil de Tk
+    assert auto.calls == []  # ni Invoke, ni action par défaut MSAA
     clicks = []
     monkeypatch.setattr(actions.realinput, "click", lambda *a, **k: clicks.append(a))
     monkeypatch.setattr(actions.realinput, "borrowed", lambda *a, **k: __import__("contextlib").nullcontext())

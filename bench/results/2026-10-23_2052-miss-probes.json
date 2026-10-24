@@ -1,0 +1,19 @@
+{
+ "wpf-clavier": [
+  {
+   "essai": "WM_SETFOCUS puis focus UIA du champ, Ctrl simulé",
+   "effet": false,
+   "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;c68fb979-a68a-4236-ba7b-24329767e1e3] (pid 246932) 1279 ms, Chrome_WidgetWin_1 (pid 15748) 292 ms (non rendu)",
+   "curseur": false,
+   "erreur": "MethodError: The target thread is the foreground thread: simulated modifiers refused."
+  },
+  {
+   "essai": "focus UIA du champ puis Ctrl+K, Ctrl simulé",
+   "effet": false,
+   "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;c68fb979-a68a-4236-ba7b-24329767e1e3] (pid 246932) 1567 ms (non rendu)",
+   "curseur": false,
+   "erreur": "MethodError: The target thread is the foreground thread: simulated modifiers refused."
+  }
+ ],
+ "liste-defil": []
+}

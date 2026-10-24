@@ -6,6 +6,39 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-10-24 — Tk in the background, scrolling without a wheel
+
+### Added
+- Tk in the background, window covered: clicks, right clicks and double clicks are sent as messages with the mouse
+  button marked pressed for Tk's own thread only (Tk reads the button state with `GetKeyState` and ignores a posted
+  click without it); keys and shortcuts get a simulated focus (`WM_SETFOCUS` sent to that window only, never
+  `WM_ACTIVATE`, Ctrl/Alt marked pressed for its thread, `WM_KILLFOCUS` posted after the keys). The user's foreground,
+  cursor and keyboard are untouched (`bench/miss_probes.py`).
+- Scrolling without a wheel, always read back: in a covered Chromium or Electron page without DevTools, the next hidden
+  line of the area under the point is brought into view (UI Automation ScrollItem), proven by the line's offset inside
+  its area (the page around it may scroll too); in Tk, line messages go to the native scroll bar attached to the
+  targeted widget (refused if that bar also touches another widget), proven by `GetScrollInfo`. Not moved: `~`.
+- Bench task "scroll" (a list that scrolls, not the canvas of the "wheel" task): 3/3 on Tk, Electron and Edge.
+
+### Changed
+- Simulated Ctrl/Alt are held 0.5 s for every family (0.15 s sometimes let a covered Win32 window read Ctrl+K as K).
+- A click on a point handed to the element under it is aimed at that point, not at the element's centre, and the
+  element is read again first: it must still cover the point.
+
+### Security
+- Reviewed by the Codex agent over several rounds: once part of an input was accepted and the rest failed, the outcome
+  is unknown and nothing else is tried on top (no other technique, no real input); the emergency stop is checked after
+  each preparation, between keys and before each press; a Tk window in the foreground, or taken by the user during the
+  action, gets nothing simulated; only the simulated keys are restored (their physical state if the user took the
+  window); a simulated press is owned by a helper thread that always sends the release, one at a time per
+  application, and an application whose release got no answer gets no further simulated press.
+
+### Unchanged (measured, still refused)
+- WPF: a click is dropped while the real cursor is not over the window (`HwndMouseInputProvider`); Ctrl+K would need
+  UI Automation focus, which takes the foreground. A wheel on a covered Chromium or Tk canvas is routed to the window
+  on top (`RerouteMouseWheel`, `WindowFromPoint`) and lost. A covered Electron page that has gone `hidden` renders
+  nothing and ignores mouse input at a point: reported as `~`.
+
 ## [3.0.1] - 2026-10-23 — Family naming
 
 ### Changed

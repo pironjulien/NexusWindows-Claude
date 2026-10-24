@@ -19,7 +19,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 3.0.1 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.0.2 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -225,8 +225,13 @@ with the file name. Scripts, shortcuts and installers are refused.
   activation. Apps started with `launch(devtools=true)` are driven through the DevTools protocol instead.
 - **Steam (CEF in an SDL frame)**: recognised as Chromium; `launch(app="Steam")` adds Steam's own
   `-cef-disable-occlusion -cef-force-accessibility` switches so the UI stays readable while covered.
-- **Tk**: no UI Automation and posted input has no effect (its buttons show up as Win32 `Button` but ignore
-  `BN_CLICKED`): refused in the background, real input with `foreground=true`; its text is found by the OCR fallback.
+- **Tk**: no UI Automation; its text is found by the OCR fallback. Clicks are sent with the mouse button marked
+  pressed for Tk's thread only (Tk reads it with `GetKeyState`), keys and shortcuts get a simulated focus
+  (`WM_SETFOCUS` to that window only, never `WM_ACTIVATE`), lists scroll through their native scroll bar; all read
+  back. A wheel on a covered Tk canvas is lost (Tk routes it to the window on top) and refused.
+- **Scrolling a covered Chromium page without DevTools**: the wheel is dropped by Chromium when another window is on
+  top, and scrolling areas expose no ScrollPattern; the next hidden line of the area is brought into view (UI
+  Automation ScrollItem) and the line's offset inside its area is read back.
 
 ### Capture
 
@@ -350,29 +355,29 @@ background mode. All three were driven through their real MCP servers (`bench/cu
 windows, covered by an opaque window, nobody at the PC; each was used the way its own guide tells an agent (Cua:
 background first, then clicks, then its foreground fallback; Windows-MCP: bring the window forward, then act on the
 screen). The effect is judged by the application (event received or value read back), never by the tool's report.
-48 tasks across Win32, WinForms, WPF, Tk, Electron and Edge; the table counts the 45 where the target was really
-covered before and after each attempt (`bench/tally_cua.py`, raw results in
-`bench/results/2026-10-23_1815-cua-vs-nexus.json`).
+51 tasks across Win32, WinForms, WPF, Tk, Electron and Edge (`bench/tally_cua.py`, raw results in
+`bench/results/2026-10-23_2351-cua-vs-nexus.json`).
 
-| Target covered (45 tasks each) | nexus-windows 3.0.1 | Cua Driver 0.38.0 |
+| All 51 tasks | nexus-windows 3.0.2 | Cua Driver 0.38.0 |
 |---|---|---|
-| Effect proven in the background | 35 | 23 (+1 by clicks, +6 after taking the foreground) |
+| Effect proven in the background | 44 | 28 (+1 by clicks, +8 after taking the foreground) |
 | False success (reported done, the app got nothing) | 0 | 4 |
-| Foreground taken | 0 | 6 |
-| Real cursor moved | 0 | 0 |
-| Median time of a successful action | 433 ms | 750 ms |
+| Scrolling a covered list (Tk, Electron, Edge) | 3/3 | 0/3 |
+| Foreground taken | 0 | 5 |
+| Median time of a successful action | 542 ms | 759 ms |
 
-Windows-MCP works on the screen with the real mouse and keyboard, which this bench is designed to avoid: its window
-switch failed on 39 of 42 covered windows, it reached the effect 12 times, always by taking the foreground, and moved
-the real cursor 30 times. Its counts are kept in `bench/RESULTS.md`, not compared line by line here.
+Windows-MCP left the lab window in the foreground several times, so 13 rows were not covered when the next tool ran;
+on the 38 rows covered before and after each attempt: 35 against 20, false successes 0 against 2. Windows-MCP works on
+the screen with the real mouse and keyboard, which this bench is designed to avoid: it reached no effect in the
+background, took the foreground 10 times and moved the real cursor 36 times; its counts are in `bench/RESULTS.md`.
 
-Taken from Cua: reading only what changed (`then="changes"`). Not taken, with the measurement in `RESULTS.md`: its
-injected WPF click (moves the user's real cursor), CDP clicks in an already open Chrome (turns on remote debugging in
-the user's real profile). Tried and dropped because they do not work in the background or touch the user's window:
-simulated activation for WPF shortcuts (WPF takes the foreground), `WM_POINTERWHEEL` (Windows refuses to post it),
-`WM_VSCROLL` to the Chromium renderer (no effect), `InjectSyntheticPointerInput` (goes to the window on top).
-CursorTouch/Windows-MCP, deploymenttheory/windows-mcp-server and microsoft/UFO² were read, not run: all three use the
-real mouse or the foreground.
+From 3.0.1 (35 of 45 covered rows) to 3.0.2: Tk clicks and shortcuts, Win32 Ctrl+K, and scrolling covered lists. Still
+refused, with the cause read in each toolkit's source and measured: WPF clicks, wheel and shortcuts, a wheel on a
+covered canvas, input at a point of a hidden Electron page. Taken from Cua: reading only what changed
+(`then="changes"`). Not taken: its injected WPF click (moves the user's real cursor), CDP clicks in an already open
+Chrome (turns on remote debugging in the user's real profile). Tried and dropped: simulated activation for WPF
+shortcuts (WPF takes the foreground), `WM_POINTERWHEEL` (Windows refuses to post it), `WM_VSCROLL` to the Chromium
+renderer (no effect), `InjectSyntheticPointerInput` (goes to the window on top).
 
 ## Cross-agent bench (October 16, 2026)
 
@@ -454,12 +459,15 @@ Questions or concerns: open an issue on this repository.
   refusal messages) is in English.
 - Windows only. Tested on Windows 11 with the lab apps and a handful of real applications; not every application has
   been checked.
-- Applications without UI Automation that ignore posted input (Tk, some games, canvases) need real input, so the user's
+- Applications without UI Automation that ignore posted input (some games, canvases) need real input, so the user's
   approval and the foreground; the OCR fallback finds their text but does not make background input possible.
-- WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF ignores posted
-  mouse input and takes the foreground when activated); controls with UI Automation patterns work.
-- A mouse wheel on a point of a covered Chromium page has no effect (no `wheel` event; 8 variants measured); it is
-  reported as `~`, never as a success.
+- WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF drops a click
+  while the real cursor is not over its window, and takes the foreground when given focus); controls with UI
+  Automation patterns work.
+- A mouse wheel on a covered Chromium or Tk canvas has no effect (both route it to the window on top); it is refused
+  or reported as `~`, never as a success. Lists and scrolling areas scroll without the wheel (see Per UI family).
+- A covered Electron page that has gone `hidden` (it had the foreground once, then lost it) stops rendering: clicks at
+  a point are reported as `~`.
 - Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);
   one that Windows still does not render can only be shown by taking the foreground; this is reported.
 - In Chromium, a page that reacts very slowly to each keystroke can exceed the read-back time and is reported as ✗.

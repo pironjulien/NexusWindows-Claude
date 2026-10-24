@@ -1,0 +1,182 @@
+{
+ "tk": [
+  {
+   "essai": "clic posté (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic posté, bouton simulé (GetKeyState)",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "molette postée (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "WM_VSCROLL SB_LINEDOWN posté à la barre native",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "WM_VSCROLL SB_LINEDOWN posté au parent de la barre",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K posté, Ctrl simulé (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS au cadre + Ctrl simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS au canevas + Ctrl simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "wpf": [
+  {
+   "essai": "clic posté (témoin)",
+   "effet": false,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 237536) 1048 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic posté, bouton simulé (GetKeyState)",
+   "effet": false,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 8956) 1043 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "survol puis molette postés",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS seul + Ctrl simulé",
+   "effet": false,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 237536) 1628 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "win32": [
+  {
+   "essai": "Ctrl+K au cadre, Ctrl simulé 0,5 s",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K au focus, Ctrl simulé 0,5 s",
+   "effet": true,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 15748) 295 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "K seul posté, Ctrl simulé",
+   "effet": true,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 8956) 372 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "electron": [
+  {
+   "essai": "clic posté, jamais activé (frais)",
+   "effet": true,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 14508) 342 ms (non rendu)",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic posté dans une activation simulée",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic posté après l'activation simulée",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "defil-electron": [
+  {
+   "essai": "UIA ScrollPattern.Scroll petite avance (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA SetScrollPercent +10 % (région)",
+   "effet": false,
+   "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 8956) 279 ms (non rendu)",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "molette postée au point de la région (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ],
+ "defil-edge": [
+  {
+   "essai": "UIA ScrollPattern.Scroll petite avance (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "UIA SetScrollPercent +10 % (région)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": "UIAError: Pattern scroll not supported by the element."
+  },
+  {
+   "essai": "molette postée au point de la région (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ]
+}

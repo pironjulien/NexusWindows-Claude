@@ -125,8 +125,11 @@ class UiaActions(ExecutorBase):
 
         if fw == "Chromium":
             return self._click_chromium(e, page, what)
-        if fw == "Tk":  # aucun canal d'arrière-plan (mesuré) : refus franc, ou vraie souris avec foreground=true
-            return self._try_or_foreground([], what, lambda: realinput.click(*self._point_of(e)))
+        if (
+            fw == "Tk"
+        ):  # clic posté, bouton simulé pour le seul fil de Tk (methods.post_click) ; effet constaté à l'image
+            chain = [("click by messages", self._watched(lambda: self._post_click(*self._point_of(e))))]
+            return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e)))
         if hwnd and methods._is_class(hwnd, methods.BUTTON_CLASSES):
             kind = w.style(hwnd) & methods.BS_TYPEMASK
             # WinForms : boutons poussoirs dessinés par l'application (BS_OWNERDRAW) compris, mais jamais une case (son
@@ -415,6 +418,43 @@ class UiaActions(ExecutorBase):
             # Alt+F4 sur WPF/UWP/WinUI : la touche est ignorée par messages, mais la fermeture qu'elle demande passe par
             # WindowPattern.Close sans premier plan (passe 2 du 22/10 : refus sur la Calculatrice et les Paramètres).
             return self._close_target(what)
+        if fw == "Tk" and element is None:
+            # Tk ne route le clavier qu'à sa fenêtre focalisée, qu'il tient de WM_SETFOCUS (FocusIn), et lit Ctrl, Alt et
+            # Maj par GetKeyState : WM_SETFOCUS ENVOYÉ à sa seule fenêtre (jamais WM_ACTIVATE), touches postées avec
+            # l'état clavier simulé pour son seul fil, puis WM_KILLFOCUS POSTÉ (traité après les touches). Mesuré le 23/10
+            # (bench/miss_probes.py) : Ctrl+K reçu, fenêtre recouverte, premier plan et curseur intacts. Élément désigné :
+            # Tk n'en publie pas de focalisable, le destinataire ne serait pas prouvé → refus ci-dessous (relecture de
+            # Codex). Fenêtre Tk au premier plan (l'utilisateur s'en sert) : rien de simulé, son vrai focus est intact.
+            tk_sent: list[str] = []
+            tk_thread = w.window_thread(self.hwnd)
+
+            def tk_in_front() -> bool:
+                front = w.foreground()
+                return bool(front) and w.window_thread(front) == tk_thread
+
+            def run_tk() -> str:
+                if tk_in_front():
+                    raise methods.MethodError("the Tk window is in the foreground: no focus is simulated")
+                answered = w.send_message(self.hwnd, methods.WM_SETFOCUS, 0, 0) is not None
+                try:
+                    if not answered:
+                        raise methods.MethodError("Tk did not answer WM_SETFOCUS within 1 s: no key was sent")
+                    worker.check_cancelled()  # arrêt d'urgence pendant la préparation : aucune touche
+
+                    def still_ours() -> None:
+                        # Prise par l'utilisateur (préparation, capture, entre deux touches) : ses touches à lui.
+                        if tk_in_front():
+                            raise methods.MethodError("the Tk window came to the foreground: no further key was sent")
+
+                    still_ours()
+                    detail = self._watched(lambda: self._post_combos(combos, fw, tk_sent, still_ours=still_ours))()
+                finally:
+                    # Reprise entre-temps par l'utilisateur : son vrai focus n'est pas défait. Refus du message : dit.
+                    if not tk_in_front() and not w.PostMessageW(self.hwnd, methods.WM_KILLFOCUS, 0, 0):
+                        tk_sent.append("simulated focus NOT undone")
+                return f"simulated focus, {', '.join(sorted(set(tk_sent)))}; {detail}"
+
+            return self._try_or_foreground([("messages with simulated focus", run_tk)], what, real)
         # Raccourcis (Ctrl/Alt/Win) : WPF/UWP les ignorent par messages, Chromium lit l'état réel du clavier.
         if (shortcut and (fw in UIA_ONLY or fw in ("Chromium", "Tk"))) or fw in NO_KEYBOARD_MESSAGES:
             hint = " (or relaunch the application with launch and devtools=true)" if fw == "Chromium" else ""

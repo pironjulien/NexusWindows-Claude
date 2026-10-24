@@ -459,3 +459,65 @@ et ses actions à l'écran ont alors visé la fenêtre de couverture. Effet obte
 fenêtre passée devant 11 fois sans être rendue ; curseur réel déplacé 30 fois ; médiane 1,6 s. Ses comptes de « faux
 succès » du tableau brut viennent de cet échec de bascule (il rapporte le clic, jamais l'effet) : non comparables,
 non publiés comme tels. Il affiche pendant chaque action un contour bleu et « AI is controlling this computer ».
+
+## Treizième passage — les 10 ratés du douzième (23 octobre, nuit)
+Demande de Julien : faire tomber les ratés (molette, clic brut, Ctrl+K) comme un humain mais plus vite, sans port
+DevTools imposé, sans session ni bureau à part, sans jamais toucher son clavier ni sa souris. Causes lues dans les
+sources (Tk `tkWinPointer.c`, `tkWinX.c` ; WPF `HwndMouseInputProvider.cs`, `HwndKeyboardInputProvider.cs` ;
+Chromium `mouse_wheel_util.cc`), puis mesurées par `bench/miss_probes.py` (relevés `results/2026-10-23_2049` à
+`_2058-miss-probes.json`, fenêtre recouverte, premier plan et curseur relevés). Relecture de Codex en 6 tours (feu vert
+au sixième). Banc complet après correction : `results/2026-10-23_2209-cua-vs-nexus.json`, Julien absent.
+
+| Raté du douzième passage | Cause | Après |
+|---|---|---|
+| Tk clic brut | Tk lit l'état des boutons par GetKeyState au traitement : un clic posté sans bouton « enfoncé » est jeté | ✓ clic envoyé avec le bouton simulé pour le seul fil de Tk |
+| Tk Ctrl+K | clavier routé à la seule fenêtre focalisée (FocusIn) et Ctrl lu par GetKeyState | ✓ WM_SETFOCUS envoyé (jamais WM_ACTIVATE), Ctrl simulé, WM_KILLFOCUS posté |
+| Win32 Ctrl+K | Ctrl simulé tenu 0,15 s, parfois restauré avant la lecture | ✓ tenu 0,5 s (✓ 9/9 seul ; ✗ une fois au banc à trois juste après que Windows-MCP a laissé la fenêtre au premier plan) |
+| WPF clic brut | `ReportInput` jette le clic si le VRAI curseur n'est pas sur la fenêtre (GetCursorPos + WindowFromPoint) | ✗ refus franc gardé |
+| WPF molette | sans souris active sur la fenêtre, aucune source pour la molette (mesuré : rien) | ✗ refus franc gardé |
+| WPF Ctrl+K | touche rapportée, mais sans élément focalisé ; UIA SetFocus prend le premier plan (mesuré) | ✗ refus franc gardé |
+| Tk molette | renvoyée à la fenêtre sous le point (WindowFromPoint) : recouverte, c'est la fenêtre du dessus | ✗ refus franc ; une liste à barre native défile par WM_VSCROLL (mesuré ✓, non branché) |
+| Electron et Edge molette | `RerouteMouseWheel` jette la molette si la fenêtre sous le point est d'un autre processus | ✗ ; une zone qui défile se fait défiler par UIA ScrollItem (ligne cachée amenée dans la vue, mesuré ✓, non branché) ; ScrollPattern absent des régions Chromium |
+| Electron clic brut | sonde : clic posté au point ✓ ; au banc, l'arbre d'accessibilité de la page occultée place une ligne « clic 5 » au point de la zone | ✗ ~ (issue inconnue dite), à suivre |
+
+| Cible recouverte (45 essais chacun) | nexus-windows (après) | Cua Driver 0.38.0 |
+|---|---|---|
+| Effet prouvé en arrière-plan | 38 (35 avant) | 23 (+1 par clics, +6 en premier plan) |
+| Faux succès | 0 | 4 |
+| Effet non prouvé, dit par l'outil (~) | 2 | 2 |
+| Premier plan pris | 0 | 6 |
+| Curseur réel déplacé | 0 | 0 |
+| Durée médiane d'une action réussie | 450 ms | 752 ms |
+
+Garde-fous ajoutés par la relecture : envoi accepté puis échec → issue inconnue, jamais d'autre technique ni de vrai
+geste par-dessus ; arrêt d'urgence vérifié après la préparation, entre deux touches et avant chaque pression ; Tk au
+premier plan, ou repris par Julien pendant l'action → rien de simulé ; seules les touches simulées sont restaurées
+(état physique si Julien a pris la fenêtre) ; pression simulée possédée par un fil auxiliaire qui envoie toujours le
+relâchement, une seule à la fois par application, application fermée aux pressions simulées si un relâchement reste
+sans réponse. Limite connue : une touche postée lue après la restauration de Ctrl (cible très occupée) devient la touche
+seule ; l'effet n'est jamais annoncé sans preuve (« ~ »).
+
+### Suite du treizième passage — défilement sans molette (23 octobre, nuit)
+Nouvelle tâche du banc « défilement » : la zone qui DÉFILE (liste Tk à barre native, région « Défilement » de la page),
+pas le canevas de « molette ». Techniques ajoutées, effet toujours relu : Chromium sans DevTools, la ligne cachée
+suivante de la zone sous le point amenée dans la vue (UIA ScrollItem), preuve par l'écart ligne-zone (la page autour
+défile aussi) ; Tk, lignes envoyées à la barre native COLLÉE au widget visé (refus si elle touche aussi un voisin),
+preuve par GetScrollInfo. Relecture de Codex : feu vert sur c97a651.
+
+Cause du clic brut Electron (✗ au douzième passage) : recouverte après avoir eu le premier plan une fois, la page passe
+« hidden » (relevé par un observateur DevTools : `visibilityState` hidden) ; plus de rendu, géométrie d'accessibilité
+figée, souris au point sans effet, et son évènement `scroll` n'arrive qu'une fois visible. Aucun levier sûr pour la
+rendre visible : « ~ » honnête. Le banc relit alors la position de la zone par l'accessibilité (même mesure pour les
+trois outils).
+
+Banc complet `results/2026-10-23_2351-cua-vs-nexus.json` (51 lignes, Julien absent). Windows-MCP a laissé plusieurs
+fois la fenêtre du labo au premier plan : 13 lignes hors compte (couverture absente au moment de l'essai).
+
+| Toutes lignes (51) | nexus-windows | Cua Driver 0.38.0 | Windows-MCP 0.8.8 |
+|---|---|---|---|
+| Effet prouvé en arrière-plan | 44 | 28 (+1 par clics, +8 en premier plan) | 0 (premier plan seulement) |
+| Faux succès | 0 | 4 | — (voir douzième passage) |
+| Défilement de liste recouverte (Tk, Electron, Edge) | 3/3 | 0/3 | 2/3 au premier plan |
+| Premier plan pris | 0 | 5 | 10 |
+
+Lignes comptées seules (38) : 35 contre 20, faux succès 0 contre 2.

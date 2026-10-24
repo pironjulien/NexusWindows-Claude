@@ -179,8 +179,7 @@ def zone_screen(app: apps.LabApp) -> tuple[int, int] | None:
             if app.kind in WEB:
                 try:
                     auto.scroll_into_view(node.element)
-                    time.sleep(0.3)
-                    node = next(n for n in auto.tree(app.hwnd).walk() if n.name == "Zone" and n.rect is not None)
+                    node = settled(auto, app, "Zone")
                 except uia.UIAError, StopIteration:
                     pass
             assert node.rect is not None
@@ -271,6 +270,9 @@ TASKS: list[tuple[str, tuple[str, ...]]] = [
     ("clic brut", DESKTOP + WEB + ("tk",)),
     ("molette", DESKTOP + WEB + ("tk",)),
     ("raccourci ctrl+k", DESKTOP + WEB + ("tk",)),
+    # Zone qui DÉFILE (liste, région à ascenseur), pas le canevas de « molette » : défiler une liste recouverte, quelle
+    # que soit la technique (treizième passage, 23/10). Effet : la position a réellement bougé vers le bas.
+    ("défilement", WEB + ("tk",)),
 ]
 VALUES = {
     "nexus": {"nom": "Julien Piron", "couleur": "Bleu", "item": "Charlie", "edit": "Bonjour"},
@@ -292,7 +294,66 @@ def expectation(task: str, tool: str, kind: str) -> Expect | None:
         "clic brut": lambda e: e.startswith("zone gauche"),
         "molette": lambda e: e.startswith("molette"),
         "raccourci ctrl+k": lambda e: e == "raccourci ctrl+k",
+        "défilement": lambda e: e.startswith("defil liste bas " if kind == "tk" else "defil A bas "),
     }[task]
+
+
+def settled(auto: uia.Automation, app: apps.LabApp, name: str) -> uia.Node:
+    """Élément relu jusqu'à ce que sa position ne bouge plus (deux lectures égales, 2 s au plus) : une page occultée
+    publie sa nouvelle géométrie avec retard après ScrollIntoView (23/10 : le point de la zone tombait sur une ligne du
+    journal de la page, pour tous les outils)."""
+    last = None
+    node = None
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        time.sleep(0.25)
+        node = next(
+            n
+            for n in auto.tree(app.hwnd).walk()
+            if n.name == name and n.rect is not None and (name != "Défilement" or n.control_type == "Group")
+        )
+        if last is not None and node.rect == last:
+            break
+        last = node.rect
+    assert node is not None
+    return node
+
+
+def web_scroll_offset(app: apps.LabApp) -> int | None:
+    """Position de la première ligne de la zone « Défilement » DANS la zone (pixels), lue par l'accessibilité de la page :
+    elle diminue quand la zone défile vers le bas, que la page soit visible ou cachée."""
+    uia.com_init()
+    auto = uia.Automation(auto_set_focus=False)
+    for node in auto.tree(app.hwnd).walk():
+        if node.name == "Défilement" and node.control_type == "Group" and node.rect is not None:
+            first = next((c for c in node.children if c.name == "A ligne 1" and c.rect is not None), None)
+            return None if first is None or first.rect is None else first.rect.top - node.rect.top
+    return None
+
+
+def task_point(task: str, app: apps.LabApp) -> tuple[int, int]:
+    """Point écran visé : la zone (canevas) pour « clic brut » et « molette », la zone qui défile pour « défilement »
+    (Tk : la liste, à gauche de sa barre native ; page web : la région « Défilement », amenée dans la vue)."""
+    point = scroll_zone_screen(app) if task == "défilement" else zone_screen(app)
+    if point is None:
+        raise RuntimeError("zone introuvable")
+    return point
+
+
+def scroll_zone_screen(app: apps.LabApp) -> tuple[int, int] | None:
+    if "barre_hwnd" in app.extra:
+        bar = w.window_rect(app.extra["barre_hwnd"])
+        return bar.left - 80, (bar.top + bar.bottom) // 2
+    uia.com_init()
+    auto = uia.Automation(auto_set_focus=False)
+    for node in auto.tree(app.hwnd).walk():
+        if node.name == "Défilement" and node.control_type == "Group" and node.rect is not None:
+            with contextlib.suppress(uia.UIAError, StopIteration):
+                auto.scroll_into_view(node.element)
+                node = settled(auto, app, "Défilement")
+            assert node.rect is not None
+            return visible_center(_box(node.rect), _box(visible_area(app)))
+    return None
 
 
 def name_value(app: apps.LabApp) -> str | None:
@@ -329,11 +390,8 @@ def nexus_call(task: str, app: apps.LabApp, image_size: tuple[int, int]) -> tupl
         steps = [{"do": "click", "target": v["item"]}]
     elif task == "menu":
         steps = [{"do": "menu", "path": "Fichier > Action menu"}]
-    elif task in ("clic brut", "molette"):
-        point = zone_screen(app)
-        if point is None:
-            raise RuntimeError("zone introuvable")
-        x, y = to_image(app, point, image_size)
+    elif task in ("clic brut", "molette", "défilement"):
+        x, y = to_image(app, task_point(task, app), image_size)
         steps = [{"do": "click", "target": f"{x},{y}"}] if task == "clic brut" else [
             {"do": "scroll", "target": f"{x},{y}", "direction": "down", "amount": 1}
         ]  # fmt: skip
@@ -374,11 +432,8 @@ def cua_calls(task: str, app: apps.LabApp, image_size: tuple[int, int], attempt:
         steps = [{"set_value": {"role": "combobox", "name": "Couleur", "value": v["couleur"]}}]
     elif task == "élément de liste":
         steps = [{"click": {"role": "listitem", "name": v["item"]}}]
-    elif task in ("clic brut", "molette"):
-        point = zone_screen(app)
-        if point is None:
-            raise RuntimeError("zone introuvable")
-        x, y = to_image(app, point, image_size)
+    elif task in ("clic brut", "molette", "défilement"):
+        x, y = to_image(app, task_point(task, app), image_size)
         calls.append(("get_window_state", {**base, "include_accessibility_tree": False}))
         if task == "clic brut":
             steps = [{"click": {**base, "x": x, "y": y}}]
@@ -491,10 +546,8 @@ async def wmcp_run(client: Client, task: str, app: apps.LabApp) -> tuple[Any, li
         await call("Click", {"loc": element_center(app, "Fichier", ("MenuItem",))})
         await asyncio.sleep(0.5)
         result = await call("Click", {"loc": element_center(app, "Action menu", ("MenuItem",), popups=True)})
-    elif task in ("clic brut", "molette"):
-        point = zone_screen(app)
-        if point is None:
-            raise RuntimeError("zone introuvable")
+    elif task in ("clic brut", "molette", "défilement"):
+        point = task_point(task, app)
         if task == "clic brut":
             result = await call("Click", {"loc": list(point)})
         else:
@@ -517,6 +570,7 @@ async def run_task(
         if tool == "nexus" and attempt != "arrière-plan":
             break  # nexus choisit seul sa technique ; aucun premier plan sans l'accord de Julien
         events.reset()
+        offset0 = web_scroll_offset(app) if task == "défilement" and app.kind in WEB else None
         calls: list[tuple[str, dict]] = []
         if tool == "nexus":
             calls = [nexus_call(task, app, size)]
@@ -534,8 +588,19 @@ async def run_task(
             ms = (time.perf_counter() - t0) * 1000
         text = text_of(result)
         if expect is not None:
-            seen = events.collect(1.5, lambda s, e=expect: any(e(x) for x in s))
+            # Défilement : la page signale la position une fois stable depuis 150 ms, minuterie qu'une page occultée
+            # ralentit (Electron recouvert, 23/10) ; même délai pour les trois outils, l'attente s'arrête au signal.
+            wait_s = 4.0 if task == "défilement" else 1.5
+            seen = events.collect(wait_s, lambda s, e=expect: any(e(x) for x in s))
             effect = any(expect(x) for x in seen)
+            if not effect and offset0 is not None:
+                # Page cachée (Chromium occulté) : la zone défile mais la page ne déclenche son évènement « scroll »
+                # qu'une fois visible (relevé par un observateur DevTools le 23/10 : scrollTop 98, page « hidden »). La
+                # position est alors relue par l'accessibilité de la page, même mesure pour les trois outils.
+                offset1 = web_scroll_offset(app)
+                if offset1 is not None and offset1 < offset0:
+                    effect = True
+                    seen = [f"position relue (page cachée) : {offset0 - offset1} px"]
         else:
             value = name_value(app)
             seen = [f"valeur relue : {value!r}"]

@@ -110,7 +110,7 @@ def test_msaa_list_item_without_parent_is_never_invoked(monkeypatch):
     changing_screen(ex)
     posted: list[tuple] = []
     monkeypatch.setattr(
-        actions.methods, "post_click", lambda top, x, y, button="left", count=1: posted.append((top, count))
+        actions.methods, "post_click", lambda top, x, y, button="left", count=1, held=False: posted.append((top, count))
     )
     outcome = ex.click_element(ex._shown_id(snapshot.Element(1, item, 0, HWND)))
     assert outcome.ok and outcome.method == "click by messages" and posted == [(HWND, 1)]

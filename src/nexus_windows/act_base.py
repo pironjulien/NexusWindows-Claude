@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 
 UIA_ONLY = {"WPF", "XAML", "UWP", "WinUI", "DirectUI"}
 NO_KEYBOARD_MESSAGES = {"XAML", "UWP", "WinUI", "DirectUI", "Tk"}  # WM_CHAR/WM_KEYDOWN postés ignorés (mesuré)
-NO_MOUSE_MESSAGES = UIA_ONLY | {"Tk"}  # clics et molette postés ignorés (mesuré)
+NO_MOUSE_MESSAGES = UIA_ONLY  # clics postés ignorés (mesuré) ; Tk : bouton simulé pour son fil (methods.post_click)
+# Molette renvoyée à la fenêtre sous le point (Tk : WindowFromPoint dans GenerateXEvent) : recouverte, elle est perdue.
+NO_WHEEL_MESSAGES = UIA_ONLY | {"Tk"}
 # Effet d'un clic Chromium constaté au titre ou à l'image avant l'état de l'élément : celui-ci relu encore au plus
 # OWN_STATE_S pour le prouver (publication de l'arbre d'accessibilité quelques dizaines de ms après le titre).
 OWN_STATE_S = 0.3
@@ -393,6 +395,7 @@ class ExecutorBase:
         attempts: list[str] = []
         for name, fn in chain:
             worker.check_cancelled()
+            sent_before = methods.accepted_posts()
             try:
                 detail = fn()
             except NeedsForeground:
@@ -406,7 +409,7 @@ class ExecutorBase:
                 # Win32/WinForms traitent les messages souris postés (mesuré) : un effet sans trace à l'écran (molette
                 # d'une zone sans défilement visible) n'est pas un refus ; jamais de vraie souris par-dessus (banc
                 # physique du 22/10 : molette Win32 reçue deux fois).
-                if self.allow_foreground and self.view.framework not in ("Win32", "WinForms"):
+                if self.allow_foreground and self.view.framework not in ("Win32", "WinForms", "Tk"):
                     # Fenêtre gardée devant (dessinée, publiée) : relue une seconde fois. Toujours rien → messages
                     # ignorés, pas retardés : la vraie souris/le vrai clavier autorisés prennent le relais.
                     if error.still_unchanged():
@@ -419,6 +422,13 @@ class ExecutorBase:
                 ) from None
             except EXPECTED as error:
                 attempts.append(f"{name} ✗ {_short(error)}")
+                if methods.accepted_posts() != sent_before:
+                    # Une partie est déjà partie (pression acceptée, relâchement refusé…) : issue inconnue, ni autre
+                    # technique ni vrai geste par-dessus (relecture de Codex du 23/10).
+                    raise Unconfirmed(
+                        f"{what}: partly sent, then failed ({'; '.join(attempts)}). Check the image before any new "
+                        "attempt."
+                    ) from None
                 continue
             attempts.append(f"{name} ✓")
             text = detail if isinstance(detail, str) else ""
@@ -723,6 +733,7 @@ class ExecutorBase:
                 prepare()
                 time.sleep(0.05)
             before = self._fingerprint()
+            worker.check_cancelled()  # arrêt d'urgence pendant la préparation ou la capture : rien n'est envoyé
             fn()
             deadline = time.monotonic() + settle_s
             while True:

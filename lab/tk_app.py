@@ -13,7 +13,7 @@ def main() -> None:
     args = parser.parse_args()
     root = tk.Tk()
     root.title("Labo Tk")
-    root.geometry(f"560x420+{args.x}+{args.y}")
+    root.geometry(f"560x520+{args.x}+{args.y}")
     root.withdraw()
     status = tk.StringVar(value="prêt")
     clicks = {"n": 0}
@@ -42,8 +42,28 @@ def main() -> None:
     zone = tk.Canvas(root, width=430, height=110, bg="white", highlightthickness=1)
     zone.grid(row=4, column=1, sticky="w", pady=8)
     zone.bind("<Button-1>", lambda e: set_status(f"zone gauche {e.x},{e.y}"))
+    zone.bind("<Double-Button-1>", lambda e: set_status(f"zone double {e.x},{e.y}"))
     zone.bind("<Button-3>", lambda e: set_status(f"zone droit {e.x},{e.y}"))
     zone.bind("<MouseWheel>", lambda e: set_status(f"molette {e.delta}"))
+    # Liste qui défile, avec une barre Windows native (tk.Scrollbar) : défilement sans molette (WM_VSCROLL).
+    defil = tk.Frame(root)
+    defil.grid(row=5, column=1, sticky="w")
+    liste = tk.Listbox(defil, height=4, width=40)
+    for i in range(1, 201):
+        liste.insert("end", f"ligne {i}")
+    barre = tk.Scrollbar(defil, orient="vertical", command=liste.yview)
+    position = {"haut": 0.0}
+
+    def defile(first: str, last: str) -> None:
+        barre.set(first, last)
+        haut = float(first)
+        if haut != position["haut"]:
+            set_status(f"defil liste {'bas' if haut > position['haut'] else 'haut'} {haut:.3f}")
+            position["haut"] = haut
+
+    liste.configure(yscrollcommand=defile)
+    liste.pack(side="left")
+    barre.pack(side="left", fill="y")
     root.bind_all("<Control-k>", lambda e: set_status("raccourci ctrl+k"))
 
     def show() -> None:
@@ -53,7 +73,9 @@ def main() -> None:
         ctypes.windll.user32.SetWindowPos(hwnd, 1, 0, 0, 0, 0, 0x1 | 0x2 | 0x10)
         # Fenêtre Windows du canevas : le banc lit son rectangle lui-même, en pixels physiques (Tk n'a pas d'UIA).
         zone_hwnd = zone.winfo_id()
-        print(json.dumps({"ready": True, "top": hwnd, "zone_hwnd": zone_hwnd}), flush=True)
+        print(
+            json.dumps({"ready": True, "top": hwnd, "zone_hwnd": zone_hwnd, "barre_hwnd": barre.winfo_id()}), flush=True
+        )
 
     root.after(50, show)
     root.mainloop()

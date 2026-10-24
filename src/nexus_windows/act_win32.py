@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import foreground, keys, methods, snapshot, uia
+from . import foreground, keys, methods, snapshot, uia, worker
 from . import win32 as w
 from .act_base import (
     EXPECTED,
@@ -260,6 +260,7 @@ class Win32Actions(ExecutorBase):
         simulated: bool = False,
         element: snapshot.Element | None = None,
         own: int = 0,
+        still_ours: Callable[[], None] | None = None,
     ) -> None:
         """simulated : Chromium en activation simulée (clavier à sa fenêtre de premier plan, raccourcis avec état
         clavier simulé : mesuré, Ctrl+K reçu par la page). element : la cible désignée ; ses touches vont à SA fenêtre
@@ -281,6 +282,10 @@ class Win32Actions(ExecutorBase):
             target_hwnd = own
         before = methods.accepted_posts()
         for index, combo in enumerate(combos):
+            if index:
+                worker.check_cancelled()  # arrêt d'urgence entre deux touches : la suivante ne part pas
+            if still_ours is not None:
+                still_ours()  # garde de l'appelant (fenêtre Tk reprise par l'utilisateur…) avant CHAQUE touche
             try:
                 _post_one(target_hwnd, combo, fw, sent, simulated)
             except methods.MethodError as error:
@@ -296,7 +301,9 @@ class Win32Actions(ExecutorBase):
 def _post_one(target_hwnd: int, combo: keys.Combo, fw: str, sent: list[str], simulated: bool) -> None:
     """Une touche ou un raccourci, par messages."""
     if combo.modifiers and (fw != "Chromium" or simulated):
-        hold = methods.SIM_MODIFIERS_HOLD_S if simulated else 0.15
+        # Ctrl/Alt tenus 0,5 s partout : à 0,15 s, Ctrl+K posté à une fenêtre Win32 recouverte arrivait parfois après la
+        # restauration de l'état (banc du 23/10 : « ~ sans effet » ; sonde à 0,5 s : reçu, bench/miss_probes.py).
+        hold = methods.SIM_MODIFIERS_HOLD_S
         methods.post_combo(target_hwnd, [combo.key], list(combo.modifiers), hold_s=hold)
         sent.append("simulated keyboard state")
     elif combo.modifiers:  # Maj seule en Chromium (les raccourcis Ctrl/Alt ont été refusés plus haut)

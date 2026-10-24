@@ -1,0 +1,88 @@
+{
+ "tk": [
+  {
+   "essai": "clic posté (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic posté, bouton simulé (GetKeyState)",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "molette postée (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "clic ENVOYÉ, bouton simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "double clic ENVOYÉ, bouton simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "WM_VSCROLL SB_LINEDOWN posté à la barre native",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "WM_VSCROLL SB_LINEDOWN posté au parent de la barre",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K posté, Ctrl simulé (témoin)",
+   "effet": false,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS au cadre + Ctrl simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS + touches au cadre",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS + touches à l'intérieur",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  },
+  {
+   "essai": "Ctrl+K, WM_SETFOCUS au canevas + Ctrl simulé",
+   "effet": true,
+   "premier plan": "intact",
+   "curseur": false,
+   "erreur": ""
+  }
+ ]
+}

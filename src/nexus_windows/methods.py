@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -62,6 +63,7 @@ _BUTTONS = {
     "right": (w.WM_RBUTTONDOWN, w.WM_RBUTTONUP, w.MK_RBUTTON, 0x0206),
     "middle": (w.WM_MBUTTONDOWN, w.WM_MBUTTONUP, w.MK_MBUTTON, 0x0209),
 }
+_BUTTON_VK = {"left": 0x01, "right": 0x02, "middle": 0x04}  # VK_LBUTTON, VK_RBUTTON, VK_MBUTTON
 
 
 ERROR_ACCESS_DENIED = 5
@@ -85,8 +87,16 @@ def post(target: int, msg: int, wparam: int, lparam: int) -> None:
     _ACCEPTED[0] += 1
 
 
-def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1) -> int:
-    """Clic par messages à la fenêtre enfant la plus profonde sous (x, y) écran. Renvoie le HWND visé."""
+def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1, held: bool = False) -> int:
+    """Clic par messages à la fenêtre enfant la plus profonde sous (x, y) écran. Renvoie le HWND visé.
+
+    held : bouton « enfoncé » pour le SEUL fil de la cible pendant chaque WM_xBUTTONDOWN, relâché pendant chaque
+    WM_xBUTTONUP (état clavier simulé, `fake_modifiers`), messages ENVOYÉS : traités pendant l'envoi, donc lus avec
+    le bon état, sans délai deviné, et un double clic donne deux pressions (relecture de Codex du 23/10 : postés, le
+    relâchement pouvait être lu bouton encore enfoncé). Tk lit l'état des boutons par GetKeyState au traitement
+    (TkWinGetModifierState) et ne fait naître ButtonPress que s'il le voit enfoncé : sans lui, le clic posté est
+    ignoré. Mesuré le 23/10 (bench/miss_probes.py) : canevas Tk recouvert, clic et double clic reçus, premier plan et
+    curseur intacts."""
     target = w.deepest_child_at(top, x, y)
     # WinForms ne lève DoubleClick que si la fenêtre au point (hit-test) est le contrôle lui-même : point recouvert, double clic posté sans effet (banc commun du 22/10, les trois outils) ; rien n'est envoyé, la technique suivante (vraie souris, premier plan bref) s'en charge si elle est permise.
     if (
@@ -98,11 +108,180 @@ def post_click(top: int, x: int, y: int, button: str = "left", count: int = 1) -
     cx, cy = w.message_point(target, x, y)
     lp = w.make_lparam(cx, cy)
     down, up, mk, dbl = _BUTTONS[button]
+    if held:
+        front = w.foreground()
+        if front and w.window_thread(front) == w.window_thread(target):
+            raise MethodError("The target thread is the foreground thread: simulated button refused.")
+        if w.window_thread(target) in _PENDING_PRESS:  # vérifié aussi à la pression ; ici, avant même le survol
+            raise MethodError("A previous simulated press in this application is not finished yet: nothing was sent.")
+        _send_counted(target, w.WM_MOUSEMOVE, 0, lp)
+        for i in range(count):
+            worker.check_cancelled()  # arrêt d'urgence (pendant le survol compris) : aucune nouvelle pression
+            _held_press(target, _BUTTON_VK[button], dbl if i == 1 and dbl else down, up, mk, lp)
+        return target
     post(target, w.WM_MOUSEMOVE, 0, lp)
     for i in range(count):
         post(target, dbl if i == 1 and dbl else down, mk, lp)
         post(target, up, 0, lp)
     return target
+
+
+def _send_counted(target: int, msg: int, wparam: int, lparam: int) -> None:
+    """Message ENVOYÉ, compté dès la tentative comme un message posté accepté : sans réponse en 1 s, il a pu être
+    traité en partie (relecture de Codex du 23/10) ; l'issue est alors inconnue, jamais suivie d'un vrai geste.
+    Fenêtre disparue : refus prouvé, rien n'est compté."""
+    if not w.IsWindow(target):
+        raise MethodError("The window disappeared: nothing was sent.")
+    _ACCEPTED[0] += 1
+    if w.send_message(target, msg, wparam, lparam) is None:
+        raise MethodError("The application did not process the message within 1 s.")
+
+
+HELD_SEND_S = 1.0  # pression envoyée par le fil auxiliaire : attente du fil de travail, au plus
+# Fils GUI dont une pression simulée n'est pas encore soldée (relâchement compris) : l'état simulé appartient au FIL,
+# commun à toutes ses fenêtres (relecture de Codex du 23/10).
+_PENDING_PRESS: set[int] = set()
+_PENDING_LOCK = threading.Lock()
+
+
+def _held_press(target: int, vk: int, down: int, up: int, mk: int, lparam: int) -> None:
+    """Une pression et son relâchement, possédés par un fil AUXILIAIRE attaché à la cible : sous AttachThreadInput,
+    le délai de SendMessageTimeout n'est pas garanti (files partagées, relecture de Codex du 23/10). L'auxiliaire
+    envoie la pression avec `vk` simulé pour le seul fil de la cible, restaure l'état, puis envoie TOUJOURS le
+    relâchement, même abandonné en route. Le fil de travail attend HELD_SEND_S au plus (arrêt d'urgence surveillé) ;
+    au-delà, ou à l'arrêt, il abandonne : l'auxiliaire qui n'a pas encore envoyé n'envoie plus rien, celui qui est
+    bloqué finit son relâchement seul ; tant qu'il n'a pas fini, aucune autre pression simulée vers cette cible."""
+    thread = w.window_thread(target)
+    with _PENDING_LOCK:
+        if thread in _PENDING_PRESS:
+            raise MethodError("A previous simulated press in this application is not finished yet: nothing was sent.")
+        _PENDING_PRESS.add(thread)
+    abandoned = threading.Event()
+    done = threading.Event()
+    outcome: list[str] = []
+
+    def run() -> None:
+        pressed = False
+        try:
+            if abandoned.is_set():
+                return
+            with fake_modifiers(target, [vk], 0.0):
+                if abandoned.is_set():
+                    return
+                pressed = True
+                _ACCEPTED[0] += 1  # tentative comptée avant l'envoi : sans réponse, issue inconnue
+                if w.send_message(target, down, mk, lparam) is None:
+                    outcome.append("The application did not process the press within 1 s.")
+        except MethodError as error:
+            outcome.append(str(error))
+        except Exception as error:  # noqa: BLE001  (rendu au fil de travail)
+            outcome.append(f"{type(error).__name__}: {error}")
+        finally:
+            try:
+                if pressed:  # relâchement de nettoyage, état déjà restauré : toujours envoyé
+                    _ACCEPTED[0] += 1
+                    if w.send_message(target, up, 0, lparam) is None:
+                        if not outcome:
+                            outcome.append("The application did not process the release within 1 s.")
+                        done.set()  # le fil de travail rend l'issue inconnue sans attendre la suite
+                        # Relâchement peut-être annulé avant livraison, ou encore en traitement : rien ne prouve qu'il
+                        # est soldé (une réponse à WM_NULL ne le prouve pas : relecture de Codex du 23/10). Le fil de
+                        # l'application reste fermé aux pressions simulées tant que sa fenêtre existe ; seule la vraie
+                        # souris, avec l'accord de l'utilisateur, peut encore y cliquer.
+                        while w.IsWindow(target):
+                            time.sleep(1.0)
+            finally:
+                with _PENDING_LOCK:
+                    _PENDING_PRESS.discard(thread)
+                done.set()
+
+    threading.Thread(target=run, name="nexus-held-press", daemon=True).start()
+    deadline = time.monotonic() + HELD_SEND_S
+    try:
+        while not done.wait(0.02):
+            worker.check_cancelled()  # arrêt d'urgence : abandon, l'auxiliaire solde seul sa pression
+            if time.monotonic() >= deadline:
+                raise MethodError("The application did not process the press within 1 s.")
+    except BaseException:
+        abandoned.set()
+        raise
+    if outcome:
+        raise MethodError(outcome[0])
+
+
+# --- Barre de défilement native (Tk : tk.Scrollbar est une barre Windows) -----------------------------------------
+WM_HSCROLL, WM_VSCROLL = 0x0114, 0x0115
+SB_LINEUP, SB_LINEDOWN, SB_ENDSCROLL = 0, 1, 8  # SB_LINELEFT/SB_LINERIGHT : mêmes valeurs
+SB_CTL, SIF_RANGE, SIF_PAGE, SIF_POS = 2, 0x1, 0x2, 0x4
+SBS_VERT = 0x1
+
+
+class _SCROLLINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_uint), ("fMask", ctypes.c_uint), ("nMin", ctypes.c_int), ("nMax", ctypes.c_int),
+        ("nPage", ctypes.c_uint), ("nPos", ctypes.c_int), ("nTrackPos", ctypes.c_int),
+    ]  # fmt: skip
+
+
+def scroll_bar_state(bar: int) -> tuple[int, int, int, int] | None:
+    """(min, max, page, pos) d'une barre de défilement native (SB_CTL), None si illisible."""
+    info = _SCROLLINFO(ctypes.sizeof(_SCROLLINFO), SIF_RANGE | SIF_PAGE | SIF_POS)
+    if not ctypes.windll.user32.GetScrollInfo(ctypes.c_void_p(bar), SB_CTL, ctypes.byref(info)):
+        return None
+    return info.nMin, info.nMax, info.nPage, info.nPos
+
+
+def scroll_bar_beside(top: int, x: int, y: int, vertical: bool) -> int:
+    """Barre de défilement native qui pilote le widget sous (x, y) : une barre visible du bon sens, sœur de ce widget
+    (même parent), COLLÉE à lui (bord contre bord à 4 px près, sur toute sa hauteur pour une barre verticale, toute sa
+    largeur sinon), comme tk.Scrollbar posée à côté de sa liste. Aucune, ou plusieurs : 0, rien n'est deviné (relecture
+    de Codex du 23/10 : la plus proche du point pouvait piloter la liste voisine)."""
+    under = w.deepest_child_at(top, x, y)
+    if not under or win_class(under) == "scrollbar":
+        return 0
+    parent = w.handle(w.GetParent(under))
+    siblings = [h for h in w.enum_children(top) if w.handle(w.GetParent(h)) == parent and w.IsWindowVisible(h)]
+
+    def touches(bar_rect: w.Rect, box: w.Rect) -> bool:
+        if vertical:
+            side = abs(bar_rect.left - box.right) <= 4 or abs(box.left - bar_rect.right) <= 4
+            return side and bar_rect.top <= box.top + 4 and bar_rect.bottom >= box.bottom - 4
+        side = abs(bar_rect.top - box.bottom) <= 4 or abs(box.top - bar_rect.bottom) <= 4
+        return side and bar_rect.left <= box.left + 4 and bar_rect.right >= box.right - 4
+
+    def adjacent(bar_rect: w.Rect, box: w.Rect) -> bool:
+        """Bord contre bord, avec un recouvrement sur l'autre axe (sans exiger que la barre couvre ce widget)."""
+        if vertical:
+            side = abs(bar_rect.left - box.right) <= 4 or abs(box.left - bar_rect.right) <= 4
+            return side and bar_rect.top < box.bottom and box.top < bar_rect.bottom
+        side = abs(bar_rect.top - box.bottom) <= 4 or abs(box.top - bar_rect.bottom) <= 4
+        return side and bar_rect.left < box.right and box.left < bar_rect.right
+
+    found: list[int] = []
+    for bar in siblings:
+        if win_class(bar) != "scrollbar" or bool(w.style(bar) & SBS_VERT) != vertical:
+            continue
+        r = w.window_rect(bar)
+        if not touches(r, w.window_rect(under)):
+            continue
+        # Barre collée aussi à un AUTRE widget (entre deux listes), quelle que soit sa taille : on ne sait pas
+        # laquelle elle pilote, refus (relecture de Codex du 23/10 : un voisin plus grand échappait au contrôle).
+        others = [h for h in siblings if h not in (bar, under) and win_class(h) != "scrollbar"]
+        if any(adjacent(r, w.window_rect(h)) for h in others):
+            continue
+        found.append(bar)
+    return found[0] if len(found) == 1 else 0
+
+
+def post_scroll_lines(bar: int, vertical: bool, forward: bool, lines: int) -> None:
+    """Lignes de défilement comme un clic sur la flèche de la barre : WM_VSCROLL/WM_HSCROLL au parent de la barre
+    (lParam = la barre), puis SB_ENDSCROLL."""
+    parent = w.handle(w.GetParent(bar))
+    msg = WM_VSCROLL if vertical else WM_HSCROLL
+    code = SB_LINEDOWN if forward else SB_LINEUP
+    for _ in range(lines):
+        post(parent, msg, code, bar)
+    post(parent, msg, SB_ENDSCROLL, bar)
 
 
 def post_wheel(top: int, x: int, y: int, delta: int, horizontal: bool = False) -> int:
@@ -400,17 +579,40 @@ class fake_modifiers:
         return self
 
     def __exit__(self, *exc) -> None:
-        if self.attached:
-            # La cible traite les touches pendant que l'état est posé : file d'entrées vidée (WaitForInputIdle, 2 s
-            # au plus), et au moins hold_s ; restaurer trop tôt changerait Ctrl+S en S (relecture de Codex, 21/10).
+        if not self.attached:
+            return
+        try:
+            # Laisser la cible traiter les touches postées pendant que l'état est posé : WaitForInputIdle (2 s au plus)
+            # puis au moins hold_s. Ce n'est PAS un accusé de traitement (WaitForInputIdle revient aussitôt si le
+            # processus a déjà été inactif une fois : relecture de Codex du 23/10) : une cible très occupée peut lire
+            # la touche après la restauration ; l'effet reste relu à l'image, jamais annoncé sans preuve.
             started = time.monotonic()
             with contextlib.suppress(OSError):
                 w.wait_input_idle(self.target, 2000)
             remaining = self.hold_s - (time.monotonic() - started)
             if remaining > 0:
                 time.sleep(remaining)
-            w.SetKeyboardState(ctypes.byref(self.saved))
-            w.AttachThreadInput(self.own, self.thread, False)
+        finally:
+            try:
+                # Seules les touches simulées reprennent leur valeur d'avant ; les autres, lues à l'instant, restent ce
+                # que l'utilisateur tient réellement (relectures de Codex du 23/10). Cible prise entre-temps par
+                # l'utilisateur : une touche simulée reprend son état PHYSIQUE (le même Ctrl tenu par lui reste tenu).
+                # Lecture impossible : l'état d'avant, entier.
+                now = (ctypes.c_ubyte * 256)()
+                if not w.GetKeyboardState(ctypes.byref(now)):
+                    ctypes.memmove(now, self.saved, 256)
+                front = w.foreground()
+                taken = bool(front) and w.window_thread(front) == self.thread
+                for vk in self.vks:
+                    if taken:
+                        held = w.GetAsyncKeyState(vk) & 0x8000
+                        now[vk] = (0x80 if held else 0) | (self.saved[vk] & 0x01)
+                    else:
+                        now[vk] = self.saved[vk]
+                w.SetKeyboardState(ctypes.byref(now))
+            finally:
+                w.AttachThreadInput(self.own, self.thread, False)
+                self.attached = False
 
 
 def post_combo(target: int, vks: list[int], modifiers: list[int], hold_s: float = 0.15) -> None:
@@ -454,6 +656,7 @@ def keyboard_target(top: int, windows: set[int] | None = None) -> int:
 # ≈10 ms par la garde). Cette première fois par processus est donc encadrée comme une activation brève (jeton commun,
 # pause de Julien attendue) ; ensuite, aucune précaution n'est nécessaire.
 WM_ACTIVATE, WM_NCACTIVATE = 0x0006, 0x0086
+WM_SETFOCUS, WM_KILLFOCUS = 0x0007, 0x0008  # focus simulé de Tk (act_uia.press)
 WA_INACTIVE, WA_ACTIVE = 0, 1
 # Fenêtre de premier niveau d'un navigateur ou d'une application Electron (HWNDMessageHandler de Chromium). Steam
 # (CEF dans un cadre SDL) n'en est pas : ses messages d'activation n'atteignent pas CEF, activation brève inchangée.

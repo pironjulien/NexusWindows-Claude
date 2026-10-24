@@ -14,6 +14,7 @@ from .act_base import (
     EXPECTED,
     LEAF_ROLES,
     NO_MOUSE_MESSAGES,
+    NO_WHEEL_MESSAGES,
     SCROLL_ROLES,
     ActionError,
     ExecutorBase,
@@ -35,8 +36,37 @@ class ProofMarkerLeft(Unconfirmed):
     fenêtre : aucune autre technique, ni la vraie souris, par-dessus."""
 
 
+def _lines_of(area: uia.Node) -> list[uia.Node]:
+    """Lignes (feuilles placées) de la zone, à toute profondeur, sauf celles d'une zone intérieure qui les rogne : une
+    ligne n'est à `area` que si chaque conteneur entre elles la contient (sinon elle défile dans ce conteneur, pas dans
+    `area` : banc du 23/10, la molette sur un canevas faisait défiler la liste voisine par le document)."""
+    out: list[uia.Node] = []
+
+    def inside(rect: w.Rect, box: w.Rect) -> bool:
+        return rect.top >= box.top - 1 and rect.bottom <= box.bottom + 1
+
+    def visit(node: uia.Node, boxes: list[w.Rect]) -> None:
+        for child in node.children:
+            rect = child.rect
+            if rect is None:
+                continue
+            if not child.children:
+                if all(inside(rect, box) for box in boxes):
+                    out.append(child)
+            else:
+                visit(child, [*boxes, rect])
+
+    visit(area, [])
+    return out
+
+
 class PointerActions(ExecutorBase):
     """Clics par point, défilement, glisser, survol."""
+
+    # Clic par point confié à l'élément qui le couvre : (élément, point donné). Ses gestes au point (messages, DevTools,
+    # vraie souris) visent CE point, pas le centre de l'élément (banc du 23/10, Electron recouvert : l'arbre
+    # d'accessibilité d'une page occultée n'est plus à jour, le centre d'une ligne « clic 5 » manquait le canevas).
+    _aim_at: tuple[snapshot.Element, tuple[int, int]] | None = None
 
     # --- Clic ---------------------------------------------------------------------------------------------------
     def click(self, spec: Any, button: str = "left", count: int = 1) -> Outcome:
@@ -48,7 +78,10 @@ class PointerActions(ExecutorBase):
     def _point_of(self, e: snapshot.Element) -> tuple[int, int]:
         """Point visé pour un élément : centre de sa partie visible dans sa fenêtre. Hors champ (défilé hors vue, ou
         sans position), il est d'abord ramené à l'écran (UIA ScrollIntoView) puis RELU ; toujours hors champ : refus,
-        rien n'est envoyé (le centre de l'ancien rectangle viserait l'élément qui occupe désormais ce point)."""
+        rien n'est envoyé (le centre de l'ancien rectangle viserait l'élément qui occupe désormais ce point). Clic par
+        point confié à cet élément : le point donné (`_aim_at`)."""
+        if self._aim_at is not None and self._aim_at[0] is e:
+            return self._aim_at[1]
         if e.rect is None or e.props.get("offscreen"):
             cause = ""
             try:
@@ -89,7 +122,7 @@ class PointerActions(ExecutorBase):
 
     def _post_click(self, x: int, y: int, button: str = "left", count: int = 1) -> int:
         """Clic par messages à la fenêtre de la cible réellement sous le point (puis à son enfant le plus profond)."""
-        return methods.post_click(self._window_under(x, y), x, y, button, count)
+        return methods.post_click(self._window_under(x, y), x, y, button, count, held=self.view.framework == "Tk")
 
     def _element_under(self, x: int, y: int, roles: set[str] | None = None) -> snapshot.Element | None:
         """Élément actionnable de la CIBLE sous un point écran, toujours rendu avec ses ancêtres (nœud de l'instantané).
@@ -147,13 +180,27 @@ class PointerActions(ExecutorBase):
         image_xy = self._screen_to_image(x, y)
         if button == "left":
             element = self._element_under(x, y)
+            if element is not None:
+                # Point donné par le modèle : il fait foi. Élément trouvé dans un instantané périmé (page défilée depuis,
+                # fenêtre recouverte : banc du 23/10, Electron, une ligne « clic 5 » à la place du canevas) : relu, il
+                # n'est retenu que s'il couvre ENCORE le point ; sinon le clic part au point lui-même.
+                try:
+                    element.node.props.update(self._refresh(element.node.element))
+                except EXPECTED:
+                    element = None  # relecture impossible : son ancien rectangle n'est jamais visé (relecture de Codex)
+                if element is not None and (element.rect is None or not element.rect.contains(x, y)):
+                    element = None
             window_area = max(1, view.info.rect.width * view.info.rect.height)
             if (
                 element is not None
                 and element.rect is not None
                 and element.rect.width * element.rect.height < window_area / 4
             ):
-                outcome = self.click_element(element, button, count)
+                self._aim_at = (element, (x, y))
+                try:
+                    outcome = self.click_element(element, button, count)
+                finally:
+                    self._aim_at = None
                 outcome.line += f" at point {image_xy}"
                 return outcome
         chain: list[tuple[str, Callable[[], Any]]] = []
@@ -300,6 +347,106 @@ class PointerActions(ExecutorBase):
             node = node.parent
         return None
 
+    LINES_PER_NOTCH = 3  # un cran de molette Windows : 3 lignes (réglage par défaut)
+
+    def _scroll_by_item(self, x: int, y: int, direction: str, amount: int) -> str:
+        """Défiler sans molette, comme un lecteur d'écran : dans la zone sous le point dont des lignes dépassent dans ce
+        sens, la ligne cachée à 3 lignes par cran est amenée dans la vue (UIA ScrollItem.ScrollIntoView), puis sa position
+        est RELUE. Aucune zone de ce genre : MethodError, rien n'est envoyé. Envoyé sans mouvement relu en 1 s : issue
+        inconnue (~), jamais « ✓ » (page occultée qui ne publie plus son arbre)."""
+        if direction not in ("up", "down"):
+            raise methods.MethodError("only up and down")
+        # Arbre COMPLET et frais de la fenêtre : l'instantané de l'outil écarte les lignes hors vue, celles qu'on cherche.
+        node: uia.Node | None = self.auto.tree(self._window_under(x, y))
+        while node is not None:
+            # Enfants qui couvrent le point : celui qui a lui-même des enfants d'abord (un volet vide de Chromium couvre
+            # toute la page à côté du document).
+            covering = [c for c in node.children if c.rect is not None and c.rect.contains(x, y)]
+            inner = next((c for c in covering if c.children), covering[0] if covering else None)
+            if inner is None:
+                break
+            node = inner
+        hidden: list[uia.Node] = []
+        while node is not None:
+            rect = node.rect
+            # Lignes = feuilles de la zone, à toute profondeur : un unique enveloppant de contenu entre la zone et ses
+            # lignes est courant (relecture de Codex du 23/10). Chromium publie des rectangles non rognés : une ligne
+            # qui dépasse de la zone est cachée par elle.
+            lines = _lines_of(node)
+            if rect is not None and len(lines) >= 2:
+                if direction == "down":
+                    hidden = sorted((n for n in lines if n.rect.bottom > rect.bottom + 1), key=lambda n: n.rect.top)
+                else:
+                    hidden = sorted((n for n in lines if n.rect.top < rect.top - 1), key=lambda n: -n.rect.bottom)
+                if hidden:
+                    break
+            node = node.parent
+        if not hidden:
+            raise methods.MethodError("no area under the point has hidden lines in this direction")
+        target = hidden[min(amount * self.LINES_PER_NOTCH, len(hidden)) - 1]
+        area = node
+        assert target.rect is not None and area is not None and area.rect is not None
+        # Position de la ligne DANS sa zone : ScrollIntoView fait aussi défiler la page autour, ce qui déplace la ligne à
+        # l'écran sans que la zone ait défilé (Electron, 23/10) ; seul l'écart ligne-zone prouve le défilement de la zone.
+        before = target.rect.top - area.rect.top
+        worker.check_cancelled()
+        scroll_item = self.auto.pattern(target.element, "scroll_item")  # absent : refus, rien n'est envoyé
+        worker.check_cancelled()  # arrêt d'urgence pendant l'acquisition : rien n'est invoqué
+        try:
+            scroll_item.ScrollIntoView()
+        except EXPECTED as error:
+            # Erreur APRÈS l'appel : il a pu agir (retour perdu) ; issue inconnue, aucune autre technique par-dessus.
+            raise Unconfirmed(
+                f"scroll {direction}: ScrollIntoView sent, then {type(error).__name__}: check the image before trying "
+                "again."
+            ) from None
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            try:
+                line = uia.Node(target.element, 0, self._refresh(target.element)).rect
+                box = uia.Node(area.element, 0, self._refresh(area.element)).rect
+            except EXPECTED:
+                continue
+            if line is not None and box is not None and line.top - box.top != before:
+                return (
+                    f"read back ✓ {snapshot.clip(target.name, 30)!r} moved {before - (line.top - box.top):+d} px in "
+                    "its area"
+                )
+        raise Unconfirmed(
+            f"scroll {direction}: line brought into view (UIA ScrollItem), its area did not scroll within 1 s: check "
+            "the image before trying again."
+        )
+
+    def _scroll_by_bar(self, x: int, y: int, direction: str, amount: int) -> str:
+        """Défiler par la barre de défilement native en face du point (Tk) : lignes envoyées comme un clic sur sa
+        flèche, position RELUE. Aucune barre en face : MethodError ; déjà en butée : MethodError, rien n'est envoyé ;
+        envoyé sans mouvement relu : issue inconnue (~)."""
+        vertical = direction in ("up", "down")
+        forward = direction in ("down", "right")
+        bar = methods.scroll_bar_beside(self.hwnd, x, y, vertical)
+        if not bar:
+            raise methods.MethodError("no native scroll bar drives what is under the point")
+        state = methods.scroll_bar_state(bar)
+        if state is None:
+            raise methods.MethodError("the scroll bar position cannot be read")
+        low, high, page, pos = state
+        end = max(low, high - max(int(page), 1) + 1)
+        if (forward and pos >= end) or (not forward and pos <= low):
+            raise methods.MethodError(f"the scroll bar is already at the {'end' if forward else 'start'}")
+        worker.check_cancelled()
+        methods.post_scroll_lines(bar, vertical, forward, amount * self.LINES_PER_NOTCH)
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            after = methods.scroll_bar_state(bar)
+            if after is not None and after[3] != pos:
+                return f"read back ✓ position {pos} → {after[3]}"
+        raise Unconfirmed(
+            f"scroll {direction}: scroll bar lines sent, position unchanged after 1 s: check the image before trying "
+            "again."
+        )
+
     def _covered_blind(self, view: snapshot.View, x: int, y: int) -> bool:
         """Le point est sous une fenêtre étrangère à la cible, aucune autre fenêtre de la cible (surgissante, palette)
         ne le contient, et l'arbre de la cible n'y trouve aucun élément : la cible n'y montre rien de lisible."""
@@ -444,10 +591,18 @@ class PointerActions(ExecutorBase):
             # Fenêtre Chromium lancée par un autre avec un port de débogage : page PROUVÉE d'abord (recette B de Codex) ;
             # non prouvée : rien n'est envoyé, le défilement sémantique suit.
             chain.append(("DevTools wheel (proven page)", lambda: self._proven_wheel(aim, delta, horizontal)))
+        if view.framework == "Chromium" and page is None:
+            # Molette d'une page recouverte jetée par Chromium (RerouteMouseWheel), zones qui défilent sans ScrollPattern :
+            # la ligne cachée suivante de la zone sous le point est amenée dans la vue, puis relue (mesuré le 23/10).
+            chain.append(("UIA ScrollItem", lambda: self._scroll_by_item(*aim, direction, amount)))
         if scroll_uia is not None:
             chain.append(("UIA Scroll", scroll_uia))
+        if view.framework == "Tk":
+            # Molette Tk renvoyée à la fenêtre sous le point (recouverte : perdue) ; une barre de défilement native
+            # (tk.Scrollbar) défile par ses messages de ligne, position relue (mesuré le 23/10).
+            chain.append(("scroll bar lines", lambda: self._scroll_by_bar(*aim, direction, amount)))
         process = w.process_name(w.window_pid(self.hwnd)).lower()
-        if view.framework not in NO_MOUSE_MESSAGES and process not in BROWSERS_WITHOUT_MESSAGE_WHEEL:
+        if view.framework not in NO_WHEEL_MESSAGES and process not in BROWSERS_WITHOUT_MESSAGE_WHEEL:
             chain.append(
                 (
                     "wheel by messages",

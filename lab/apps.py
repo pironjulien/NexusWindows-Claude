@@ -347,6 +347,8 @@ def _wait_window(app: LabApp, ready: queue.Queue, timeout_s: float) -> None:
         app.hwnd = int(data["top"])
         if "zone_hwnd" in data:  # Tk : aucun élément UI Automation, fenêtre de la zone donnée par l'application
             app.extra["zone_hwnd"] = int(data["zone_hwnd"])
+        if "barre_hwnd" in data:  # Tk : barre de défilement native de la liste
+            app.extra["barre_hwnd"] = int(data["barre_hwnd"])
         if "wheel_lines" in data:  # WPF : lignes par cran de molette (banc commun : déplacement d'un cran)
             app.extra["wheel_lines"] = int(data["wheel_lines"])
     else:
