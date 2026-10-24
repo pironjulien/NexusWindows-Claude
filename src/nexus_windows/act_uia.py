@@ -9,7 +9,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import foreground, keys, methods, realinput, snapshot, uia, worker
+from . import foreground, keys, methods, policy, realinput, snapshot, uia, worker
+from . import launch as launcher
 from . import win32 as w
 from .act_base import (
     CHECK_ROLES,
@@ -327,7 +328,18 @@ class UiaActions(ExecutorBase):
 
     # --- Touches ------------------------------------------------------------------------------------------------
     def _close_target(self, what: str) -> Outcome:
-        """Demande de fermeture de la fenêtre cible (comme Alt+F4), relue : fermée, ou encore là (« Enregistrer ? »)."""
+        """Demande de fermeture de la fenêtre cible (comme Alt+F4), relue : fermée, ou encore là (« Enregistrer ? »).
+        Mêmes gardes que window close : Explorateur à plusieurs onglets (ceux de Julien) jamais fermé en entier ; fenêtre
+        désactivée par un dialogue modal refusée, comme le vrai Alt+F4 qui ne l'atteint pas (relecture de Codex)."""
+        if w.class_name(self.hwnd) in policy.EXPLORER_CLASSES:
+            tabs = launcher.explorer_tabs(self.hwnd)
+            if len(tabs) > 1:
+                raise ActionError(
+                    f"This File Explorer window holds {len(tabs)} tabs ({', '.join(snapshot.clip(t, 40) for t in tabs[:5])}): "
+                    "nothing was sent. Close only the wanted tab (key ctrl+w on that tab)."
+                )
+        if not w.IsWindowEnabled(self.hwnd):
+            raise ActionError("The window is disabled by an open dialog: close the dialog first; nothing was sent.")
         state, how, detail = request_close(self.auto, self.hwnd)
         return Outcome(True, f"{what} ({how}): {detail}", how, verified=True if state else None)
 
@@ -410,13 +422,15 @@ class UiaActions(ExecutorBase):
                     pass  # l'application ne s'y prête pas : refus (ou vrai clavier autorisé) ci-dessous
         if (
             element is None
-            and fw in UIA_ONLY
+            and fw != "Tk"
             and len(combos) == 1
             and combos[0].key == 0x73
             and combos[0].modifiers == (0x12,)
         ):
-            # Alt+F4 sur WPF/UWP/WinUI : la touche est ignorée par messages, mais la fermeture qu'elle demande passe par
-            # WindowPattern.Close sans premier plan (passe 2 du 22/10 : refus sur la Calculatrice et les Paramètres).
+            # Alt+F4 : la touche postée est ignorée par WPF/UWP/WinUI (passe 2 du 22/10 : Calculatrice, Paramètres) et par
+            # les boîtes de dialogue Win32 (24/10 : Table des caractères, « no visible effect »), mais la fermeture
+            # qu'elle demande passe par WindowPattern.Close, ou WM_CLOSE, sans premier plan, relue et jamais rejouée.
+            # Pas Tk : WM_CLOSE y contournerait la garde d'un dialogue modal (grab), que SC_CLOSE respecte (Codex).
             return self._close_target(what)
         if fw == "Tk" and element is None:
             # Tk ne route le clavier qu'à sa fenêtre focalisée, qu'il tient de WM_SETFOCUS (FocusIn), et lit Ctrl, Alt et
@@ -873,6 +887,8 @@ def request_close(auto: uia.Automation, hwnd: int) -> tuple[bool | None, str, st
         pattern = auto.pattern(auto.element_from_hwnd(hwnd), "window")
     except Exception:  # noqa: BLE001 - pas de motif Window : demande classique
         pattern = None
+    # La recherche du motif peut durer : arrêt d'urgence ou annulation relus juste avant la demande (relecture de Codex).
+    worker.check_cancelled()
     lost = ""
     if pattern is not None:
         how = "UIA WindowPattern.Close"

@@ -6,6 +6,20 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-24 — Alt+F4 in the background on every window
+
+### Fixed
+- `act` key `alt+f4` with no target now closes any window through `WindowPattern.Close` (or `WM_CLOSE` without that
+  pattern), read back and never replayed. Before, only WPF/UWP/WinUI did: on a Win32 dialog (Character Map) the posted
+  key had no effect ("~ no visible effect"). Measured: closed in 76 ms, foreground untouched.
+- Same guards as `window close`: a File Explorer window holding several tabs is never closed as a whole, a window
+  disabled by an open modal dialog is refused, nothing sent; the emergency stop is read again right before the request.
+  Tk and Chromium keep their own path (Tk's modal grab guard; DevTools and simulated activation).
+
+### Security
+- Reviewed by the Codex agent over two rounds (stop between the pattern lookup and the close request, Tk grab bypass,
+  Explorer tabs).
+
 ## [3.1.0] - 2026-10-24 — Common image rule, Chromium apps launched covered
 
 ### Changed
