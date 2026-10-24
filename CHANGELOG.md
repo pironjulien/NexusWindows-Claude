@@ -6,6 +6,31 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-10-24 — Four bench fixes
+
+### Fixed
+- `act` `menu` on a classic Win32 menu bar (WinForms `MainMenu`): "File > Save as" now finds the "Save as..." entry
+  (trailing ellipsis, case and spaces ignored; an exact match wins, a normalized one only when unique) instead of
+  falling back to a failing UIA Expand. The `WM_COMMAND` is proven by the dialog it opens (a new captioned window of the
+  target whose title carries the entry's label): "✓" instead of "~"; any other change stays "sent". The emergency stop
+  is read again right before the post, and a command that may have left is never replayed through UIA.
+- `act` `click` on a display cell ("Name", "Size"...) of a File Explorer item: the row alone is selected (UIA Select),
+  like a real click. UIA SetFocus on the cell used to add the item to the selection ("2 items selected"). Limited to
+  DirectUI display cells without a window of their own: a real editor (Win32 rename box, WPF grid cell) stays a field,
+  a disabled cell is refused. A click through UIA Select is now read back ("selected").
+- `act` `scroll`: one notch follows the Windows setting of its axis ("lines to scroll", 3 by default, or one page;
+  "characters" horizontally) instead of a single small step; set to 0, nothing is sent. In XAML (Settings, WinUI),
+  which animates every step and swallows the next ones (15 sent, 5 applied), the first step is sent alone and measured
+  once settled, in the provider's own units, then the rest is set in one call (`SetScrollPercent`). An unreadable,
+  unsettled or reversed measurement, or content that changes size meanwhile, is never extrapolated: the outcome is
+  reported as unknown and nothing is replayed over the first step. Measured in Settings > Display: 5 notches,
+  0 % → 24.3 % (was 0.3 % per notch).
+- `window`, `look`, `act` given the HWND of a child window (a Store app's CoreWindow inside its frame) resolve to its
+  top-level window: the Calculator now closes through its content HWND (was "still there").
+
+### Security
+- Reviewed by the Codex agent over five rounds (menu proof, cell scope, stop checks, scroll units and partial outcomes).
+
 ## [3.1.2] - 2026-10-24 — Text first
 
 ### Changed

@@ -484,15 +484,36 @@ def win32_menu_items(top: int) -> list[tuple[str, int]]:
     return out
 
 
+def _menu_key(label: str) -> str:
+    """Entrée de menu comparable : casse, espaces et points de suspension finaux ignorés (« Enregistrer sous... »
+    est demandé « Enregistrer sous »)."""
+    return " ".join(label.replace("&", "").split()).rstrip(".…").strip().lower()
+
+
 def win32_menu_command(top: int, path: str) -> str:
+    """Commande de menu par son chemin : correspondance exacte d'abord (casse et espaces ignorés), puis sans points de
+    suspension, seulement si elle est unique (« File > Run » et « File > Run... » : chacun garde la sienne)."""
     items = win32_menu_items(top)
     if not items:
         raise MethodError("No Win32 menu bar.")
-    wanted = [p.strip().lower() for p in path.replace("/", ">").split(">")]
-    for label, ident in items:
-        parts = [p.strip().lower() for p in label.split(">")]
-        if parts[-len(wanted) :] == wanted or (len(wanted) == 1 and parts[-1] == wanted[0]):
-            post(top, w.WM_COMMAND, ident & 0xFFFF, 0)
+    raw = [p for p in path.replace("/", ">").split(">") if p.strip()]
+
+    def matching(key) -> list[tuple[str, int]]:
+        wanted = [key(p) for p in raw]
+        found = []
+        for label, ident in items:
+            parts = [key(p) for p in label.split(">")]
+            if parts[-len(wanted) :] == wanted or (len(wanted) == 1 and parts[-1] == wanted[0]):
+                found.append((label, ident))
+        return found
+
+    for key in (lambda t: " ".join(t.split()).lower(), _menu_key):
+        found = matching(key)
+        if len(found) > 1:
+            raise MethodError(f'Menu command "{path}" ambiguous ({", ".join(label for label, _ in found[:5])}).')
+        if found:
+            worker.check_cancelled()  # énumération du menu possiblement longue : arrêt relu au dernier moment
+            post(top, w.WM_COMMAND, found[0][1] & 0xFFFF, 0)
             return "wm_command_menu"
     raise MethodError(f'Menu command "{path}" not found.')
 

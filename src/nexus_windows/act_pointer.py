@@ -531,26 +531,36 @@ class PointerActions(ExecutorBase):
         vertical = direction in ("up", "down")
         scroll_uia: Callable[[], str] | None = None
         if container is not None:
-            step = 4  # ScrollAmount_SmallIncrement
-            back = 1  # ScrollAmount_SmallDecrement
+            # Un cran de molette = petits pas selon le réglage Windows de l'axe : « Lignes à faire défiler » (3 par
+            # défaut ; -1 = une page par cran) à la verticale, « Caractères » à l'horizontale (banc du 24/10 : un petit
+            # pas par cran faisait avancer Paramètres de 0,3 % ; relecture de Codex : réglages distincts par axe).
+            lines = w.wheel_scroll_lines() if vertical else w.wheel_scroll_chars()
+            if lines == 0:
+                raise ActionError("Windows is set to scroll 0 lines per wheel notch: nothing was sent.")
+            step, back, repeat = (3, 0, 1) if lines < 0 else (4, 1, lines)
 
             def _scroll_uia() -> str:
                 before = self.auto.scroll_percent(container.element)
                 axis = 1 if vertical else 0
                 if before is not None and before[axis] < 0:
                     raise methods.MethodError("this container does not scroll in this direction")
-                for _ in range(amount):
-                    worker.check_cancelled()
-                    h = back if direction == "left" else step if direction == "right" else 2
-                    v = back if direction == "up" else step if direction == "down" else 2
-                    self.auto.scroll(container.element, h, v)
-                # Chromium publie la nouvelle position avec retard : jusqu'à 1 s avant de conclure.
+                h = back if direction == "left" else step if direction == "right" else 2
+                v = back if direction == "up" else step if direction == "down" else 2
+                if before is not None and self.view.framework in ("UWP", "WinUI"):
+                    self._xaml_scroll(container, before, axis, amount * repeat, h, v)
+                else:
+                    for _ in range(amount * repeat):
+                        worker.check_cancelled()
+                        self.auto.scroll(container.element, h, v)
+                # Chromium publie la nouvelle position avec retard, XAML l'anime : relue jusqu'à ce qu'elle se stabilise
+                # (1 s au plus), pas au premier changement (position intermédiaire de l'animation).
                 deadline = time.monotonic() + 1.0
                 after = before
                 while time.monotonic() < deadline:
-                    after = self.auto.scroll_percent(container.element)
-                    if after != before:
+                    now = self.auto.scroll_percent(container.element)
+                    if now != before and now == after:
                         break
+                    after = now
                     time.sleep(0.05)
                 if after is None or after[axis] < 0:
                     return "position not read back"
@@ -615,6 +625,67 @@ class PointerActions(ExecutorBase):
         return self._try_or_foreground(
             chain, f"scroll {direction} ×{amount}{where}", lambda: realinput.wheel(*aim, delta, horizontal)
         )
+
+    def _xaml_scroll(
+        self, container: uia.Node, before: tuple[float, float], axis: int, count: int, h: int, v: int
+    ) -> None:
+        """`count` pas UIA (petits, ou grands pour une page par cran) dans un ScrollViewer XAML (UWP, WinUI), qui anime
+        chaque pas et avale ceux qui le suivent (mesuré le 24/10 dans Paramètres : 15 envoyés, 5 appliqués). Le premier
+        pas est envoyé seul et sa longueur relue une fois l'animation finie, dans les unités du fournisseur (pixels ou
+        éléments d'un panneau virtualisé : relecture de Codex du 24/10) ; les suivants sont posés en un appel
+        (SetScrollPercent) à la même cadence."""
+        frame = self.auto.scroll_view_size(container.element) if count > 1 else None
+        worker.check_cancelled()  # après la lecture du repère, possiblement longue : arrêt relu juste avant le pas
+        self.auto.scroll(container.element, h, v)
+        if count <= 1:
+            return
+        first = self._settled_percent(container, before)
+        if first is None or first[axis] < 0:
+            # Premier pas parti mais sa longueur illisible ou encore en mouvement : rien de plus, issue dite incertaine.
+            raise Unconfirmed(
+                f"scroll: first of {count} steps sent, its length could not be measured: check the image before "
+                "trying again."
+            )
+        forward = (v if axis == 1 else h) in (3, 4)
+        if first[axis] == before[axis]:
+            if (before[axis] >= 100.0) if forward else (before[axis] <= 0.0):
+                return  # butée attestée dans le sens demandé : rien de plus (la relecture finale le dit)
+            # Au milieu, un pas sans effet relu en 1 s peut encore arriver : jamais pris pour une butée.
+            raise Unconfirmed(
+                f"scroll: first of {count} steps sent, position unchanged ({before[axis]:.1f} %) after 1 s: the rest "
+                "was not sent; check the image before trying again."
+            )
+        moved = first[axis] - before[axis]
+        if frame is None or self.auto.scroll_view_size(container.element) != frame or (moved > 0) != forward:
+            # Repère qui bouge (contenu chargé pendant le pas, taille visible illisible) ou pas à l'envers : une
+            # variation de pourcentage n'est plus la longueur d'un pas, rien n'est extrapolé (relecture de Codex).
+            raise Unconfirmed(
+                f"scroll: first of {count} steps sent ({before[axis]:.1f} % → {first[axis]:.1f} %), but the content "
+                "changed size meanwhile: the rest was not sent; check the image before trying again."
+            )
+        target = max(0.0, min(100.0, before[axis] + (first[axis] - before[axis]) * count))
+        worker.check_cancelled()  # relecture de l'animation : arrêt contrôlé juste avant l'envoi
+        try:
+            self.auto.set_scroll_percent(container.element, target if axis == 0 else -1, target if axis == 1 else -1)
+        except EXPECTED as error:
+            # Premier pas déjà appliqué : aucune autre technique par-dessus (double défilement).
+            raise Unconfirmed(
+                f"scroll: first step applied ({before[axis]:.1f} % → {first[axis]:.1f} %), then SetScrollPercent "
+                f"failed ({_short(error)}): check the image before trying again."
+            ) from None
+
+    def _settled_percent(self, container: uia.Node, before: tuple[float, float], timeout_s: float = 1.0):
+        """Position relue jusqu'à deux lectures égales, différentes de `before` (animation finie) ; inchangée après
+        timeout_s : `before` (en butée) ; illisible ou encore en mouvement : None."""
+        deadline = time.monotonic() + timeout_s
+        last = before
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            now = self.auto.scroll_percent(container.element)
+            if now != before and now == last:
+                return now
+            last = now
+        return before if last == before else None
 
     # --- Glisser et survol : DevTools si disponible, sinon vraie souris -------------------------------------------
     def _point(self, spec: Any) -> tuple[int, int]:

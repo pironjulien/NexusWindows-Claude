@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from nexus_windows import agentlock, foreground, launch, log, routines, stop
+from nexus_windows import win32 as w
 
 
 @pytest.fixture(autouse=True)
@@ -85,3 +86,11 @@ def indicator_off(monkeypatch):
 def launch_choice_isolated(monkeypatch):
     """Suivi du choix de l'utilisateur pendant un lancement (launch._CHOICE) : jamais hérité d'un autre test."""
     monkeypatch.setattr(launch, "_CHOICE", None)
+
+
+@pytest.fixture(autouse=True)
+def wheel_lines_isolated(monkeypatch):
+    """Molette : une ligne par cran, jamais le réglage « Lignes à faire défiler » du poste (les tests comptent les pas
+    envoyés) ; un test qui en dépend le fixe lui-même."""
+    monkeypatch.setattr(w, "wheel_scroll_lines", lambda: 1)
+    monkeypatch.setattr(w, "wheel_scroll_chars", lambda: 1)

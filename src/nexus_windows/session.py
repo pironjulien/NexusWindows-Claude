@@ -104,6 +104,10 @@ class Session:
             hwnd = int(spec)
             if not w.IsWindow(hwnd):
                 raise WindowError(f"Window {hwnd} no longer exists: call windows.")
+            # Fenêtre enfant (contenu CoreWindow d'une appli du Store dans son cadre, contrôle) : sa fenêtre de premier
+            # niveau, la seule que l'outil lit, ferme ou déplace (banc du 24/10 : la Calculatrice fermée par son contenu
+            # restait ouverte, « still there »).
+            hwnd = w.root(hwnd)
             self.target = hwnd
             return hwnd
         text = str(spec).strip().lower()

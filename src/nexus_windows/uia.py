@@ -370,6 +370,19 @@ class Automation:
         except UIAError, comtypes.COMError:
             return None
 
+    def scroll_view_size(self, element) -> tuple[float, float] | None:
+        """Part visible du contenu, en % (100 = tout est visible), horizontale et verticale ; change si le contenu
+        grandit ou rétrécit."""
+        try:
+            p = self.pattern(element, "scroll")
+            return p.CurrentHorizontalViewSize, p.CurrentVerticalViewSize
+        except UIAError, comtypes.COMError:
+            return None
+
+    def set_scroll_percent(self, element, horizontal: float, vertical: float) -> None:
+        """Position absolue en % ; -1 = axe inchangé (UIA_ScrollPatternNoScroll)."""
+        self.pattern(element, "scroll").SetScrollPercent(horizontal, vertical)
+
     def set_focus(self, element) -> None:
         element.SetFocus()
 

@@ -138,6 +138,28 @@ IsIconic = _fn(user32, "IsIconic", w.BOOL, w.HWND)
 IsZoomed = _fn(user32, "IsZoomed", w.BOOL, w.HWND)
 IsHungAppWindow = _fn(user32, "IsHungAppWindow", w.BOOL, w.HWND)
 IsChild = _fn(user32, "IsChild", w.BOOL, w.HWND, w.HWND)
+_SystemParametersInfoW = _fn(user32, "SystemParametersInfoW", w.BOOL, w.UINT, w.UINT, ctypes.c_void_p, w.UINT)
+SPI_GETWHEELSCROLLLINES, SPI_GETWHEELSCROLLCHARS = 0x0068, 0x006C
+WHEEL_PAGESCROLL = 0xFFFFFFFF
+
+
+def wheel_scroll_lines() -> int:
+    """Lignes défilées par cran de molette (réglage Windows « Lignes à faire défiler », 3 par défaut) ; -1 = une page
+    par cran."""
+    lines = w.UINT(3)
+    if not _SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, ctypes.byref(lines), 0):
+        return 3
+    return -1 if lines.value == WHEEL_PAGESCROLL else int(lines.value)
+
+
+def wheel_scroll_chars() -> int:
+    """Caractères défilés par cran de molette horizontale (réglage Windows, 3 par défaut)."""
+    chars = w.UINT(3)
+    if not _SystemParametersInfoW(SPI_GETWHEELSCROLLCHARS, 0, ctypes.byref(chars), 0):
+        return 3
+    return int(chars.value)
+
+
 GetWindowTextLengthW = _fn(user32, "GetWindowTextLengthW", ctypes.c_int, w.HWND)
 GetWindowTextW = _fn(user32, "GetWindowTextW", ctypes.c_int, w.HWND, w.LPWSTR, ctypes.c_int)
 GetClassNameW = _fn(user32, "GetClassNameW", ctypes.c_int, w.HWND, w.LPWSTR, ctypes.c_int)
@@ -261,6 +283,7 @@ GA_PARENT, GA_ROOT, GA_ROOTOWNER = 1, 2, 3
 GW_HWNDNEXT, GW_HWNDPREV, GW_OWNER, GW_ENABLEDPOPUP = 2, 3, 4, 6
 GWL_STYLE, GWL_EXSTYLE = -16, -20
 WS_VISIBLE, WS_DISABLED, WS_CHILD, WS_POPUP = 0x10000000, 0x08000000, 0x40000000, 0x80000000
+WS_CAPTION = 0x00C00000  # WS_BORDER | WS_DLGFRAME : barre de titre
 WS_EX_TOOLWINDOW, WS_EX_APPWINDOW, WS_EX_TOPMOST, WS_EX_NOACTIVATE = 0x80, 0x40000, 0x8, 0x08000000
 CWP_SKIPINVISIBLE, CWP_SKIPDISABLED, CWP_SKIPTRANSPARENT = 0x1, 0x2, 0x4
 DWMWA_EXTENDED_FRAME_BOUNDS, DWMWA_CLOAKED = 9, 14

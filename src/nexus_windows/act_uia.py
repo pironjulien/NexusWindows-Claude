@@ -70,9 +70,46 @@ class UiaActions(ExecutorBase):
 
         return run
 
+    def _command_proven(self, action: Callable[[], Any], label: str, wait_s: float = 0.6) -> Callable[[], Any]:
+        """Commande de menu par WM_COMMAND, PROUVÉE seulement par la boîte qu'elle ouvre : une nouvelle fenêtre de
+        dialogue de la cible (barre de titre, activée) dont le titre porte le libellé de l'entrée (« Enregistrer
+        sous... » → boîte « Enregistrer sous »), relue jusqu'à wait_s. Tout autre changement (titre, info-bulle,
+        notification) ne prouve rien : le compte rendu reste « envoyé » (banc du 24/10 : la boîte ouverte restait « ~ » ;
+        relecture de Codex du 24/10 : ni un titre ni une surgissante sans rapport ne sont une preuve)."""
+        key = methods._menu_key(label.replace("/", ">").split(">")[-1])
+
+        def opened(hwnd: int) -> bool:
+            if w.style(hwnd) & w.WS_CAPTION != w.WS_CAPTION or not w.IsWindowEnabled(hwnd):
+                return False  # info-bulle, menu, notification : pas une boîte de dialogue
+            title = methods._menu_key(w.window_text(hwnd))
+            return bool(key) and key in title
+
+        def run() -> Any:
+            before = set(snapshot.popups_of(self.hwnd))
+            worker.check_cancelled()  # lecture des surgissantes possiblement longue : arrêt relu juste avant l'envoi
+            detail = action()
+            deadline = time.monotonic() + wait_s
+            while time.monotonic() < deadline:
+                try:
+                    worker.check_cancelled()
+                except worker.Cancelled:
+                    return detail  # envoyé ; plus de relecture après un arrêt (l'étape suivante s'arrêtera)
+                for h in snapshot.popups_of(self.hwnd):
+                    if h not in before and opened(h):
+                        return f'read back ✓ window "{w.window_text(h)}" opened'
+                time.sleep(0.06)
+            return detail
+
+        return run
+
     def click_element(
         self, e: snapshot.Element, button: str = "left", count: int = 1, close_list: bool = True
     ) -> Outcome:
+        row = self._selectable_row_of(e) if button == "left" and count == 1 else None
+        if row is not None:
+            # Cellule d'une ligne (Edit « Nom » de l'Explorateur en Détails) : un vrai clic sélectionne la LIGNE, seule.
+            # UIA SetFocus sur la cellule l'ajoutait à la sélection (banc du 24/10 : « 2 éléments sélectionnés »).
+            e = row
         view = self.view
         fw = framework_of(e, view)
         role = e.role
@@ -156,11 +193,13 @@ class UiaActions(ExecutorBase):
             if tabs and index is not None:
                 chain.append(("TCM_SETCURFOCUS", lambda: methods.win32_tab_select(tabs, index)))
         if role == "MenuItem" and fw == "Win32" and not p.get("has_expand"):
-            chain.append(("WM_COMMAND menu", lambda: methods.win32_menu_command(self.hwnd, e.name)))
+            chain.append(
+                ("WM_COMMAND menu", self._command_proven(lambda: methods.win32_menu_command(self.hwnd, e.name), e.name))
+            )
         if role == "CheckBox" and p.get("has_toggle"):
             chain.append(("UIA Toggle", lambda: self.auto.toggle(e.node.element)))
         if role in ITEM_ROLES and p.get("has_selection_item") and fw not in ("Win32", "WinForms"):
-            chain.append(("UIA Select", lambda: self.auto.select(e.node.element)))
+            chain.append(("UIA Select", lambda: self._select_proven(e)))
         if p.get("has_expand") and role in ("ComboBox", "MenuItem", "SplitButton", "TreeItem") and not winforms:
             expanded = p.get("expand") == 1
             chain.append(
@@ -179,7 +218,7 @@ class UiaActions(ExecutorBase):
             and not any(n == "UIA Select" for n, _ in chain)
             and fw not in ("Win32", "WinForms")
         ):
-            chain.append(("UIA Select", lambda: self.auto.select(e.node.element)))
+            chain.append(("UIA Select", lambda: self._select_proven(e)))
         if role in ("Edit", "Document"):
             chain.append(("UIA focus", lambda: self._quiet_focus(e)))
         if p.get("has_legacy") and fw not in ("Win32", "WinForms"):
@@ -207,6 +246,36 @@ class UiaActions(ExecutorBase):
                     f' — READ-BACK FAILED: {combo_parent.describe()} does not show "{snapshot.clip(e.name, 40)}"'
                 )
         return outcome
+
+    def _select_proven(self, e: snapshot.Element, wait_s: float = 0.6) -> str:
+        """UIA Select, PROUVÉ par l'état « sélectionné » de l'élément relu jusqu'à wait_s ; sinon envoyé, non relu."""
+        self.auto.select(e.node.element)
+        deadline = time.monotonic() + wait_s
+        while True:
+            try:
+                if self._refresh(e.node.element).get("selected"):
+                    return "read back ✓ selected"
+            except EXPECTED:
+                return ""
+            if time.monotonic() >= deadline:
+                return ""
+            time.sleep(0.05)
+
+    def _selectable_row_of(self, e: snapshot.Element) -> snapshot.Element | None:
+        """Ligne de l'Explorateur (ListItem DirectUI à motif SelectionItem) dont `e` est une cellule d'affichage (Edit
+        ou Text DirectUI sans fenêtre propre : « Nom », « Taille »…), ou None. Restreint à ce cas attesté : ailleurs (DataGrid WPF, arbre), une cellule
+        Edit peut être un vrai champ à éditer (relecture de Codex du 24/10)."""
+        if e.role not in ("Edit", "Text") or e.props.get("enabled") is False:
+            return None
+        if str(e.props.get("framework") or "").lower() != "directui" or e.node.hwnd:
+            return None  # vrai champ (Edit Win32 du renommage, à sa fenêtre propre) : jamais remplacé par sa ligne
+        parent = e.node.parent
+        if parent is None or parent.control_type != "ListItem" or not parent.props.get("has_selection_item"):
+            return None
+        if str(parent.props.get("framework") or "").lower() != "directui":
+            return None
+        listed = [x for x in self.view.elements if x.node is parent]
+        return listed[0] if listed else snapshot.Element(0, parent, max(0, e.depth - 1), e.window)
 
     @staticmethod
     def _open_combo_of(e: snapshot.Element) -> snapshot.Element | None:
@@ -768,8 +837,16 @@ class UiaActions(ExecutorBase):
             self._confirm_menu(path)  # WM_COMMAND ne passe par aucun clic d'élément : contrôlé ici
             try:
                 return self._try(
-                    [("WM_COMMAND menu", lambda: methods.win32_menu_command(self.hwnd, path))], f'menu "{path}"'
+                    [
+                        (
+                            "WM_COMMAND menu",
+                            self._command_proven(lambda: methods.win32_menu_command(self.hwnd, path), path),
+                        )
+                    ],
+                    f'menu "{path}"',
                 )
+            except Unconfirmed:
+                raise  # commande peut-être partie : jamais rejouée par le chemin UIA (relecture de Codex du 24/10)
             except ActionError:
                 pass
         outcome = None
