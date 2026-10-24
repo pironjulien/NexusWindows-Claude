@@ -1,0 +1,3473 @@
+[
+ {
+  "famille": "win32",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 801,
+    "note": "682×641, sombre 0%, couleur dominante 51%",
+    "size": [
+     682,
+     641
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 424,
+    "note": "680×639, sombre 36%, couleur dominante 36%",
+    "size": [
+     680,
+     639
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 194,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"994dbd5e-0e1d-4eaa-bd6c-f521a38e65e3\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 250,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [2] (screen (398,373)).; on [2] Button \"Valider\" in window 61867800",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 1574 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 55787,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (398,373).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 330,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"581392ce-830f-41fe-a541-0930022c4ccc\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 726,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [3] (screen (573,374)).; on [3] CheckBox \"Option\" selected in window 61867800",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 934 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 937,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (573,374).",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 177,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ setValue — verified (background:messages)\n{\n \"token\": \"454087c3-f557-4f52-8ea4-320f67197ad8\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 758,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [0] (UIA ValuePattern).; on [0] Edit \"Nom\" value=\"Julien Piron\" in window 61867800",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 2580 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2584,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (592,229).",
+      "vu": [
+       "valeur relue : 'Windows MCP'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 148,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ select — verified (background:messages)\n{\n \"token\": \"16aefbe9-6f9f-40eb-9eae-3e3d98a7e426\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n ",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 738,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set the drop-down combo box [4] to 'Vert' (CB_SETCURSEL, then CBN_SELENDOK and CBN_SELCHANGE to the app); read back 'Vert'.; on [4] ComboBox \"Couleur\" value=\"Bleu\" in window 61867800",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 2038 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2040,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,439).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 153,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"2fbf1aca-9913-45bf-a997-90c8716821db\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 647,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA SelectionItem.Select on [8] (screen (448,474)).; on [8] ListItem \"Bravo\" in window 61867800",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 902 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 904,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,458).",
+      "vu": [
+       "liste Alpha"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 107,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ menu — verified (background:messages)\n{\n \"token\": \"40fd49bc-2309-4ca5-b1f7-4cc0d3f529e5\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"t",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 334 ms",
+      "curseur déplacé": false,
+      "ms": 348,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "menu path segment 1 was not found",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3672,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Performed PostMessage click on [18] (screen (228,188)).; on [18] MenuItem \"Fichier\" in window 61867800\n2. click ERROR (find): no menuitem \"Action menu\" in window 61867800; nearest: [14] MenuItem \"Système\"; [18] MenuItem \"Fichier\" (waited 2826 ms)",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "menu",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 1998 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1999,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (301,218).",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 490,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"0ff0923f-01ca-4271-8143-cd0db1086d2b\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "zone gauche 171,44"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 941,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to pid 288360.",
+      "vu": [
+       "zone gauche 213,47"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 922 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 924,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (592,700).",
+      "vu": [
+       "zone gauche 215,54"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 496,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ scroll — verified (background:messages)\n{\n \"token\": \"0432bdf7-df52-4404-a595-056a3529dfd4\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"popups\": [],\n ",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 108,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'NexusLabWin32' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 wit",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 133,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (590,691) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 901 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 904,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (592,700).",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 73 ms",
+      "curseur déplacé": false,
+      "ms": 327,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ key — verified (physical:native, foreground taken)\n{\n \"token\": \"ce6f00f3-bdbb-4c4d-8b92-5825b4058ef4\",\n \"window\": {\n  \"id\": 61867800,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Win32\",\n  \"pid\": 288360,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  61867800\n ],\n \"windowChange\": null,\n \"pop",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 586,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 288360 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288360) 855 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 858,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "winforms",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 92,
+    "note": "702×665, sombre 0%, couleur dominante 53%",
+    "size": [
+     702,
+     665
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 110,
+    "note": "700×663, sombre 36%, couleur dominante 36%",
+    "size": [
+     700,
+     663
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1866,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ click — sent-unconfirmed (background:messages)\n{\n \"token\": \"1460b07f-2d9a-4f17-aec7-78066a654bb7\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 703,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [4] (screen (398,358)).; on [4] Button \"Valider\" in window 56363966",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : WindowsForms10.Window.8.app.0.38a021f_r13_ad1 (pid 244328) 551 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1055,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (398,358).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 330,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"0723abbb-7013-426a-9640-2c6500523039\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 win",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 720,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [5] (screen (537,360)).; on [5] CheckBox \"Option\" selected in window 56363966",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 957,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (537,360).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 138,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ setValue — verified (background:messages)\n{\n \"token\": \"234908ae-0b48-4280-9299-36a930600a7f\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\"",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 688,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [2] (UIA ValuePattern).; on [2] Edit \"Nom\" value=\"Julien Piron\" in window 56363966",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2624,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (592,233).",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 199,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ select — verified (background:messages)\n{\n \"token\": \"f68f93bd-77a5-46f6-842e-0425dbfd95d2\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": ",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 766,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set the drop-down combo box [6] to 'Vert' (CB_SETCURSEL, then CBN_SELENDOK and CBN_SELCHANGE to the app); read back 'Vert'.; on [6] ComboBox \"Couleur\" value=\"Bleu\" in window 56363966",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Rouge"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 137,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"67c9aba9-688c-42b6-af88-72d3ac046b70\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 678,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [10] (screen (447,469)).; on [10] ListItem \"Bravo\" in window 56363966",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 953,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,450).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1968,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ menu — sent-unconfirmed (background:uia)\n{\n \"token\": \"274f8f54-b9dc-40b5-81b4-e443ab51a0d0\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\":",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : WindowsForms10.Window.8.app.0.38a021f_r13_ad1 (pid 244328) 314 ms",
+      "curseur déplacé": false,
+      "ms": 335,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "Resolved the live native menu path and dispatched its final accessibility action; verify the command's semantic effect from fresh state.",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Action menu"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2162,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ click — sent-unconfirmed (background:messages)\n{\n \"token\": \"ff1bd56c-e38e-48c7-8845-a83df190a45a\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "zone gauche 171,44"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 786,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to pid 244328.",
+      "vu": [
+       "zone gauche 214,48"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 945,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (592,675).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2277,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ scroll — sent-unconfirmed (background:messages)\n{\n \"token\": \"3e456a7b-f474-49e9-be46-56e85651307b\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n ",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 110,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'WindowsForms10.Window.8.app.0.38a021f_r13_ad1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 147,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (591,667) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 947,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (592,675).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : WindowsForms10.Window.8.app.0.38a021f_r13_ad1 (pid 244328) 77 ms",
+      "curseur déplacé": false,
+      "ms": 2053,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ key — unmet (physical:native, foreground taken)\n{\n \"token\": \"6e753a38-6f74-4d9b-ba67-76ef6f052339\",\n \"window\": {\n  \"id\": 56363966,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WinForms\",\n  \"pid\": 244328,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  56363966\n ],\n \"windowChange\": null,\n \"popups\": [],\n ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 568,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 244328 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 888,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "wpf",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 1355,
+    "note": "709×817, sombre 1%, couleur dominante 84%",
+    "size": [
+     709,
+     817
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 138,
+    "note": "707×815, sombre 0%, couleur dominante 84%",
+    "size": [
+     707,
+     815
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4822,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ click — sent-unconfirmed (background:uia)\n{\n \"token\": \"51fa53e5-d879-4d0c-99d6-cf58f2a9095f\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 ",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1535,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [8] (screen (397,363)).; on [8] Button \"Valider\" in window 67961082",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;8276c18d-4ff7-4c16-9f8c-c962f62bb3cb] (pid 286496) 552 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2889,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (397,363).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2182,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"bf315001-1046-4377-b1f6-45af4f5dc1d7\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 window L",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1374,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Toggle on [9] (screen (532,363)).; on [9] CheckBox \"Option\" selected in window 67961082",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 3061,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (532,363).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2564,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ setValue — verified (background:uia)\n{\n \"token\": \"531d33b8-3372-438a-98f0-91281d2a05ae\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 windo",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1278,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [6] (UIA ValuePattern).; on [6] Edit \"Nom\" value=\"Julien Piron\" in window 67961082",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 4765,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (607,231).",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2530,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ select — verified (background:uia)\n{\n \"token\": \"fb011deb-d72b-406f-a3f9-ec2faddbe4d6\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 window ",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1217,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. set_value ERROR (action): set_value: element [11] does not implement ValuePattern or RangeValuePattern. For controls with TogglePattern (CheckBox) or SelectionItemPattern (RadioButton / ComboBoxItem), use the `click` tool instead.",
+      "vu": []
+     },
+     "par clics": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1889,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Performed UIA ExpandCollapse.Expand on [11] (screen (447,409)).; on [11] ComboBox \"Couleur\" in window 67961082\n2. click ok: ✅ Performed UIA SelectionItem.Select on [13] (screen (447,429)).; on [13] ListItem \"Vert\" in window 67961082",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 5887,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,439).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2319,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"045a3682-51af-4dd8-975d-4168b695513b\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"0 window L",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1401,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA SelectionItem.Select on [17] (screen (447,474)).; on [17] ListItem \"Bravo\" in window 67961082",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 3188,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,449).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1449,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ menu — refused: No background technique applies, and a native observation has no Sky index for a physical menu\nNo fresh observation: look again before the next act.",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;8276c18d-4ff7-4c16-9f8c-c962f62bb3cb] (pid 286496) 1436 ms",
+      "curseur déplacé": false,
+      "ms": 1448,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "Resolved the live native menu path and dispatched its final accessibility action; verify the command's semantic effect from fresh state.",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "menu",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;8276c18d-4ff7-4c16-9f8c-c962f62bb3cb] (pid 286496) 3451 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 5602,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (296,215).",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;8276c18d-4ff7-4c16-9f8c-c962f62bb3cb] (pid 286496) 86 ms",
+      "curseur déplacé": true,
+      "ms": 7237,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ click — unmet (physical:native, foreground taken)\n{\n \"token\": \"2630cb18-64bd-4fa9-911b-a2b1647d31b8\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tr",
+      "vu": [
+       "zone gauche 38,48"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1068,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Injected click to pid 286496 at (374,656) (background, no foreground swap).",
+      "vu": [
+       "zone gauche 42,44"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2792,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (370,661).",
+      "vu": [
+       "zone gauche 38,48"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 6735,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ scroll — unmet (physical:native, foreground taken)\n{\n \"token\": \"250f9b70-5b67-4ad0-abdc-0d6f261d659d\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"t",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 99,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'HwndWrapper[DefaultDomain;Pipeline Execution Thread;8276c18d-4ff7-4c16-9f8c-c962f62bb3cb]' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restor... To r",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 130,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (374,656) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2672,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (370,661).",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4439,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ key — unmet (physical:native, foreground taken)\n{\n \"token\": \"64c1eda5-c495-45ba-a701-852264e5baf6\",\n \"window\": {\n  \"id\": 67961082,\n  \"app\": \"process:C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\",\n  \"title\": \"Labo WPF\",\n  \"pid\": 286496,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  67961082\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 603,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 286496 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 889,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   }
+  ]
+ },
+ {
+  "famille": "tk",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 58,
+    "note": "702×690, sombre 0%, couleur dominante 70%",
+    "size": [
+     702,
+     690
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 98,
+    "note": "700×688, sombre 36%, couleur dominante 45%",
+    "size": [
+     700,
+     688
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 78 ms",
+      "curseur déplacé": true,
+      "ms": 372,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ click — observed (physical:native, foreground taken)\n{\n \"token\": \"e72fd009-8ffc-4e30-b6fc-5de978a1dbcf\",\n \"window\": {\n  \"id\": 149292938,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk\",\n  \"pid\": 305992,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  149292938\n ],\n \"windowChange\": null,\n \"po",
+      "vu": [
+       "zone gauche 216,57"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 660,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. click ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_click): background coordinate injection cannot reach this target at (534,390) — it is occluded by another window (raising it would break the no-foreground contract). Escalate to delivery_mode:\"foregro... To ru",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 133 ms",
+      "curseur déplacé": true,
+      "ms": 291,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Sent click via SendInput to pid 305992 at (534,390) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "zone gauche 216,54"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 904,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (534,393).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 63 ms",
+      "curseur déplacé": false,
+      "ms": 314,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ scroll — observed (physical:native, foreground taken)\n{\n \"token\": \"c28c07bf-e1b7-4039-90c4-7c219de39237\",\n \"window\": {\n  \"id\": 149292938,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — zone gauche 216,54\",\n  \"pid\": 305992,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  149292938\n ],\n \"win",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 101,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 133,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (534,390) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 904,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (534,393).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 74 ms",
+      "curseur déplacé": false,
+      "ms": 269,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ key — observed (physical:native, foreground taken)\n{\n \"token\": \"548e8539-11c4-4dd1-9126-2c1ce584059f\",\n \"window\": {\n  \"id\": 149292938,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — zone gauche 216,54\",\n  \"pid\": 305992,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  149292938\n ],\n \"window",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 550,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"del",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 2020 ms",
+      "curseur déplacé": false,
+      "ms": 2057,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 305992 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 888,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 305992) 77 ms",
+      "curseur déplacé": true,
+      "ms": 324,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ scroll — observed (physical:native, foreground taken)\n{\n \"token\": \"54257b35-f712-43c6-85d5-45464cb6b937\",\n \"window\": {\n  \"id\": 149292938,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — raccourci ctrl+k\",\n  \"pid\": 305992,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  149292938\n ],\n \"windo",
+      "vu": [
+       "defil liste bas 0.015"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 103,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 135,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (491,510) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 917,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (489,515).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "electron",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 149,
+    "note": "742×800, sombre 0%, couleur dominante 54%",
+    "size": [
+     742,
+     800
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 100,
+    "note": "740×798, sombre 0%, couleur dominante 55%",
+    "size": [
+     740,
+     798
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 346,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"58965c76-cc44-4572-b829-51bf44a66aee\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — prêt\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  136185920\n ],\n \"windowChang",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 824,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [17] at screen (248,544) (background, no foreground swap).; on [17] Button \"Valider\" in window 136185920",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 552 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1185,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (248,544).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 268,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"33eaa642-d019-4f76-a744-2efae1ed7677\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — clic 3\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  136185920\n ],\n \"windowCha",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 63 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 773,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [18] at screen (300,541) (background, no foreground swap).; on [18] CheckBox \"Option\" selected in window 136185920",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 552 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1177,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (300,541).",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 269,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ setValue — verified (background:uia)\n{\n \"token\": \"9176dcc7-2200-4880-bc2e-098aba5a7968\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — coche on\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  136185920\n ],\n \"wind",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 812,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [6] (UIA ValuePattern).; on [6] Edit \"Nom\" value=\"Julien Piron\" in window 136185920",
+      "vu": [
+       "nom Cua Driver"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2844,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (580,238).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 848,
+      "appels": [
+       "look",
+       "act",
+       "look",
+       "act"
+      ],
+      "réponse": "✓ typeText — verified (background:simulated-activation)\n{\n \"token\": \"be797753-39c8-4e11-a557-286151058078\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — nom Cua Driver\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1432,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Posted click on Chromium element [30] at screen (481,780) (background, no foreground swap).; on [30] Edit \"Éditeur\" value=\"Bonjour\" in window 136185920\n2. type_text ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (text_input). Retry this action with ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 76 ms",
+      "curseur déplacé": false,
+      "ms": 1495,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [30] at screen (481,780) (background, no foreground swap).; on [30] Edit \"Éditeur\" value=\"Bonjour\" in window 136185920\n2. type_text ok: ✅ Typed 5 char(s) on pid 301204 via SendInput (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "editeur BonjourSalut"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "éditeur riche",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 1009 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1622,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Hello at (240,738).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 387,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ select — verified (background:simulated-activation)\n{\n \"token\": \"fa26b887-ac5d-4998-a4ee-5aa274c76f9a\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — editeur BonjourSalut\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 714,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: Set the UIA value of combo box [21] to 'Vert'. This combo box is not a native Win32 one, and a UIA value write may change the shown text without the app treating it as a selection. Check with get_window_state; if the app did not react, click the combo box and then the option.; on [21] ComboBox \"Couleur\" value=\"Bleu\" in window 136185920",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 965,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [21] at screen (356,579) (background, no foreground swap).; on [21] ComboBox \"Couleur\" value=\"Bleu\" in window 136185920\n2. click ok: ✅ Posted click on Chromium element [23] at screen (347,636) (background, no foreground swap).; on [23] ListItem \"Vert\" in window 136185920",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 1904 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2536,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (347,606).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 262,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"c74e149c-1bf6-4fc6-b70a-3dbbaf896aa5\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — couleur Rouge\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  136185920\n ],\n \"wi",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 61 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 768,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [25] at screen (443,641) (background, no foreground swap).; on [25] ListItem \"Bravo\" in window 136185920",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1185,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (443,613).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1984,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"366c703d-bada-4a78-9e6b-9b269678537e\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — liste Bravo\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  136185920\n ],\n ",
+      "vu": [
+       "zone gauche 216,55"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 695,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to Chromium pid 301204 at (485,613) (background, no foreground swap).",
+      "vu": [
+       "zone gauche 218,51"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2243,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (483,618).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 72 ms",
+      "curseur déplacé": false,
+      "ms": 3560,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✗ scroll — unmet (physical:native, foreground taken)\n{\n \"token\": \"b97076b7-6013-4694-8101-74004d3d1cb1\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — zone gauche 218,51\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": ",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 114,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 124,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (485,613) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2237,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (483,618).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 82 ms",
+      "curseur déplacé": false,
+      "ms": 521,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ key — verified (physical:native, foreground taken)\n{\n \"token\": \"f8d46fec-774e-4aa4-b86b-adec8b103025\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — zone gauche 218,51\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 565,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 w",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 20 ms",
+      "curseur déplacé": false,
+      "ms": 56,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 301204 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 886,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 301204) 71 ms",
+      "curseur déplacé": true,
+      "ms": 2137,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ scroll — verified (physical:native, foreground taken)\n{\n \"token\": \"74098743-adcf-439c-99fb-4f332afa416f\",\n \"window\": {\n  \"id\": 136185920,\n  \"app\": \"process:~\\\\.claude\\\\nexus-claude\\\\lab\\\\electron\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\",\n  \"title\": \"Labo Web — raccourci ctrl+k\",\n  \"pid\": 301204,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\":",
+      "vu": [
+       "roue A 100 0",
+       "defil A bas 75 75"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 107,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 130,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (350,776) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "roue A 100 0",
+       "defil A bas 75 150"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2257,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (345,783).",
+      "vu": [
+       "roue A 100 0",
+       "defil A bas 76 226"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "edge",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 159,
+    "note": "734×792, sombre 0%, couleur dominante 55%",
+    "size": [
+     734,
+     792
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 100,
+    "note": "732×790, sombre 0%, couleur dominante 56%",
+    "size": [
+     732,
+     790
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 406,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"bc264432-95f8-40d7-a545-14a6186b09bc\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — prêt\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\": \"",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 829,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [18] at screen (248,510) (background, no foreground swap).; on [18] Button \"Valider\" in window 60293252",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1229,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (248,510).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 313,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"f3110bca-1ae4-4ea8-8a6b-4542cad276af\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — clic 2\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"tree\":",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 762,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [19] at screen (300,507) (background, no foreground swap).; on [19] CheckBox \"Option\" selected in window 60293252",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1620,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (300,507).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 337,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ setValue — verified (background:uia)\n{\n \"token\": \"cd62f736-799c-4e3d-a895-fa6da4309223\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — coche off\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 840,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [7] (UIA ValuePattern).; on [7] Edit \"Nom\" value=\"Julien Piron\" in window 60293252",
+      "vu": [
+       "nom Cua Driver"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2889,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (580,204).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1003,
+      "appels": [
+       "look",
+       "act",
+       "look",
+       "act"
+      ],
+      "réponse": "✓ typeText — verified (background:simulated-activation)\n{\n \"token\": \"26f5aebd-15a6-4e09-88d4-121758f692f6\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — nom Cua Driver\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": n",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1425,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Posted click on Chromium element [31] at screen (481,746) (background, no foreground swap).; on [31] Edit \"Éditeur\" value=\"Bonjour\" in window 60293252\n2. type_text ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (text_input). Retry this action with d",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 72 ms",
+      "curseur déplacé": false,
+      "ms": 1494,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [31] at screen (481,746) (background, no foreground swap).; on [31] Edit \"Éditeur\" value=\"Bonjour\" in window 60293252\n2. type_text ok: ✅ Typed 5 char(s) on pid 305072 via SendInput (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "editeur BonjourSalut"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "éditeur riche",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 1010 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1670,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Hello at (240,704).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 466,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ select — verified (background:simulated-activation)\n{\n \"token\": \"d69356b8-2396-4d03-b634-04294860a562\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — editeur BonjourSalut\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 730,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: Set the UIA value of combo box [22] to 'Vert'. This combo box is not a native Win32 one, and a UIA value write may change the shown text without the app treating it as a selection. Check with get_window_state; if the app did not react, click the combo box and then the option.; on [22] ComboBox \"Couleur\" value=\"Bleu\" in window 60293252",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 841 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 1038,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [22] at screen (356,545) (background, no foreground swap).; on [22] ComboBox \"Couleur\" value=\"Bleu\" in window 60293252\n2. click ok: ✅ Posted click on Chromium element [24] at screen (347,607) (background, no foreground swap).; on [24] ListItem \"Vert\" in window 60293252",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 1934 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2609,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (347,577).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 350,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:uia)\n{\n \"token\": \"c6d10850-5dd2-428a-ac81-e2c8a136b531\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — couleur Rouge\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n \"popups\": [],\n ",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 63 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 786,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [26] at screen (443,607) (background, no foreground swap).; on [26] ListItem \"Bravo\" in window 60293252",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1213,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (443,579).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2125,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ click — verified (background:messages)\n{\n \"token\": \"dee21334-6044-4f5c-8e56-6a22dc1a8b62\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — liste Bravo\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n \"popups\": []",
+      "vu": [
+       "zone gauche 216,54"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 234492) 342 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 746,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to Chromium pid 305072 at (485,604) (background, no foreground swap).",
+      "vu": [
+       "zone gauche 218,50"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 234492) 237 ms, Chrome_WidgetWin_1 (pid 15748) 311 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2520,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (483,609).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 69 ms",
+      "curseur déplacé": false,
+      "ms": 2547,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ scroll — verified (physical:native, foreground taken)\n{\n \"token\": \"0ec915bc-d1d9-426c-98cd-2e1473cbaffb\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — zone gauche 218,50\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange",
+      "vu": [
+       "molette -100"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 103,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 15748) 25 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 123,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (485,604) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 233288) 2392 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 2631,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (483,609).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 81 ms",
+      "curseur déplacé": false,
+      "ms": 680,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ key — verified (physical:native, foreground taken)\n{\n \"token\": \"57cfe80c-4336-4d9c-a3f6-8305199d5d00\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — molette -100\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\": null,\n",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 567,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 w",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 20 ms",
+      "curseur déplacé": false,
+      "ms": 55,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 305072 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 889,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 305072) 84 ms, Chrome_WidgetWin_1 (pid 233288) 153 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2562,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "✓ scroll — verified (physical:native, foreground taken)\n{\n \"token\": \"37b1d3ff-e0ca-4d12-94d2-c7c65ce4d75f\",\n \"window\": {\n  \"id\": 60293252,\n  \"app\": \"process:C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\",\n  \"title\": \"Labo Web — raccourci ctrl+k\",\n  \"pid\": 305072,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  60293252\n ],\n \"windowChange\":",
+      "vu": [
+       "roue A 100 0",
+       "defil A bas 75 75"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 104,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 146,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (350,767) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2744,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (345,774).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ }
+]

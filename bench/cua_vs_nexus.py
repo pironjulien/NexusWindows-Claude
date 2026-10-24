@@ -24,6 +24,7 @@ import ctypes
 import datetime
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -37,6 +38,7 @@ sys.path.insert(0, str(ROOT / "lab"))
 
 import apps  # noqa: E402
 import drive  # noqa: E402
+import editions  # noqa: E402
 import tally_cua  # noqa: E402
 from mcp import Client, StdioServerParameters  # noqa: E402
 
@@ -118,7 +120,8 @@ class Foreground:
 
 
 def nexus_params() -> StdioServerParameters:
-    return drive.server_params()
+    """Serveur de l'édition mesurée (editions.EDITION) : celui de ce dépôt pour Claude, le paquet publié sinon."""
+    return drive.server_params() if editions.EDITION == "claude" else editions.params()
 
 
 def cua_params() -> StdioServerParameters:
@@ -331,6 +334,23 @@ def web_scroll_offset(app: apps.LabApp) -> int | None:
     return None
 
 
+def redact_home(text: str) -> str:
+    """Profil de l'utilisateur retiré d'un relevé, sous toutes ses écritures : barres obliques, contre-obliques simples,
+    échappées une ou plusieurs fois (réponse JSON d'un outil dans le JSON du relevé : chemins des captures de Codex, 24/10).
+    """
+    home = Path.home()
+    parts = [re.escape(part) for part in home.parts[1:]]  # « Users », nom de session
+    drive = re.escape(home.drive)
+    pattern = drive + r"(?:\\+|/)" + r"(?:\\+|/)".join(parts)
+    return re.sub(pattern, "~", text, flags=re.IGNORECASE)
+
+
+def target_in_front(app: apps.LabApp) -> bool:
+    """La fenêtre au premier plan appartient-elle à l'application du labo (laissée devant par un outil précédent) ?"""
+    front = w.foreground()
+    return bool(front) and w.window_pid(front) in set(app.pids)
+
+
 def task_point(task: str, app: apps.LabApp) -> tuple[int, int]:
     """Point écran visé : la zone (canevas) pour « clic brut » et « molette », la zone qui défile pour « défilement »
     (Tk : la liste, à gauche de sa barre native ; page web : la région « Défilement », amenée dans la vue)."""
@@ -477,7 +497,9 @@ def nexus_claim(text: str) -> str:
 async def capture(client: Client, tool: str, app: apps.LabApp) -> dict:
     """Capture de la fenêtre (recouverte par celles de Julien) : durée, taille, image pleine (non noire, non vide)."""
     t0 = time.perf_counter()
-    if tool == "nexus":
+    if tool == "nexus" and editions.EDITION != "claude":
+        result = await client.call_tool("look", editions.look_args(app.hwnd, image=True))
+    elif tool == "nexus":
         result = await client.call_tool("look", {"window": app.hwnd, "show": "image"})
     else:
         args = {"pid": w.window_pid(app.hwnd), "window_id": app.hwnd, "include_accessibility_tree": False}
@@ -572,7 +594,7 @@ async def run_task(
         events.reset()
         offset0 = web_scroll_offset(app) if task == "défilement" and app.kind in WEB else None
         calls: list[tuple[str, dict]] = []
-        if tool == "nexus":
+        if tool == "nexus" and editions.EDITION == "claude":
             calls = [nexus_call(task, app, size)]
         elif tool == "cua":
             calls = cua_calls(task, app, size, attempt)
@@ -583,7 +605,13 @@ async def run_task(
             if tool == "wmcp":
                 result, names = await wmcp_run(client, task, app)
                 calls = [(name, {}) for name in names]
-            for name, args in calls if tool != "wmcp" else []:
+            elif tool == "nexus" and editions.EDITION != "claude":
+                point = task_point(task, app) if task in ("clic brut", "molette", "défilement") else None
+                result, names = await editions.run(client, task, app, VALUES["nexus"], point)
+                calls = [(name, {}) for name in names]
+            for name, args in (
+                calls if tool != "wmcp" and not (tool == "nexus" and editions.EDITION != "claude") else []
+            ):
                 result = await client.call_tool(name, args)
             ms = (time.perf_counter() - t0) * 1000
         text = text_of(result)
@@ -605,7 +633,10 @@ async def run_task(
             value = name_value(app)
             seen = [f"valeur relue : {value!r}"]
             effect = value == VALUES[tool]["nom"]
-        claim = nexus_claim(text) if tool == "nexus" else claim_of(result, text)
+        if tool == "nexus":
+            claim = nexus_claim(text) if editions.EDITION == "claude" else editions.claim(text)
+        else:
+            claim = claim_of(result, text)
         row = {
             "effet": effect,
             "déclaré": claim,
@@ -659,16 +690,32 @@ async def reading_sizes(nexus: Client, cua: Client, app: apps.LabApp) -> dict:
 async def bench_app(kind: str, nexus: Client, cua: Client | None, wmcp: Client | None = None) -> dict:
     app = apps.launch(kind, x=150, y=110)
     events = drive.Events(app)
-    report: dict[str, Any] = {"famille": kind, "recouverte": None, "capture": {}, "tâches": []}
+    info = nexus.server_info
+    report: dict[str, Any] = {
+        "famille": kind,
+        "édition": {
+            "nom": editions.EDITION,
+            "serveur": getattr(info, "name", None),
+            "version": getattr(info, "version", None),
+            "commande": " ".join([nexus_params().command, *nexus_params().args]),
+        },
+        "recouverte": None,
+        "capture": {},
+        "tâches": [],
+    }
     try:
         with Cover(app.hwnd) as cover:
             await asyncio.sleep(1.0)
-            await nexus.call_tool("look", {"window": app.hwnd, "show": "elements"})  # arbre publié (Chromium)
+            # arbre publié (Chromium)
+            if editions.EDITION == "claude":
+                await nexus.call_tool("look", {"window": app.hwnd, "show": "elements"})
+            else:
+                await nexus.call_tool("look", editions.look_args(app.hwnd))
             cover.raise_()
             report["recouverte"] = covered(app)
             print(f"== {kind} : {w.window_text(app.hwnd)!r}, recouverte={report['recouverte']}")
             tools = [("nexus", nexus)] + ([("cua", cua)] if cua is not None else [])
-            if app.kind != "tk" and cua is not None:
+            if app.kind != "tk" and cua is not None and editions.EDITION == "claude":
                 report["lecture"] = await reading_sizes(nexus, cua, app)
             sizes = {}
             for tool, client in tools:
@@ -683,13 +730,15 @@ async def bench_app(kind: str, nexus: Client, cua: Client | None, wmcp: Client |
                 covers: list[bool] = []
                 for tool, client in tools:
                     cover.raise_()
-                    covers.append(covered(app))  # exigé AVANT chaque essai, pas seulement noté après (W16, Codex)
+                    # exigé AVANT chaque essai (W16, Codex), et la cible jamais déjà au premier plan : le relevé du premier
+                    # plan ne verrait alors aucune prise (relecture de Codex du 24/10, lignes WPF laissées devant)
+                    covers.append(covered(app) and not target_in_front(app))
                     try:
                         row[tool] = await run_task(client, tool, task, app, events, sizes[tool])
                     except Exception as exc:  # noqa: BLE001  (banc : une erreur d'un outil n'arrête pas l'autre)
                         row[tool] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
                         print(f"   {tool:5} ERREUR {task} : {exc}")
-                covers.append(covered(app))
+                covers.append(covered(app) and not target_in_front(app))
                 if wmcp is not None:
                     # Après le contrôle de couverture : Windows-MCP met la fenêtre devant par construction.
                     cover.raise_()
@@ -733,11 +782,12 @@ async def main(kinds: list[str], wait_s: float, nexus_only: bool = False) -> Non
                         break
                     await asyncio.sleep(30)  # Julien au travail : on attend qu'il s'absente
     suffix = "nexus-seul" if nexus_only else "cua-vs-nexus"
+    if editions.EDITION != "claude":
+        suffix += f"-{editions.EDITION}"
     out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-{suffix}.json"
     text = json.dumps(results, ensure_ascii=False, indent=1)
     # Réponses brutes des deux serveurs : le profil du poste (URL file:/// du labo) n'a rien à faire dans un relevé.
-    for home in {Path.home().as_posix(), str(Path.home()).replace("\\", "\\\\")}:
-        text = text.replace(home, "~")
+    text = redact_home(text)
     out.write_text(text, encoding="utf-8")
     print(f"Résultats : {out}")
     print(tally_cua.report(out))  # comptes de RESULTS.md, calculés depuis le relevé

@@ -1,0 +1,3387 @@
+[
+ {
+  "famille": "win32",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 451,
+    "note": "682×641, sombre 36%, couleur dominante 36%",
+    "size": [
+     682,
+     641
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 1589,
+    "note": "700×650, sombre 39%, couleur dominante 39%",
+    "size": [
+     700,
+     650
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1542,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_bn_clicked\",\n      ",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 147,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [2] (screen (398,373)).; on [2] Button \"Valider\" in window 153815686",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "MCPError: Request 'tools/call' timed out"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 52,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_bm_setcheck\",\n     ",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 672,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [3] (screen (573,374)).; on [3] CheckBox \"Option\" selected in window 153815686",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "MCPError: Request 'tools/call' timed out"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 40,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_em_replacesel\",\n     ",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 660,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [0] (UIA ValuePattern).; on [0] Edit \"Nom\" value=\"Julien Piron\" in window 153815686",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 2616 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 16249,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (592,229).",
+      "vu": [
+       "valeur relue : 'Windows MCP'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 57,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_cb_setcursel\",\n   ",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 693,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set the drop-down combo box [4] to 'Vert' (CB_SETCURSEL, then CBN_SELENDOK and CBN_SELCHANGE to the app); read back 'Vert'.; on [4] ComboBox \"Couleur\" value=\"Bleu\" in window 153815686",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 2043 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2048,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,439).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 87,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_lb_setcursel\",\n    ",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 737,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA SelectionItem.Select on [8] (screen (448,474)).; on [8] ListItem \"Bravo\" in window 153815686",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 906 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 909,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (448,458).",
+      "vu": [
+       "liste Alpha"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 471,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 345 ms",
+      "curseur déplacé": false,
+      "ms": 358,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "menu path segment 1 was not found",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3766,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Performed PostMessage click on [18] (screen (228,188)).; on [18] MenuItem \"Fichier\" in window 153815686\n2. click ERROR (find): no menuitem \"Action menu\" in window 153815686; nearest: [14] MenuItem \"Système\"; [18] MenuItem \"Fichier\" (waited 2923 ms)",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "menu",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 2030 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 2033,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (301,218).",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 675,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_post_click\",\n      ",
+      "vu": [
+       "zone gauche 178,44"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1013,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to pid 288196.",
+      "vu": [
+       "zone gauche 223,55"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 918 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 920,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (592,700).",
+      "vu": [
+       "zone gauche 215,54"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 564,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"scroll\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_post_wheel\",\n     ",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 156,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'NexusLabWin32' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 wit",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 181,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (602,701) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 928 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 934,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (592,700).",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 711,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 153815686,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 602,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 288196 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : NexusLabWin32 (pid 288196) 874 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 876,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "winforms",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 133,
+    "note": "702×665, sombre 36%, couleur dominante 36%",
+    "size": [
+     702,
+     665
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 178,
+    "note": "700×663, sombre 36%, couleur dominante 36%",
+    "size": [
+     700,
+     663
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 763,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\":",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 818,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [4] (screen (398,358)).; on [4] Button \"Valider\" in window 7277872",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : WindowsForms10.Window.8.app.0.2565fc6_r13_ad1 (pid 294888) 553 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1213,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (398,358).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 621,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"tec",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 815,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [5] (screen (537,360)).; on [5] CheckBox \"Option\" selected in window 7277872",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1017,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (537,360).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 584,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_set_value\",\n          \"te",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 808,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [2] (UIA ValuePattern).; on [2] Edit \"Nom\" value=\"Julien Piron\" in window 7277872",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2701,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (592,233).",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 118,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_cb_setcursel\",\n     ",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 860,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set the drop-down combo box [6] to 'Vert' (CB_SETCURSEL, then CBN_SELENDOK and CBN_SELCHANGE to the app); read back 'Vert'.; on [6] ComboBox \"Couleur\" value=\"Bleu\" in window 7277872",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Rouge"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 97,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_lb_setcursel\",\n      ",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 753,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [10] (screen (447,469)).; on [10] ListItem \"Bravo\" in window 7277872",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 956,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,450).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1755,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\":",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : WindowsForms10.Window.8.app.0.2565fc6_r13_ad1 (pid 294888) 349 ms",
+      "curseur déplacé": false,
+      "ms": 371,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "Resolved the live native menu path and dispatched its final accessibility action; verify the command's semantic effect from fresh state.",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Action menu"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 834,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\":",
+      "vu": [
+       "zone gauche 178,44"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 844,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to pid 294888.",
+      "vu": [
+       "zone gauche 214,48"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 969,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (592,675).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 637,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\":",
+      "vu": [
+       "molette -120"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 140,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'WindowsForms10.Window.8.app.0.2565fc6_r13_ad1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 158,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (591,667) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 974,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (592,675).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 873,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 7277872,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\":",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 568,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 294888 via PostMessage (Win32 target).",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 887,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "wpf",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 994,
+    "note": "709×817, sombre 1%, couleur dominante 80%",
+    "size": [
+     709,
+     817
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 97,
+    "note": "707×815, sombre 0%, couleur dominante 84%",
+    "size": [
+     707,
+     815
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3496,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\"",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1516,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Invoke on [8] (screen (397,363)).; on [8] Button \"Valider\" in window 24513766",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f] (pid 301952) 552 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 3546,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (397,363).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1294,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"te",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1405,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA Toggle on [9] (screen (532,363)).; on [9] CheckBox \"Option\" selected in window 24513766",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2789,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (532,363).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1287,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_set_value\",\n          \"t",
+      "vu": [
+       "valeur relue : 'Julien Piron'"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1245,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [6] (UIA ValuePattern).; on [6] Edit \"Nom\" value=\"Julien Piron\" in window 24513766",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 4478,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (607,231).",
+      "vu": [
+       "valeur relue : 'Cua Driver'"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2389,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"t",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1268,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. set_value ERROR (action): set_value: element [11] does not implement ValuePattern or RangeValuePattern. For controls with TogglePattern (CheckBox) or SelectionItemPattern (RadioButton / ComboBoxItem), use the `click` tool instead.",
+      "vu": []
+     },
+     "par clics": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1902,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Performed UIA ExpandCollapse.Expand on [11] (screen (447,409)).; on [11] ComboBox \"Couleur\" in window 24513766\n2. click ok: ✅ Performed UIA SelectionItem.Select on [13] (screen (447,435)).; on [13] ListItem \"Vert\" in window 24513766",
+      "vu": [
+       "couleur Vert"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "liste déroulante",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 5743,
+      "appels": [
+       "App",
+       "Click",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,439).",
+      "vu": [
+       "couleur Rouge"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1498,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"te",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1197,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Performed UIA SelectionItem.Select on [17] (screen (447,474)).; on [17] ListItem \"Bravo\" in window 24513766",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2852,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (447,449).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "menu",
+    "nexus": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4095,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\"",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "menu",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f] (pid 301952) 1394 ms",
+      "curseur déplacé": false,
+      "ms": 1406,
+      "appels": [
+       "invoke_menu"
+      ],
+      "réponse": "Resolved the live native menu path and dispatched its final accessibility action; verify the command's semantic effect from fresh state.",
+      "vu": [
+       "menu action"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Action menu"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4133,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : clic par coordonnées sur une zone sans élément UI Automation — impossible en arrière-plan (WPF), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n    ",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1030,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. click ERROR (action): Background delivery is not available for target window class 'HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f]' on this event kind (mouse_click): background coordinate injection cannot reach this target at (374,656) — it is occluded by another window (raising... To ru",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f] (pid 301952) 142 ms",
+      "curseur déplacé": true,
+      "ms": 663,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Sent click via SendInput to pid 301952 at (374,656) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "zone gauche 42,44"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2747,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (370,661).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3376,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (WPF), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 119,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f]' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restor... To r",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 125,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (374,656) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2766,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (370,661).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 945,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : touches « ctrl+k » : WPF ignore les raccourcis Ctrl/Alt envoyés par messages (mesuré) — impossible en arrière-plan (WPF), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 24513766,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n  ",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 594,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f]' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore t... To r",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : HwndWrapper[DefaultDomain;Pipeline Execution Thread;f6c393e0-3f78-4cd0-bc68-deb03f61db4f] (pid 301952) 49 ms",
+      "curseur déplacé": false,
+      "ms": 86,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 301952 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 888,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "tk",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 67,
+    "note": "702×690, sombre 36%, couleur dominante 43%",
+    "size": [
+     702,
+     690
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 93,
+    "note": "700×688, sombre 36%, couleur dominante 45%",
+    "size": [
+     700,
+     688
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 113,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 113576978,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"tk_held_click\",\n         ",
+      "vu": [
+       "zone gauche 178,45"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 686,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. click ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_click): background coordinate injection cannot reach this target at (534,390) — it is occluded by another window (raising it would break the no-foreground contract). Escalate to delivery_mode:\"foregro... To ru",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 298452) 142 ms",
+      "curseur déplacé": true,
+      "ms": 302,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Sent click via SendInput to pid 298452 at (534,390) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "zone gauche 216,54"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 909,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (534,393).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 97,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Tk), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 113576978,\n    \"executed_steps\": 1,\n    \"total",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 110,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 128,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (534,390) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 899,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (534,393).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 581,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 113576978,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 547,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"del",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 298452) 23 ms",
+      "curseur déplacé": false,
+      "ms": 73,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 298452 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 890,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 98,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 113576978,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"scroll\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"tk_scroll_bar_lines\",\n  ",
+      "vu": [
+       "defil liste bas 0.005",
+       "defil liste bas 0.010",
+       "defil liste bas 0.015"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 111,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'TkTopLevel' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 with \"",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 149,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (491,510) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 921,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (489,515).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "electron",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": false,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 231,
+    "note": "742×800, sombre 0%, couleur dominante 49%",
+    "size": [
+     742,
+     800
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 95,
+    "note": "740×798, sombre 0%, couleur dominante 55%",
+    "size": [
+     740,
+     798
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 899,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_invoke\",\n          \"t",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 820,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [17] at screen (248,544) (background, no foreground swap).; on [17] Button \"Valider\" in window 154339974",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 300376) 554 ms (non rendu)",
+      "curseur déplacé": true,
+      "ms": 1185,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (248,544).",
+      "vu": [
+       "clic 3"
+      ]
+     }
+    },
+    "recouverte": false,
+    "comptée": false
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 689,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"t",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 300376) 64 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 784,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [18] at screen (300,541) (background, no foreground swap).; on [18] CheckBox \"Option\" selected in window 154339974",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1184,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (300,541).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1093,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_RenderWidgetHostHWND (pid 300376) 3 ms, Chrome_WidgetWin_1 (pid 300376) 9 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 826,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [6] (UIA ValuePattern).; on [6] Edit \"Nom\" value=\"Julien Piron\" in window 154339974",
+      "vu": [
+       "nom Cua Driver"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2960,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (580,238).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3930,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1420,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Posted click on Chromium element [30] at screen (481,780) (background, no foreground swap).; on [30] Edit \"Éditeur\" value=\"Bonjour\" in window 154339974\n2. type_text ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (text_input). Retry this action with ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 300376) 74 ms",
+      "curseur déplacé": false,
+      "ms": 1554,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [30] at screen (481,780) (background, no foreground swap).; on [30] Edit \"Éditeur\" value=\"Bonjour\" in window 154339974\n2. type_text ok: ✅ Typed 5 char(s) on pid 300376 via SendInput (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "editeur BonjourSalut"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "éditeur riche",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1666,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Hello at (240,738).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4876,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_RenderWidgetHostHWND (pid 300376) 3 ms, Chrome_WidgetWin_1 (pid 300376) 13 ms (non rendu)",
+      "curseur déplacé": false,
+      "ms": 759,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: Set the UIA value of combo box [21] to 'Vert'. This combo box is not a native Win32 one, and a UIA value write may change the shown text without the app treating it as a selection. Check with get_window_state; if the app did not react, click the combo box and then the option.; on [21] ComboBox \"Couleur\" value=\"Bleu\" in window 154339974",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3329,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Posted click on Chromium element [21] at screen (356,579) (background, no foreground swap).; on [21] ComboBox \"Couleur\" value=\"Bleu\" in window 154339974\n2. click ERROR (find): no element \"Vert\" in window 154339974 (waited 3100 ms)",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Rouge"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1092,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 780,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [25] at screen (443,641) (background, no foreground swap).; on [25] ListItem \"Bravo\" in window 154339974",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1179,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (443,613).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2770,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 675,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to Chromium pid 300376 at (485,613) (background, no foreground swap).",
+      "vu": [
+       "zone gauche 218,51"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2232,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (483,618).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1740,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Chromium), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    ",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 129,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 134,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (485,613) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2373,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (483,618).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 955,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 560,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 w",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 300376) 17 ms",
+      "curseur déplacé": false,
+      "ms": 45,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 300376 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 893,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2956,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"unverified\",\n  \"next\": \"~ effet non vu aux étapes [0] : lot arrêté, la suite n'a pas été envoyée ; regarde l'image jointe ou look avant toute nouvelle tentative ; ne renvoie pas le même lot (les étapes ✓ et = sont faites).\",\n  \"data\": {\n    \"success\": null,\n    \"hwnd\": 154339974,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action",
+      "vu": [
+       "position relue (page cachée) : 123 px"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 169,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 162,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (350,776) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2277,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (345,783).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "edge",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.2",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 242,
+    "note": "734×792, sombre 0%, couleur dominante 51%",
+    "size": [
+     734,
+     792
+    ]
+   },
+   "cua": {
+    "ok": true,
+    "ms": 201,
+    "note": "732×790, sombre 0%, couleur dominante 56%",
+    "size": [
+     732,
+     790
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 918,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_invoke\",\n          \"te",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 836,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [18] at screen (248,510) (background, no foreground swap).; on [18] Button \"Valider\" in window 84607574",
+      "vu": [
+       "clic 2"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "bouton",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1313,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (248,510).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 704,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"te",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 754,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [19] at screen (300,507) (background, no foreground swap).; on [19] CheckBox \"Option\" selected in window 84607574",
+      "vu": [
+       "coche off"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "case",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1480,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (300,507).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 701,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_set_value\",\n          \"t",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 826,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: ✅ Set AXValue on [7] (UIA ValuePattern).; on [7] Edit \"Nom\" value=\"Julien Piron\" in window 84607574",
+      "vu": [
+       "nom Cua Driver"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "champ",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2842,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Windows MCP at (580,204).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1964,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"type\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"chromium_simulated_typing\",",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1396,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 2 of 2 failed; 1 step(s) ran before it, 0 not run\n1. click ok: ✅ Posted click on Chromium element [31] at screen (481,746) (background, no foreground swap).; on [31] Edit \"Éditeur\" value=\"Bonjour\" in window 84607574\n2. type_text ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (text_input). Retry this action with d",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": true,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 306696) 77 ms",
+      "curseur déplacé": false,
+      "ms": 1521,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [31] at screen (481,746) (background, no foreground swap).; on [31] Edit \"Éditeur\" value=\"Bonjour\" in window 84607574\n2. type_text ok: ✅ Typed 5 char(s) on pid 306696 via SendInput (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": [
+       "editeur BonjourSalut"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "éditeur riche",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1665,
+      "appels": [
+       "App",
+       "Type"
+      ],
+      "réponse": "Typed Hello at (240,704).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3395,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"t",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 764,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. set_value ok: Set the UIA value of combo box [22] to 'Vert'. This combo box is not a native Win32 one, and a UIA value write may change the shown text without the app treating it as a selection. Check with get_window_state; if the app did not react, click the combo box and then the option.; on [22] ComboBox \"Couleur\" value=\"Bleu\" in window 84607574",
+      "vu": []
+     },
+     "par clics": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1001,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 2/2 steps ok\n1. click ok: ✅ Posted click on Chromium element [22] at screen (356,545) (background, no foreground swap).; on [22] ComboBox \"Couleur\" value=\"Bleu\" in window 84607574\n2. click ok: ✅ Posted click on Chromium element [24] at screen (347,607) (background, no foreground swap).; on [24] ListItem \"Vert\" in window 84607574",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "erreur": "RuntimeError: élément introuvable : Rouge"
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 697,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"te",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 775,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click on Chromium element [26] at screen (443,607) (background, no foreground swap).; on [26] ListItem \"Bravo\" in window 84607574",
+      "vu": [
+       "liste Bravo"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "élément de liste",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1239,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (443,579).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2358,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_post_click\",\n       ",
+      "vu": [
+       "zone gauche 222,54"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 685,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. click ok: ✅ Posted click to Chromium pid 306696 at (485,604) (background, no foreground swap).",
+      "vu": [
+       "zone gauche 218,50"
+      ]
+     }
+    },
+    "wmcp": {
+     "tâche": "clic brut",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2247,
+      "appels": [
+       "App",
+       "Click"
+      ],
+      "réponse": "Single left clicked at (483,609).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1916,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Chromium), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"",
+      "vu": []
+     }
+    },
+    "cua": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 108,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 134,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (485,604) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "molette",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2506,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (483,609).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 971,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": \"",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 554,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. hotkey ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (key_combo). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step 1 w",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "PRIS : Chrome_WidgetWin_1 (pid 306696) 20 ms",
+      "curseur déplacé": false,
+      "ms": 49,
+      "appels": [
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. hotkey ok: ✅ Pressed ctrl+k on pid 306696 via SendInput (Win32 target).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "raccourci ctrl+k",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 899,
+      "appels": [
+       "App",
+       "Shortcut"
+      ],
+      "réponse": "Pressed ctrl+k.",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1895,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 84607574,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"scroll\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_scroll_item\",\n       ",
+      "vu": [
+       "defil A bas 98 98"
+      ]
+     }
+    },
+    "cua": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 104,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: step 1 of 1 failed; 0 step(s) ran before it, 0 not run\n1. scroll ERROR (action): Background delivery is not available for target window class 'Chrome_WidgetWin_1' on this event kind (mouse_scroll). Retry this action with delivery_mode:\"foreground\"; Cua Driver will activate the target for the action and restore the previous foreground afterward. To run it, send the batch again from step ",
+      "vu": []
+     },
+     "premier plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 137,
+      "appels": [
+       "get_window_state",
+       "run_steps"
+      ],
+      "réponse": "run_steps: 1/1 steps ok\n1. scroll ok: ✅ Scrolled down via SendInput wheel (1 tick(s)) at screen (350,767) (delivery_mode:foreground).; background delivery was refused, so it ran in the foreground",
+      "vu": []
+     }
+    },
+    "wmcp": {
+     "tâche": "défilement",
+     "premier plan": {
+      "effet": false,
+      "déclaré": "ok",
+      "faux succès": true,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 2597,
+      "appels": [
+       "App",
+       "Scroll"
+      ],
+      "réponse": "Scrolled vertical down by 1 wheel times at (345,774).",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ }
+]

@@ -1,0 +1,627 @@
+[
+ {
+  "famille": "tk",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.1",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 499,
+    "note": "702×690, sombre 36%, couleur dominante 43%",
+    "size": [
+     702,
+     690
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 728,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 11144620,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"tk_held_click\",\n          ",
+      "vu": [
+       "zone gauche 178,45"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 726,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Tk), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 11144620,\n    \"executed_steps\": 1,\n    \"total_",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1368,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 11144620,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": \"",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 93,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 11144620,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"scroll\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"tk_scroll_bar_lines\",\n   ",
+      "vu": [
+       "defil liste bas 0.005",
+       "defil liste bas 0.010",
+       "defil liste bas 0.015"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "electron",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.1",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 318,
+    "note": "742×800, sombre 0%, couleur dominante 49%",
+    "size": [
+     742,
+     800
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1874,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_invoke\",\n          \"t",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 677,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"t",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 726,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_set_value\",\n          \"",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2150,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"type\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"chromium_simulated_typing\"",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3400,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 687,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"t",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 4514,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_post_click\",\n      ",
+      "vu": [
+       "zone gauche 222,55"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2577,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Chromium), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    ",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1750,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": ",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2001,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 143657444,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"scroll\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_scroll_item\",\n      ",
+      "vu": [
+       "defil A bas 98 98"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ },
+ {
+  "famille": "edge",
+  "édition": {
+   "nom": "antigravity",
+   "serveur": "nexus-windows-antigravity",
+   "version": "3.0.1",
+   "commande": "pwsh -NoProfile -File ~/OneDrive/Documents/NexusHarness/NexusAGY/scripts/start-computer-mcp.ps1"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 1339,
+    "note": "734×792, sombre 0%, couleur dominante 51%",
+    "size": [
+     734,
+     792
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "bouton",
+    "nexus": {
+     "tâche": "bouton",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1798,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_invoke\",\n          \"te",
+      "vu": [
+       "clic 1"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "case",
+    "nexus": {
+     "tâche": "case",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 1069,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"check\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_toggle\",\n          \"te",
+      "vu": [
+       "coche on"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "champ",
+    "nexus": {
+     "tâche": "champ",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": true,
+      "ms": 900,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"set\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_set_value\",\n          \"t",
+      "vu": [
+       "nom Julien Piron"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "éditeur riche",
+    "nexus": {
+     "tâche": "éditeur riche",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2041,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"type\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"chromium_simulated_typing\",",
+      "vu": [
+       "editeur Bonjour"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "liste déroulante",
+    "nexus": {
+     "tâche": "liste déroulante",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 3451,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"select\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"t",
+      "vu": [
+       "couleur Bleu"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "élément de liste",
+    "nexus": {
+     "tâche": "élément de liste",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 744,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"uia_select\",\n          \"te",
+      "vu": [
+       "liste Charlie"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 4377,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"click\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"method\": \"win32_post_click\",\n       ",
+      "vu": [
+       "zone gauche 222,54"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "échec",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 2422,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"failed\",\n  \"next\": \"étape 0 : ✗ échec : défilement à la molette (viser une liste ou une zone défilante par son libellé pour l'arrière-plan) — impossible en arrière-plan (Chromium), rien n'a été envoyé ; essaie une cible par libellé (target), sinon foreground=true (vraie souris/clavier en repli).\",\n  \"data\": {\n    \"success\": false,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "ok",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1785,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "{\n  \"status\": \"success\",\n  \"next\": \"✓ fait, passe à la suite.\",\n  \"data\": {\n    \"success\": true,\n    \"hwnd\": 33360928,\n    \"executed_steps\": 1,\n    \"total_steps\": 1,\n    \"steps\": [\n      {\n        \"step\": 0,\n        \"action\": \"key\",\n        \"status\": \"ok\",\n        \"verified\": true,\n        \"mark\": \"✓\",\n        \"result\": {\n          \"success\": true,\n          \"verified\": true,\n          \"method\": \"",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "erreur": "RuntimeError: zone introuvable"
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ }
+]
