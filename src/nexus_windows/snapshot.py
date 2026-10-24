@@ -516,6 +516,7 @@ class View:
     truncated: bool = False  # arbre coupé à max_nodes
     web_missing: bool = False  # Chromium n'a pas publié le contenu de la page
     unreadable: bool = False  # arbre de la fenêtre principale illisible (seules ses surgissantes ont été lues)
+    stale: bool = False  # page Chromium recouverte dont la publication n'a pu être déclenchée : arbre peut-être périmé
     roots: dict[int, uia.Node] = field(default_factory=dict)  # fenêtre → racine de son arbre (nœuds non listés compris)
 
     @property
@@ -568,7 +569,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     node_count = 0
     root_framework = ""
     notes: list[str] = []
-    truncated = web_missing = unreadable = False
+    truncated = web_missing = unreadable = stale = False
     roots: dict[int, uia.Node] = {}
     popups = set(windows[1:])
     chromium = info.framework == "Chromium"
@@ -592,6 +593,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
                     tree = auto.tree(win, max_nodes=max_nodes)
                     remember_web_documents(hwnd, tree)
                 elif flushed is False:
+                    stale = True
                     notes.append(
                         "UI Automation tree may be stale (Chromium window covered: its publication could not be "
                         "triggered): rely on the image"
@@ -634,7 +636,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
     framework = info.framework if info.framework != "Win32" or not root_framework else root_framework
     return View(
         hwnd, info, windows, elements, frame, node_count=node_count, framework=framework, detail=detail, notes=notes,
-        truncated=truncated, web_missing=web_missing, roots=roots, unreadable=unreadable,
+        truncated=truncated, web_missing=web_missing, roots=roots, unreadable=unreadable, stale=stale,
     )  # fmt: skip
 
 

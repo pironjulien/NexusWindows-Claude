@@ -6,6 +6,18 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-10-24 — Text first
+
+### Changed
+- `look` (`show`), `act` and `launch` (`then`) default to the new `auto` mode: the element list, plus the image only
+  when the tree is too thin to act on (fewer than 6 elements, a page that publishes nothing or may be stale, an
+  unreadable or truncated tree) or when an `act` step ends `~` or `✗`. `both` keeps the previous behaviour. Measured
+  on the common Windows bench (two runs, order swapped): same score with and without images (7/7), 77 % and 82 % fewer
+  observation tokens.
+
+### Security
+- Reviewed by the Codex agent over two rounds (stale Chromium tree and truncated tree now attach the image).
+
 ## [3.1.1] - 2026-10-24 — Alt+F4 in the background on every window
 
 ### Fixed

@@ -851,3 +851,45 @@ def test_posted_click_uses_the_logical_client_point_of_a_dpi_virtualized_window(
     assert methods.w.message_point(1, 0, 0) == (100, 40)
     monkeypatch.setattr(methods.w, "window_dpi_scale", lambda h: 1.0)
     assert methods.w.message_point(1, 0, 0) == (125, 50)
+
+
+# --- Texte d'abord (règle commune, point 2 ; banc passe 2 du 24/10) ---------------------------------------------------
+def _rich(after: snapshot.View) -> snapshot.View:
+    elements = [
+        snapshot.Element(i, node("Button", f"Bouton {i}", has_invoke=True, rect=(120 + 40 * i, 420, 30, 20)), 0, HWND)
+        for i in range(1, 9)
+    ]
+    return snapshot.View(HWND, after.info, [HWND], elements, after.frame)
+
+
+def test_auto_is_text_only_on_a_rich_tree(shifted, monkeypatch):
+    session, _, after, _ = shifted
+    monkeypatch.setattr(session, "view", lambda auto, hwnd, rebuild=False, detail=None: _rich(after))
+    out = server.render(NO_AUTO, HWND, "auto")
+    assert len(out) == 1 and '"Bouton 8"' in out[0]  # la liste seule, sans image
+
+
+def test_auto_attaches_the_image_after_an_unverified_action(shifted, monkeypatch):
+    session, _, after, _ = shifted
+    monkeypatch.setattr(session, "view", lambda auto, hwnd, rebuild=False, detail=None: _rich(after))
+    out = server.render(NO_AUTO, HWND, "auto", unverified=True)
+    assert len(out) == 2 and '"Bouton 8"' in out[0]
+
+
+def test_auto_attaches_the_image_when_the_tree_is_too_thin(shifted):
+    out = server.render(NO_AUTO, HWND, "auto")  # deux éléments seulement (canevas, jeu, page muette)
+    assert len(out) == 2
+
+
+def test_unverified_steps():
+    assert server.unverified(True, ["✓"]) and server.unverified(False, ["✓", "~"]) and server.unverified(False, ["✗"])
+    assert not server.unverified(False, ["✓", "="])
+
+
+@pytest.mark.parametrize("flag", ["stale", "truncated"])
+def test_auto_attaches_the_image_when_the_tree_may_be_stale_or_cut(shifted, monkeypatch, flag):
+    session, _, after, _ = shifted
+    view = _rich(after)
+    setattr(view, flag, True)  # en-tête : « rely on the image » / « incomplete list »
+    monkeypatch.setattr(session, "view", lambda auto, hwnd, rebuild=False, detail=None: view)
+    assert len(server.render(NO_AUTO, HWND, "auto")) == 2

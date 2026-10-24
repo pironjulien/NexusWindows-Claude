@@ -1,0 +1,121 @@
+[
+ {
+  "famille": "tk",
+  "édition": {
+   "nom": "codex",
+   "serveur": "nexus-windows-codex",
+   "version": "3.0.1",
+   "commande": "npx.cmd -y nexus-windows-codex"
+  },
+  "recouverte": true,
+  "capture": {
+   "nexus": {
+    "ok": true,
+    "ms": 121,
+    "note": "702×690, sombre 0%, couleur dominante 70%",
+    "size": [
+     702,
+     690
+    ]
+   }
+  },
+  "tâches": [
+   {
+    "tâche": "clic brut",
+    "nexus": {
+     "tâche": "clic brut",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 1183,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ click — observed (background:messages)\n{\n \"token\": \"201176b7-79f8-45eb-a305-dd0a83fc6082\",\n \"window\": {\n  \"id\": 128519048,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk\",\n  \"pid\": 302856,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  128519048\n ],\n \"windowChange\": null,\n \"popups\": [],\n \"t",
+      "vu": [
+       "zone gauche 173,45"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "molette",
+    "nexus": {
+     "tâche": "molette",
+     "arrière-plan": {
+      "effet": false,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 302856) 67 ms",
+      "curseur déplacé": true,
+      "ms": 590,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ scroll — observed (physical:native, foreground taken)\n{\n \"token\": \"168c19af-d487-428f-8159-4f43e44f7756\",\n \"window\": {\n  \"id\": 128519048,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — zone gauche 173,45\",\n  \"pid\": 302856,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  128519048\n ],\n \"win",
+      "vu": []
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "raccourci ctrl+k",
+    "nexus": {
+     "tâche": "raccourci ctrl+k",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "PRIS : TkTopLevel (pid 302856) 235 ms",
+      "curseur déplacé": false,
+      "ms": 855,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ key — observed (physical:native, foreground taken)\n{\n \"token\": \"6d320646-cd9f-45d4-83d2-fc6d108400ec\",\n \"window\": {\n  \"id\": 128519048,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — zone gauche 173,45\",\n  \"pid\": 302856,\n  \"nativeOnly\": true\n },\n \"mode\": \"text\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  128519048\n ],\n \"window",
+      "vu": [
+       "raccourci ctrl+k"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   },
+   {
+    "tâche": "défilement",
+    "nexus": {
+     "tâche": "défilement",
+     "arrière-plan": {
+      "effet": true,
+      "déclaré": "incertain",
+      "faux succès": false,
+      "premier plan": "intact",
+      "curseur déplacé": false,
+      "ms": 530,
+      "appels": [
+       "look",
+       "act"
+      ],
+      "réponse": "~ scroll — observed (background:messages)\n{\n \"token\": \"724abb81-b272-4bb3-a838-6b2f33be94c7\",\n \"window\": {\n  \"id\": 128519048,\n  \"app\": \"process:~\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python314\\\\python.exe\",\n  \"title\": \"Labo Tk — raccourci ctrl+k\",\n  \"pid\": 302856,\n  \"nativeOnly\": true\n },\n \"mode\": \"both\",\n \"source\": \"native-uia\",\n \"windowStack\": [\n  128519048\n ],\n \"windowChange\": null",
+      "vu": [
+       "defil liste bas 0.005",
+       "defil liste bas 0.010",
+       "defil liste bas 0.015"
+      ]
+     }
+    },
+    "recouverte": true,
+    "comptée": true
+   }
+  ]
+ }
+]

@@ -105,7 +105,7 @@ def _hints(
                            idempotent_hint=idempotent, open_world_hint=open_world)  # fmt: skip
 
 
-Show = Literal["both", "image", "elements", "changes", "text", "none"]
+Show = Literal["auto", "both", "image", "elements", "changes", "text", "none"]
 
 
 class Check(BaseModel):
@@ -344,7 +344,7 @@ def _changes(
 def render(
     auto: uia.Automation,
     hwnd: int,
-    show: str = "both",
+    show: str = "auto",
     query: str | None = None,
     region: list[float] | None = None,
     detail: str = "normal",
@@ -352,6 +352,7 @@ def render(
     max_elements: int = 150,
     extra: list[str] | None = None,
     call: log.Call | None = None,
+    unverified: bool = False,
 ) -> list[Any]:
     extra = list(extra or [])
     _check_readable_window(hwnd)  # gestionnaire de mots de passe, invite d'identifiants… : jamais lus
@@ -367,8 +368,17 @@ def render(
     view = SESSION.view(auto, hwnd, rebuild=True, detail=detail)
     uia_ms = (time.perf_counter() - t0) * 1000
     changes = show == "changes"
-    with_lines = show in ("both", "elements") or (minimized and show == "image")
-    want_image = (show in ("both", "image") or bool(region)) and not minimized
+    # Texte d'abord (règle commune, point 2 ; banc passe 2 du 24/10 : 7/7 avec et sans image, −77 à −82 % de jetons
+    # d'observation) : auto = la liste, et l'image seulement quand le texte ne suffit pas — arbre pauvre ou illisible
+    # (canevas, jeu, page qui ne publie pas : lu aussi par OCR) ou effet d'une action non relu (~, ✗ : unverified).
+    # Arbre tronqué ou page peut-être périmée : leur en-tête renvoie à l'image, qui est donc jointe (relecture de Codex).
+    thin = (
+        view.unreadable or view.web_missing or view.stale or view.truncated or len(view.elements) < snapshot.OCR_BELOW
+    )
+    with_lines = show in ("auto", "both", "elements") or (minimized and show == "image")
+    want_image = (
+        show in ("both", "image") or (show == "auto" and (thin or unverified)) or bool(region)
+    ) and not minimized
     # Un seul cadre de coordonnées pour toute la réponse (liste, en-tête, zoom) : celui de l'image complète jointe,
     # sinon celui de la dernière image montrée, où les points "x,y" du modèle se résolvent (fenêtre déplacée : suivie).
     stored = SESSION.frames.get(hwnd)
@@ -741,7 +751,7 @@ async def windows(filter: str | None = None) -> str:
 @mcp.tool(meta=ALWAYS, annotations=_hints("Look at a window", read_only=True, idempotent=True), structured_output=False)
 async def look(
     window: str | int | None = None,
-    show: Show = "both",
+    show: Show = "auto",
     query: str | None = None,
     region: list[float] | None = None,
     detail: Literal["normal", "high"] = "normal",
@@ -749,11 +759,13 @@ async def look(
     max_elements: int = 150,
 ) -> list[Any]:
     """See a window without bringing it to the front: numbered elements [N] (role, name, value, states, position
-    @x,y) and an image. window: title (part of it), process ("notepad"), hwnd, or Windows itself: "taskbar"
+    @x,y), and an image when the text is not enough. window: title (part of it), process ("notepad"), hwnd, or Windows itself: "taskbar"
     (buttons, tray, clock), "desktop" (icons), "screen" (whole screen as the user sees it, with the windows' places:
     overview only); omitted = current window.
-    show: both (default), image, elements, changes (only what changed since the last list: added "+", changed "~",
-    removed "-", the others keep their [N]), text (text of documents, no image), none.
+    show: auto (default: the list, plus the image only when the tree is too thin to act on — canvas, game, page that
+    publishes nothing — or after an unverified action), both (list and image), image, elements, changes (only what
+    changed since the last list: added "+", changed "~", removed "-", the others keep their [N]), text (text of
+    documents, no image), none.
     query: list only the elements containing this text. region [x1,y1,x2,y2]: zoom on an area of the image (fine
     reading; coordinates stay those of the full image). Images: WebP, at most 1568 px and 1.15 Mpx (detail=high
     gives the same size: zoom with region to read small text); an image identical to the last one sent for this window
@@ -778,6 +790,11 @@ async def look(
                 )  # fmt: skip
 
     return await _run(job, reads_only=True)
+
+
+def unverified(failed: bool, symbols: list[str]) -> bool:
+    """Un pas en échec ou d'issue inconnue : l'image accompagne la liste en mode auto (le texte n'a pas prouvé l'effet)."""
+    return failed or any(s in ("~", "✗") for s in symbols)
 
 
 def _dispatch(ex: actions.Executor, step: Step) -> actions.Outcome:
@@ -1188,7 +1205,7 @@ def _remember(
 async def act(
     steps: list[Step] | None = None,
     window: str | int | None = None,
-    then: Show = "both",
+    then: Show = "auto",
     foreground: bool = False,
     settle_ms: int = 300,
     remember: str | None = None,
@@ -1196,7 +1213,8 @@ async def act(
     params: dict[str, str] | None = None,
 ) -> list[Any]:
     """Act in the background: steps run in order (stops at the first error or unknown outcome), then the updated
-    state (then: both, image, elements, changes = only what changed since the last list, none). Per-step report:
+    state (then: auto = list + image if a step is not verified; both, image, elements, changes, none).
+    Per-step report:
     ✓ effect verified, = already done (nothing sent), ~ unknown outcome (batch stopped: inspect the state), ✗ failed or
     not reached; then the summary.
     Steps (do): click, double_click, right_click, type (appends text; no target = focused element), set (replaces
@@ -1285,7 +1303,9 @@ async def act(
                             "Window kept in the foreground during the batch, then the foreground was given back to the user."
                         )
                         if w.IsWindow(hwnd):
-                            out = render(auto, hwnd, then, extra=report, call=call)
+                            out = render(
+                                auto, hwnd, then, extra=report, call=call, unverified=unverified(failed, symbols)
+                            )
             if failed:
                 # Ligne d'échec du rapport réduite à ses premiers mots (« 3. ✗ type ») : le rapport rendu à l'agent cite
                 # l'erreur entière, texte saisi compris ; le journal jamais (relecture de Codex du 23/10).
@@ -1301,7 +1321,7 @@ async def act(
                 if watch.note() and out and isinstance(out[0], str):
                     out[0] += "\n" + watch.note()
                 return out
-            return render(auto, hwnd, then, extra=report, call=call)
+            return render(auto, hwnd, then, extra=report, call=call, unverified=unverified(failed, symbols))
 
     # Arrêt d'urgence non garanti : signalé aussi en tête d'act (résultat comme refus), pas seulement des lectures.
     try:
@@ -1320,7 +1340,7 @@ async def launch(
     app: str,
     args: str = "",
     devtools: bool = False,
-    then: Show = "both",
+    then: Show = "auto",
     wait_s: float = 15.0,
     restart: bool = False,
 ) -> list[Any]:
