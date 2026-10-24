@@ -521,3 +521,12 @@ fois la fenêtre du labo au premier plan : 13 lignes hors compte (couverture abs
 | Premier plan pris | 0 | 5 | 10 |
 
 Lignes comptées seules (38) : 35 contre 20, faux succès 0 contre 2.
+
+### Pistes WPF encore essayées (24 octobre, PC libre)
+| Essai | Résultat | Décision |
+|---|---|---|
+| Ctrl+K : WM_SETFOCUS envoyé à une fenêtre WPF jamais focalisée | WPF **prend le premier plan** (SetFocus à la réception) | écarté |
+| Ctrl+K : même chose après un vrai usage de la fenêtre (focus mémorisé), premier plan rendu | aucun effet, 3 essais sur 3 (et touches seules : aucun effet) | écarté |
+| Clic : capture de la souris posée pour le fil WPF (AttachThreadInput + SetCapture), clic envoyé avec le bouton simulé | aucun effet, et curseur réel vu bougé pendant l'essai | **écarté** (touche au curseur) |
+Molette sur un canevas recouvert (Chromium, Tk) et page Electron « hidden » : aucune voie native sans toucher aux
+fenêtres de l'utilisateur ni lancer de faux évènements système ; refus et « ~ » gardés.
