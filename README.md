@@ -235,9 +235,11 @@ with the file name. Scripts, shortcuts and installers are refused.
 
 ### Capture
 
-`PrintWindow` (10 to 26 ms, covered windows included), Windows.Graphics.Capture only as a fallback. Images are capped
-at 1568 px and 1.15 MP (2000 px and 3.75 MP with `detail="high"`) so that Claude models do not downscale them, which
-keeps coordinates exact. Coordinates are bound to the window: followed if it moves, refused if it was resized.
+`PrintWindow` (10 to 26 ms, covered windows included), Windows.Graphics.Capture only as a fallback. Images follow the
+common Nexus image rule: at most 1568 px and 1.15 MP, so that Claude models do not downscale them (coordinates stay
+exact); lossless WebP up to 200 KB, then lossy until the image fits 500 KB, same size (a 1429×804 screen: 48 KB instead
+of 84 KB in PNG). To read small text, zoom with `region` rather than a larger image. An image identical to the last one
+sent for that window (or zoomed area) is not attached again; the reply says so, and `show="image"` always attaches it. Coordinates are bound to the window: followed if it moves, refused if it was resized.
 
 ### Agent at work
 

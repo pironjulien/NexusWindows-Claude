@@ -6,6 +6,31 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-24 — Common image rule, Chromium apps launched covered
+
+### Changed
+- Images are WebP: lossless up to 200 KB, then quality 85, 70… until the image fits 500 KB, at the same size, so
+  coordinates do not change (a 1429×804 screen: 48 KB instead of 84 KB in PNG). `detail="high"` follows the same
+  1568 px / 1.15 MP limit (it was 2000 px); the `screen` overview also keeps under 1.15 MP. A zoom (`region`) is bounded
+  by both the long side and the area.
+
+### Added
+- No duplicate image: when the exact pixels and frame are unchanged since the last image sent for that window or zoomed
+  area, the image is not attached again and the reply says so; `show="image"` always attaches it. The image is marked
+  as sent only once it is attached; debug copies (`NEXUS_WINDOWS_DEBUG_IMAGES=1`) never block a reply and are pruned
+  like the logs.
+- `launch` of a Chromium/Electron app by its Start menu name (custom AppID, e.g. Logi Options+): the shortcut's
+  executable is started with the switches that keep it drawn while covered. A shortcut with its own arguments is kept
+  as is, and `launch` says the switches are missing.
+- `look` on a Chromium window whose captures are all uniform and that an opaque window fully covers (proven by the
+  z-order) says it is "probably not drawn", with the remedy.
+
+### Security
+- Reviewed by the Codex agent over three rounds (zoom area over the pixel budget, a suppressed duplicate that could
+  replace the coordinate frame, image prints left after a window was evicted, a debug write failure after the image
+  was marked as sent, red and green with the same grey).
+
+
 ## [3.0.2] - 2026-10-24 — Tk in the background, scrolling without a wheel
 
 ### Added

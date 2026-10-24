@@ -54,7 +54,7 @@ def main() -> None:
     barre = tk.Scrollbar(defil, orient="vertical", command=liste.yview)
     position = {"haut": 0.0}
 
-    def defile(first: str, last: str) -> None:
+    def defile(first: float | str, last: float | str) -> None:  # Tk passe des chaînes, typées float par ses stubs
         barre.set(first, last)
         haut = float(first)
         if haut != position["haut"]:

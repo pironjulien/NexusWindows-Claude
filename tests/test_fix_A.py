@@ -9,6 +9,7 @@ construit une seule fois au premier nom d'un act.
 from __future__ import annotations
 
 import ctypes
+import io
 import re
 from typing import cast
 
@@ -407,6 +408,23 @@ def test_zoom_never_replaces_the_reference_frame(shifted):
     assert len(out) == 2 and session.frames[HWND] is before.frame and "zoom" in out[0]
     server.render(NO_AUTO, HWND, "both")  # image complète : elle devient la référence
     assert session.frames[HWND] is after.frame
+
+
+def test_square_zoom_stays_under_the_pixel_budget(shifted):
+    session, before, _, _ = shifted
+    session.mark_image(before)
+    out = server.render(NO_AUTO, HWND, "both", region=[0, 0, 300, 300])
+    width, height = Image.open(io.BytesIO(out[1].data)).size
+    assert width * height <= snapshot.MAX_PIXELS["normal"] and max(width, height) <= 1568  # ×4 donnait 1200×1200
+
+
+def test_unchanged_image_is_not_resent_and_keeps_the_frame(shifted):
+    session, _, after, _ = shifted
+    first = server.render(NO_AUTO, HWND, "both")
+    assert len(first) == 2 and session.frames[HWND] is after.frame
+    second = server.render(NO_AUTO, HWND, "both")
+    assert len(second) == 1 and "Image unchanged" in second[0]
+    assert len(server.render(NO_AUTO, HWND, "image")) == 2  # show=image : toujours renvoyée
 
 
 def test_list_only_without_any_image_memorizes_its_frame(shifted):

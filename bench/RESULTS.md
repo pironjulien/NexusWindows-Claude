@@ -530,3 +530,17 @@ Lignes comptées seules (38) : 35 contre 20, faux succès 0 contre 2.
 | Clic : capture de la souris posée pour le fil WPF (AttachThreadInput + SetCapture), clic envoyé avec le bouton simulé | aucun effet, et curseur réel vu bougé pendant l'essai | **écarté** (touche au curseur) |
 Molette sur un canevas recouvert (Chromium, Tk) et page Electron « hidden » : aucune voie native sans toucher aux
 fenêtres de l'utilisateur ni lancer de faux évènements système ; refus et « ~ » gardés.
+
+## Chromium lancé par son nom, recouvert (24 octobre)
+Constat de Julien : trois images violettes unies de Logi Options+ (`launch(app="Logi Options+")`, Claude agrandi
+devant), 0 élément, « capture printwindow blank / capture wgc blank ». Journal du serveur : chaque lancement du 24/10
+était « via Start menu shortcut », celui du 23/10 par l'exécutable (sans défaut).
+
+| Constat mesuré | Conséquence dans le code |
+|---|---|
+| AppID « Logi.OptionsPlus.App » : ni chemin ni dossier connu, donc lancé par `explorer shell:AppsFolder\…`, sans `--disable-features=CalculateNativeWinOcclusion` | `launch._shortcut_target` lit l'exécutable et les arguments du raccourci (`System.Link.TargetParsingPath`, `System.Link.Arguments`, ~5 ms) |
+| Raccourcis Chromium à arguments propres : Chrome (profil), Antigravity (`--remote-debugging-port`), Gemini FR/US (profil) | jamais remplacés par l'exécutable seul ni complétés par l'outil ; note « switches NOT added » |
+| Sonde `covered_launch_probe.py`, couverture Win32 du labo agrandie et active, puis ChatGPT agrandi réel : par le raccourci, Logi peint 2 fois sur 2 en 10 s | défaut intermittent (écran de démarrage plus long, agent Logi lent) : la cause, l'absence des commutateurs, est corrigée, pas le symptôme |
+| Même sonde après correction | « via executable », commutateurs présents, peint, 32 éléments |
+| Electron du labo sans commutateur, hors écran (x = −6000) | peint quand même : le cas « jamais dessiné » n'est pas reproductible à la demande ; note de `look` couverte par tests (captures unies simulées) |
+

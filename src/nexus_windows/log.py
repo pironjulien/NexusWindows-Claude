@@ -37,7 +37,8 @@ def prune() -> None:
     if not LOG_DIR.exists():
         return
     limit = time.time() - KEEP_DAYS * 86400
-    for path in list(LOG_DIR.glob("*.jsonl")) + (list(IMAGE_DIR.glob("*.png")) if IMAGE_DIR.exists() else []):
+    images = [*IMAGE_DIR.glob("*.webp"), *IMAGE_DIR.glob("*.png")] if IMAGE_DIR.exists() else []  # PNG d'avant le 24/10
+    for path in list(LOG_DIR.glob("*.jsonl")) + images:
         try:
             if path.stat().st_mtime < limit:
                 path.unlink()
@@ -106,10 +107,15 @@ class Call:
         self.notes.update(_short(fields))
 
     def image(self, png: bytes, label: str = "") -> None:
+        """Copie de débogage de l'image envoyée : jamais bloquante (disque plein, accès refusé : l'image part quand même,
+        relecture de Codex du 24/10)."""
         if not DEBUG_IMAGES:
             return
-        IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-        (IMAGE_DIR / f"{self.id}{'-' + label if label else ''}.png").write_bytes(png)
+        try:
+            IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+            (IMAGE_DIR / f"{self.id}{'-' + label if label else ''}.webp").write_bytes(png)
+        except OSError:
+            pass
 
     def __enter__(self) -> Call:
         self._busy = indicator.begin(self.tool)  # logo « agent au travail » pendant les actions

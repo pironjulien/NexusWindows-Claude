@@ -288,7 +288,8 @@ def probe_web_scroll(kind: str) -> list[dict]:
                 if region is not None:
                     break
                 time.sleep(0.3)
-            assert region is not None, "région « Défilement » introuvable"
+            assert region is not None and region.rect is not None, "région « Défilement » introuvable"
+            region_center = region.rect.center
             cover.raise_()
             print(f"   {kind} : défilement {auto.scroll_percent(region.element)}")
             rows.append(
@@ -323,7 +324,7 @@ def probe_web_scroll(kind: str) -> list[dict]:
                 trial(
                     app,
                     "molette postée au point de la région (témoin)",
-                    lambda: methods.post(app.hwnd, w.WM_MOUSEWHEEL, WHEEL_DOWN, w.make_lparam(*region.rect.center)),
+                    lambda: methods.post(app.hwnd, w.WM_MOUSEWHEEL, WHEEL_DOWN, w.make_lparam(*region_center)),
                     "roue A",
                 )
             )
@@ -370,6 +371,7 @@ def list_web_scrollables(kind: str) -> list[dict]:
         time.sleep(2.0)
         uia.com_init()
         auto = uia.Automation(auto_set_focus=False)
+        nodes: list[uia.Node] = []
         for _ in range(20):
             nodes = [n for n in auto.tree(app.hwnd).walk() if n.props.get("has_scroll")]
             if len(nodes) > 1:

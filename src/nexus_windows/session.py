@@ -79,6 +79,8 @@ class Session:
     views: dict[int, snapshot.View] = field(default_factory=dict)
     shown: dict[int, snapshot.View] = field(default_factory=dict)
     frames: dict[int, snapshot.Frame] = field(default_factory=dict)  # cadre de la dernière image montrée
+    # (fenêtre, zone zoomée ou None) → empreinte de la dernière image envoyée : la même ne repart pas (règle commune)
+    sent_images: dict[tuple[int, tuple[float, ...] | None], bytes] = field(default_factory=dict)
     devtools: dict[int, int] = field(default_factory=dict)  # pid → port DevTools vérifié
     pages: dict[int | tuple[int, str], cdp.Page] = field(default_factory=dict)  # hwnd (ou hwnd, titre) → page
     dead_ports: dict[int, float] = field(default_factory=dict)  # port → instant du dernier échec
@@ -134,9 +136,7 @@ class Session:
             self.views[hwnd] = current
             if len(self.views) > 24:
                 oldest = min(self.views, key=lambda h: self.views[h].taken)
-                self.views.pop(oldest, None)
-                self.shown.pop(oldest, None)
-                self.frames.pop(oldest, None)
+                self.forget_view(oldest)
         return current
 
     def mark_shown(self, view: snapshot.View, ids: set[int]) -> None:
@@ -155,16 +155,24 @@ class Session:
         """Une image de cette vue vient d'être montrée : ses coordonnées sont désormais celles des points "x,y"."""
         self.frames[view.hwnd] = view.frame
 
-    def forget(self, hwnd: int) -> None:
+    def forget_view(self, hwnd: int) -> None:
+        """Vue, numéros, repère et empreintes d'images d'une fenêtre oubliés ensemble (jamais d'empreinte orpheline)."""
         self.views.pop(hwnd, None)
         self.shown.pop(hwnd, None)
         self.frames.pop(hwnd, None)
+        for key in [k for k in self.sent_images if k[0] == hwnd]:
+            self.sent_images.pop(key, None)
+
+    def forget(self, hwnd: int) -> None:
+        self.forget_view(hwnd)
         for key in [k for k in self.pages if k == hwnd or (isinstance(k, tuple) and k[0] == hwnd)]:
             self.pages.pop(key).close()
 
     def forget_all(self) -> None:
         for hwnd in list(self.views) + [k[0] if isinstance(k, tuple) else k for k in self.pages]:
             self.forget(hwnd)
+        self.sent_images.clear()  # aussi les fenêtres dont la vue n'est plus gardée
+        self.frames.clear()
 
     # --- DevTools -----------------------------------------------------------------------------------------------
     def register_devtools(

@@ -348,7 +348,7 @@ def redact_home(text: str) -> str:
 def target_in_front(app: apps.LabApp) -> bool:
     """La fenêtre au premier plan appartient-elle à l'application du labo (laissée devant par un outil précédent) ?"""
     front = w.foreground()
-    return bool(front) and w.window_pid(front) in set(app.pids)
+    return bool(front) and w.window_pid(front) in app.pids()
 
 
 def task_point(task: str, app: apps.LabApp) -> tuple[int, int]:

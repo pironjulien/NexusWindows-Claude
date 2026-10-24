@@ -374,10 +374,13 @@ class PointerActions(ExecutorBase):
             # qui dépasse de la zone est cachée par elle.
             lines = _lines_of(node)
             if rect is not None and len(lines) >= 2:
+                placed = [(n, r) for n in lines if (r := n.rect) is not None]  # _lines_of : feuilles placées
                 if direction == "down":
-                    hidden = sorted((n for n in lines if n.rect.bottom > rect.bottom + 1), key=lambda n: n.rect.top)
+                    below = sorted((p for p in placed if p[1].bottom > rect.bottom + 1), key=lambda p: p[1].top)
+                    hidden = [n for n, _ in below]
                 else:
-                    hidden = sorted((n for n in lines if n.rect.top < rect.top - 1), key=lambda n: -n.rect.bottom)
+                    above = sorted((p for p in placed if p[1].top < rect.top - 1), key=lambda p: -p[1].bottom)
+                    hidden = [n for n, _ in above]
                 if hidden:
                     break
             node = node.parent

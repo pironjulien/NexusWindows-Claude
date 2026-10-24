@@ -259,7 +259,7 @@ def _new_window(
 
 
 # Fenêtre recouverte : sans ces options, Chromium cesse de dessiner et de publier son arbre d'accessibilité.
-OCCLUSION_FEATURES = ("CalculateNativeWinOcclusion",)
+OCCLUSION_FEATURES = (snapshot.OCCLUSION_FEATURE,)
 # Edge : tout profil neuf se connecte implicitement au compte Windows de Julien et synchronise ses identifiants
 # (mesuré : 985 identifiants copiés dans un profil « jetable ») ; ni --guest ni --inprivate ne l'empêchent.
 NO_ACCOUNT_FEATURES = ("msImplicitSignin",)
@@ -598,6 +598,26 @@ def _app_id_path(app_id: str) -> str | None:
         if base and (Path(base) / match.group(2)).exists():
             return str(Path(base) / match.group(2))
     return None
+
+
+def _shortcut_target(app_id: str) -> tuple[str, str] | None:
+    """Exécutable et arguments du raccourci derrière un AppID personnalisé du menu Démarrer (« Logi.OptionsPlus.App »,
+    « electron.app.Antigravity »), lus dans shell:AppsFolder. None : application Store, adresse, cible qui n'est pas
+    un exécutable présent, ou dossier illisible."""
+    if "!" in app_id:
+        return None
+    try:
+        shell = comtypes.client.CreateObject("Shell.Application", dynamic=True)
+        item = shell.NameSpace("shell:AppsFolder").ParseName(app_id)
+        if item is None:
+            return None
+        target = item.ExtendedProperty("System.Link.TargetParsingPath")
+        arguments = item.ExtendedProperty("System.Link.Arguments")
+    except comtypes.COMError, OSError, AttributeError:
+        return None
+    if not isinstance(target, str) or not target.lower().endswith(".exe") or not Path(target).is_file():
+        return None
+    return target, arguments if isinstance(arguments, str) else ""
 
 
 # --- Dossier ou document ouvert par son association -------------------------------------------------------------
@@ -982,6 +1002,7 @@ def launch(
     oublie ce processus). restart : relancer l'application déjà ouverte (Steam seulement, accord de l'utilisateur)."""
     global _CHOICE
     notes: list[str] = []
+    chromium_shortcut = False
     user_front = w.foreground()
     _CHOICE = foreground.UserChoice(user_front)  # nouveau lancement : suivi du choix de l'utilisateur remis à zéro
     before = set(w.enum_windows())
@@ -1061,6 +1082,16 @@ def launch(
         if target and target.lower().endswith(".exe"):
             # Exécutable : politique et identité par processus.
             return launch(target, args, devtools, wait_s, auto, on_account_kill, restart)
+        shortcut = None if target else _shortcut_target(app_id)
+        if shortcut and policy.is_chromium_exe(shortcut[0]):
+            if not shortcut[1].strip():
+                # Raccourci sans arguments vers une application Chromium/Electron (AppID personnalisé : Logi Options+ le
+                # 2026-10-24) : lancée par son exécutable, elle reçoit les commutateurs qui la gardent dessinée
+                # recouverte ; par le raccourci, elle pouvait rester sur son écran de démarrage tant qu'elle l'était.
+                done = launch(shortcut[0], args, devtools, wait_s, auto, on_account_kill, restart)
+                done.notes.insert(0, f'Start menu: "{title_hint}" ({Path(shortcut[0]).name})')
+                return done
+            chromium_shortcut = True  # arguments propres au raccourci (profil, port…) : jamais remplacés par l'outil
         if target:
             policy.check_launch_exe(target, "")  # raccourci vers un document : commutateurs jamais acceptés
         policy.check_launch_app_id(app_id, title_hint, args, devtools)
@@ -1081,6 +1112,11 @@ def launch(
             via = "Start menu shortcut"
             if args.strip():
                 notes.append("arguments ignored: a Start menu shortcut is launched as is")
+            if chromium_shortcut:
+                notes.append(
+                    "Chromium/Electron launched by its shortcut, with its own arguments: the switches that keep it "
+                    "drawn when covered are NOT added (covered, it may stay blank)"
+                )
     stem = Path(exe).stem.lower() if exe else ""
     running = (lambda: proc.poll() is None) if proc is not None else None
     hwnd, took_back = _new_window(

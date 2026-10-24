@@ -8,6 +8,7 @@ partie de l'instantané (fenêtres surgissantes du même processus).
 from __future__ import annotations
 
 import ctypes
+import hashlib
 import io
 import math
 import re
@@ -18,14 +19,17 @@ from dataclasses import dataclass, field
 import comtypes
 from PIL import Image, ImageDraw, ImageFont
 
-from . import capture, ocr, steam, uia
+from . import capture, cdp, ocr, policy, steam, uia
 from . import win32 as w
 
-# Limites de vision de Claude : sans réduction côté serveur, les coordonnées lues sur l'image restent exactes.
-# normal : 1568 px et 1,15 Mpx (tous les modèles) ; high : 2000 px (au-delà de 20 images par requête, les modèles
-# haute résolution redescendent à 2000 px) et 3,75 Mpx.
-MAX_SIDE = {"normal": 1568, "high": 2000}
-MAX_PIXELS = {"normal": 1_150_000, "high": 3_750_000}
+# Règle image commune des produits Nexus (shared/images.md, 24/10) : côté long ≤ 1568 px et ≤ 1,15 Mpx (limite standard
+# de Claude, aucune réduction de sa part ; GPT-5.x et Gemini 3 lisent la même), WebP sans perte, > 200 Ko → qualité 85
+# puis 70, jamais > 500 Ko. detail="high" (2000 px auparavant) suit la même limite : pour lire un petit texte, region
+# (zoom) plutôt qu'une grande image.
+MAX_SIDE = {"normal": 1568, "high": 1568}
+MAX_PIXELS = {"normal": 1_150_000, "high": 1_150_000}
+LOSSLESS_BUDGET = 200 * 1024
+IMAGE_LIMIT = 500 * 1024
 
 ACTION_ROLES = {
     "Button",
@@ -598,14 +602,7 @@ def build_view(auto: uia.Automation, hwnd: int, detail: str = "normal", max_node
                     web_missing = True
                     notes.append(
                         "Web content missing from the UI Automation tree (Chromium stops publishing it while its window "
-                        "is covered): rely on the image and clicks by coordinates; an application started by launch does not "
-                        "have this problem"
-                        + (
-                            ' (Steam: launch(app="Steam", restart=true), with the user\'s consent, restarts it with '
-                            "-cef-disable-occlusion -cef-force-accessibility)."
-                            if steam.is_steam_window(hwnd)
-                            else "."
-                        )
+                        "is covered): rely on the image and clicks by coordinates; " + covered_remedy(hwnd)
                     )
         except uia.UIAError as error:
             if win == hwnd:
@@ -704,6 +701,73 @@ def flush_web(auto: uia.Automation, hwnd: int) -> bool | None:
     if not done:
         _ROOT_DOCUMENTS.pop(hwnd, None)
     return done
+
+
+# Commutateur ajouté par launch à toute application Chromium/Electron qu'il démarre (launch.OCCLUSION_FEATURES).
+OCCLUSION_FEATURE = "CalculateNativeWinOcclusion"
+
+
+def occlusion_disabled(pid: int) -> bool | None:
+    """Le processus a-t-il été démarré avec le suivi d'occlusion de Chromium coupé ? Ligne lue comme Chromium la
+    lit : commutateurs jusqu'au terminateur « -- » ou « --single-argument » seulement, dernier --disable-features retenu, nom de fonctionnalité
+    exact (sensible à la casse). None : ligne de commande illisible."""
+    line = cdp.process_command_line(pid)
+    if line is None:
+        return None
+    last = None
+    for token in policy.split_args(line):
+        if token == "--" or policy.switch_key(token) == "single-argument":
+            break  # la suite n'est faite que d'arguments
+        if policy.switch_key(token) == "disable-features":
+            last = token.partition("=")[2]
+    return last is not None and OCCLUSION_FEATURE in (n.strip() for n in last.split(","))
+
+
+_WS_EX_SEE_THROUGH = 0x20 | 0x80000  # WS_EX_TRANSPARENT, WS_EX_LAYERED : calques qui ne cachent pas ce qui est dessous
+
+
+def covered_by_window(hwnd: int) -> bool:
+    """Une fenêtre visible, au-dessus dans l'ordre z, couvre-t-elle à elle seule tout le cadre (Claude agrandi le
+    24/10) ? Recouvrement par plusieurs fenêtres ou par un calque : non prouvé, False."""
+    rect = w.frame_rect(hwnd)
+    for other in w.enum_windows():
+        if other == hwnd:
+            return False
+        if not w.IsWindowVisible(other) or w.is_cloaked(other) or w.IsIconic(other):
+            continue
+        if w.ex_style(other) & _WS_EX_SEE_THROUGH:
+            continue
+        r = w.frame_rect(other)
+        if r.left <= rect.left and r.top <= rect.top and r.right >= rect.right and r.bottom >= rect.bottom:
+            return True
+    return False
+
+
+def covered_remedy(hwnd: int) -> str:
+    """Remède, dit au modèle, à une fenêtre Chromium recouverte qui ne se dessine ni ne publie son contenu : selon la
+    ligne de commande réelle de son processus, jamais supposée (le 2026-10-24, Logi Options+ lancé par son raccourci
+    du menu Démarrer n'avait pas les commutateurs, et la note affirmait le contraire)."""
+    if steam.is_steam_window(hwnd):
+        return (
+            'Steam: launch(app="Steam", restart=true), with the user\'s consent, restarts it with '
+            "-cef-disable-occlusion -cef-force-accessibility."
+        )
+    disabled = occlusion_disabled(w.window_pid(hwnd))
+    if disabled:
+        return (
+            "its process has launch's switches (kept drawn when covered): the plain image is its real content or it "
+            "is still loading; look again."
+        )
+    if disabled is None:
+        return (
+            "its command line is unreadable (switches unknown): look again; if nothing changes, "
+            "act(foreground=true) with the user's consent."
+        )
+    return (
+        "this window was not started by launch with the switches that keep it drawn when covered (opened by the user "
+        "or by a shortcut with its own arguments): if the user agrees to close it, close it and launch it again with "
+        "launch (executable or Start menu name); otherwise act(foreground=true), with the user's consent."
+    )
 
 
 def _has_web_content(tree: uia.Node) -> bool:
@@ -1015,6 +1079,7 @@ def capture_view(view: View) -> tuple[Image.Image, list[str]]:
     canvas = Image.new("RGB", (width, height), (32, 32, 32))
     for win in view.windows:
         shot = None
+        painted = False
         for method in (capture.capture_printwindow, capture.capture_wgc):
             try:
                 shot = method(win)
@@ -1022,8 +1087,19 @@ def capture_view(view: View) -> tuple[Image.Image, list[str]]:
                 notes.append(f"capture {method.__name__.removeprefix('capture_')}: {error}")
                 continue
             if capture.blank_ratio(shot.image) < 1.0:
+                painted = True
                 break
             notes.append(f"capture {shot.method} blank")
+        chromium = win == view.hwnd and view.info.framework == "Chromium"
+        if shot is not None and not painted and chromium and w.root(w.foreground()) != view.hwnd:
+            # Image unie (écran de démarrage, fond) ET recouvrement prouvé : cause probable, jamais affirmée (une page
+            # d'une seule couleur, dessinée, donne la même image) ; non recouverte, rien n'est dit.
+            if covered_by_window(view.hwnd):
+                notes.append(
+                    "Image of one plain color, window covered: probably not drawn (Chromium stops drawing a covered "
+                    "window), or a page of one color"
+                    + (": see the note above." if view.web_missing else "; " + covered_remedy(view.hwnd))
+                )
         if shot is None:
             continue
         canvas.paste(shot.image, (shot.origin[0] - view.frame.origin[0], shot.origin[1] - view.frame.origin[1]))
@@ -1072,10 +1148,40 @@ def render_image(view: View, physical: Image.Image, marks: str = "auto") -> Imag
     return image
 
 
-def png_bytes(image: Image.Image) -> bytes:
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG", compress_level=3)
-    return buffer.getvalue()
+def image_bytes(image: Image.Image) -> bytes:
+    """Image envoyée au modèle, en WebP (règle commune) : sans perte si ≤ 200 Ko, sinon qualité 85 puis 70 (jamais
+    au-delà de 500 Ko : qualité 50, 30, 10 puis 0 en dernier recours). Mêmes dimensions : les coordonnées de l'image ne changent pas."""
+    rgb = image.convert("RGB")
+
+    def encode(**options: object) -> bytes:
+        buffer = io.BytesIO()
+        rgb.save(buffer, format="WEBP", method=4, **options)
+        return buffer.getvalue()
+
+    data = encode(lossless=True)
+    if len(data) <= LOSSLESS_BUDGET:
+        return data
+    # Puis qualité décroissante jusqu'à tenir 500 Ko (image très bruitée : à 0, un écran entier pèse < 100 Ko).
+    for quality, budget in (
+        (85, LOSSLESS_BUDGET),
+        (70, IMAGE_LIMIT),
+        (50, IMAGE_LIMIT),
+        (30, IMAGE_LIMIT),
+        (10, IMAGE_LIMIT),
+        (0, IMAGE_LIMIT),
+    ):
+        data = encode(quality=quality)
+        if len(data) <= budget:
+            return data
+    return data
+
+
+def image_print(image: Image.Image) -> bytes:
+    """Empreinte EXACTE d'une image envoyée (dimensions et pixels RGB) : écran inchangé depuis la dernière image = pas
+    de double. Pas l'empreinte grise 64×64 de shared/images.md : un voyant rouge devenu vert y garde le même gris
+    (relecture de Codex du 24/10) et disparaîtrait de la réponse."""
+    rgb = image.convert("RGB")
+    return hashlib.sha256(f"{rgb.width}x{rgb.height}:".encode() + rgb.tobytes()).digest()
 
 
 # --- Résolution d'une cible -----------------------------------------------------------------------------------

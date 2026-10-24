@@ -341,6 +341,7 @@ class ExecutorBase:
             simulated: bool = False,
             element: snapshot.Element | None = None,
             own: int = 0,
+            still_ours: Callable[[], None] | None = None,
         ) -> None: ...
 
     @property

@@ -265,7 +265,7 @@ def test_step_error_logged_without_typed_or_expected_text():
     logged = server._logged_error(
         server.Step(do="key", keys="enter"), server.actions.ActionError("Accord required. content: Message: SENTINEL")
     )
-    assert "SENTINEL" not in logged
+    assert logged is None or "SENTINEL" not in logged
     # Texte multiligne normalisé par les garde-fous (« typed: A B ») : masqué aussi.
     step = server.Step(do="type", text="SENTINEL-A\nSENTINEL-B")
     message = server._redacted(step, "Refused: typed: SENTINEL-A SENTINEL-B")
