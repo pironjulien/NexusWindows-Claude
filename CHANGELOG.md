@@ -6,6 +6,19 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.4] - 2026-10-24 — Right-click in File Explorer
+
+### Fixed
+- `act` `right_click` on a list or tree item (outside Win32/WinForms): like a real right-click, an unselected item is
+  first selected alone (UIA Select, read back), an item already selected keeps the current selection; selection not
+  read back or not published: no menu. UIA ShowContextMenu used to open the menu on the target ADDED to the selection
+  (File Explorer, after going back with "Back": "Properties" covered two items). A right-click on a File Explorer
+  display cell targets its row. Measured: "Properties of: alpha" with another folder selected before (was "2 items
+  selected").
+
+### Security
+- Reviewed by the Codex agent over two rounds (unpublished selection state now refused).
+
 ## [3.1.3] - 2026-10-24 — Four bench fixes
 
 ### Fixed

@@ -29,6 +29,7 @@ from .act_base import (
     NeedsForeground,
     Outcome,
     Unconfirmed,
+    _short,
     _unique,
     framework_of,
 )
@@ -105,10 +106,10 @@ class UiaActions(ExecutorBase):
     def click_element(
         self, e: snapshot.Element, button: str = "left", count: int = 1, close_list: bool = True
     ) -> Outcome:
-        row = self._selectable_row_of(e) if button == "left" and count == 1 else None
+        row = self._selectable_row_of(e) if button in ("left", "right") and count == 1 else None
         if row is not None:
-            # Cellule d'une ligne (Edit « Nom » de l'Explorateur en Détails) : un vrai clic sélectionne la LIGNE, seule.
-            # UIA SetFocus sur la cellule l'ajoutait à la sélection (banc du 24/10 : « 2 éléments sélectionnés »).
+            # Cellule d'une ligne (Edit « Nom » de l'Explorateur en Détails) : un vrai clic, gauche ou droit, vise la
+            # LIGNE. UIA SetFocus sur la cellule l'ajoutait à la sélection (banc du 24/10 : « 2 éléments sélectionnés »).
             e = row
         view = self.view
         fw = framework_of(e, view)
@@ -125,6 +126,12 @@ class UiaActions(ExecutorBase):
         page = self._page_if_free()
 
         if button == "right":
+            if (
+                role in ("ListItem", "TreeItem", "DataItem")
+                and p.get("has_selection_item")
+                and fw not in ("Win32", "WinForms")
+            ):
+                self._select_before_context_menu(e)
             right_messages = ("right-click by messages", self._right_click_proven(e))
             if fw in ("Win32", "WinForms"):
                 # Mesuré le 21/10 (banc commun) : le clic droit posté ouvre le menu contextuel WinForms sans toucher au
@@ -260,6 +267,29 @@ class UiaActions(ExecutorBase):
             if time.monotonic() >= deadline:
                 return ""
             time.sleep(0.05)
+
+    def _select_before_context_menu(self, e: snapshot.Element) -> None:
+        """Comme un vrai clic droit : un élément non sélectionné est d'abord sélectionné SEUL (UIA Select remplace la
+        sélection), un élément déjà sélectionné garde la sélection en cours. UIA ShowContextMenu, lui, ouvrait le menu
+        sur la cible AJOUTÉE à la sélection (banc du 24/10, Explorateur : menu « Propriétés » sur deux éléments).
+        Sélection non relue : rien d'autre n'est envoyé."""
+        try:
+            selected = self._refresh(e.node.element).get("selected")
+        except EXPECTED as error:
+            raise ActionError(
+                f"{e.describe()}: selection unreadable ({_short(error)}), no context menu sent."
+            ) from None
+        if selected is None:
+            # Propriété omise par le fournisseur : ni vrai ni faux, la sélection en cours n'est jamais touchée.
+            raise ActionError(f"{e.describe()}: selection state not published, no context menu sent.")
+        if selected:
+            return
+        worker.check_cancelled()
+        if not self._select_proven(e):
+            raise ActionError(
+                f"{e.describe()} was not read back as selected: no context menu sent (it would cover the previous "
+                "selection too)."
+            )
 
     def _selectable_row_of(self, e: snapshot.Element) -> snapshot.Element | None:
         """Ligne de l'Explorateur (ListItem DirectUI à motif SelectionItem) dont `e` est une cellule d'affichage (Edit

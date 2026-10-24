@@ -460,3 +460,73 @@ def test_late_first_step_in_the_middle_is_not_taken_for_the_end(monkeypatch):
     with pytest.raises(Unconfirmed, match="unchanged"):
         ex.scroll("Pane:Contenu", "down", 5)
     assert auto.set_to == []
+
+
+# --- 2 bis. Clic droit : la cible sélectionnée seule avant le menu (vrai défaut 2 du banc) -------------------
+class ContextMenuAuto(FakeAuto):
+    def show_context_menu(self, element: FakeEl) -> None:
+        self.calls.append(("context_menu", element))
+
+
+def _explorer_items(monkeypatch):
+    from nexus_windows import act_uia
+
+    monkeypatch.setattr(act_uia.snapshot, "popups_of", lambda hwnd: [])
+    folder = node("ListItem", "Dossier renommé", has_selection_item=True, selected=True, framework="DirectUI")
+    note = node("ListItem", "note", has_selection_item=True, selected=False, framework="DirectUI")
+    return folder, note
+
+
+def test_right_click_selects_an_unselected_item_alone_before_its_menu(monkeypatch):
+    folder, note = _explorer_items(monkeypatch)
+    auto = ContextMenuAuto()
+    ex = executor(make_view(folder, note), auto)
+    ex.click("ListItem:note", button="right")
+    assert auto.calls == [("select", note.element), ("context_menu", note.element)]
+
+
+def test_right_click_on_an_already_selected_item_keeps_the_selection(monkeypatch):
+    folder, note = _explorer_items(monkeypatch)
+    note.element.live["selected"] = True
+    auto = ContextMenuAuto()
+    ex = executor(make_view(folder, note), auto)
+    ex.click("ListItem:note", button="right")
+    assert auto.calls == [("context_menu", note.element)]
+
+
+def test_right_click_without_selection_read_back_opens_no_menu(monkeypatch):
+    folder, note = _explorer_items(monkeypatch)
+
+    class NoSelect(ContextMenuAuto):
+        def select(self, element: FakeEl) -> None:
+            self.calls.append(("select", element))  # envoyé, jamais relu sélectionné
+
+    from nexus_windows import act_uia
+
+    monkeypatch.setattr(act_uia.time, "sleep", lambda s: None)
+    auto = NoSelect()
+    ex = executor(make_view(folder, note), auto)
+    with pytest.raises(ActionError, match="not read back as selected"):
+        ex.click("ListItem:note", button="right")
+    assert ("context_menu", note.element) not in auto.calls
+
+
+def test_right_click_on_a_name_cell_targets_its_row(monkeypatch):
+    from nexus_windows import act_uia
+
+    monkeypatch.setattr(act_uia.snapshot, "popups_of", lambda hwnd: [])
+    row, cell = _row_with_name_cell("note")
+    auto = ContextMenuAuto()
+    ex = executor(make_view(row, cell), auto)
+    ex.click("Edit:Nom", button="right")
+    assert auto.calls == [("select", row.element), ("context_menu", row.element)]
+
+
+def test_right_click_with_unpublished_selection_state_changes_nothing(monkeypatch):
+    folder, note = _explorer_items(monkeypatch)
+    del note.element.live["selected"]  # propriété omise : ni vrai ni faux
+    auto = ContextMenuAuto()
+    ex = executor(make_view(folder, note), auto)
+    with pytest.raises(ActionError, match="not published"):
+        ex.click("ListItem:note", button="right")
+    assert auto.calls == []
