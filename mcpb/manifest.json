@@ -1,0 +1,49 @@
+{
+  "manifest_version": "0.4",
+  "name": "nexus-windows-claude",
+  "display_name": "NexusWindows for Claude",
+  "version": "3.2.1",
+  "description": "Windows computer use in the background: see and drive desktop apps without taking your mouse, keyboard or foreground, every action read back.",
+  "long_description": "NexusWindows for Claude lets Claude use your Windows desktop applications **in the background**: it reads a window (UI Automation list, image when needed), clicks, types, picks, uses menus and shortcuts and launches apps while you keep working, without taking your mouse, keyboard or foreground. Every action is read back and reported as verified, already done, unknown or failed.\n\n- Win32, WinForms, WPF, UWP/WinUI, Chromium/Electron and Tk, each with the safe technique for it\n- Irreversible or outward gestures (send, pay, publish, delete) need your explicit yes\n- Emergency stop: Ctrl+Alt+Shift+Esc stops every action for two minutes\n- Runs entirely on your PC: no account, no telemetry\n\nSource, safeguards and privacy: https://github.com/pironjulien/NexusWindows-Claude",
+  "author": {
+    "name": "Julien Piron",
+    "url": "https://github.com/pironjulien"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pironjulien/NexusWindows-Claude"
+  },
+  "homepage": "https://julienpiron.fr/nexuswindows/claude/",
+  "documentation": "https://github.com/pironjulien/NexusWindows-Claude#readme",
+  "support": "https://github.com/pironjulien/NexusWindows-Claude/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["--directory", "${__dirname}", "run", "--frozen", "python", "server/main.py"],
+      "env": {
+        "PYTHONUTF8": "1"
+      }
+    }
+  },
+  "tools": [
+    {"name": "windows", "description": "List application windows, dialogs included, and Windows surfaces (taskbar, desktop)"},
+    {"name": "look", "description": "See a window without bringing it to the front: numbered elements, image when needed"},
+    {"name": "act", "description": "Several actions in one call (click, type, select, menus, keys, scroll, wait), each read back"},
+    {"name": "launch", "description": "Open an application, folder, document or Settings page in the background"},
+    {"name": "window", "description": "Move, resize, minimize, restore, close or bring a window to the front"},
+    {"name": "notifications", "description": "Read the Windows notifications, security codes masked"},
+    {"name": "logs", "description": "Recent calls with the techniques tried, for debugging"}
+  ],
+  "keywords": ["windows", "computer-use", "ui-automation", "desktop", "background", "accessibility"],
+  "license": "MIT",
+  "privacy_policies": ["https://github.com/pironjulien/NexusWindows-Claude#privacy"],
+  "compatibility": {
+    "platforms": ["win32"],
+    "runtimes": {
+      "python": ">=3.14,<3.15"
+    }
+  }
+}

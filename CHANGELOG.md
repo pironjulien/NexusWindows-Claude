@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Added
+- `mcpb/`: Claude Desktop extension (`.mcpb`, manifest 0.4, `uv` server type so Claude Desktop manages uv; the PyPI
+  server pinned to the same version; Python 3.14). Validated with `@anthropic-ai/mcpb`; its launch command, run cold
+  in an empty folder, starts the server (7 tools). The packed file is attached to the release. Installation inside
+  Claude Desktop is not verified yet. `tests/test_mcpb.py` keeps its version, pin and tool list aligned.
+
 ### Changed
 - `setup.ps1`: declares the server in Claude Desktop's `claude_desktop_config.json` (classic and Store installs;
   merged, backup in `~\.claude\nexus-windows-setup-backups`, an entry of your own kept) instead of only printing it.
