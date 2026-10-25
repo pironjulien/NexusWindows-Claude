@@ -6,7 +6,23 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-10-26 — Updates by the server itself
+
+### Added
+- Update check by the server itself: at startup, in the background and at most once a day, it reads the latest
+  version from PyPI and, when it was started by `uvx`, prepares it in uv's cache for the next start of Claude
+  (`uvx nexus-windows-claude@<version> --version`; a `--version` flag prints the version without starting a server).
+  Its state is written to `%USERPROFILE%\.nexus\status\windows-claude.json` (installed and latest version, `idle`,
+  `checking`, `updating`, `done` or `failed`, message), the common contract of the Nexus apps. A failure keeps the
+  running version. `NEXUS_UPDATE_CHECK=off` turns it off. The README's Privacy section lists this request. Installs
+  declared without a version (`uvx --python 3.14 nexus-windows-claude`, as `setup.ps1` does) also start offline from
+  uv's cache.
+
 ### Changed
+- Lab and bench (`lab/apps.py`, `bench/cua_vs_nexus.py`): the user's physical input is watched for the whole bench;
+  at the first one, every lab window and its cover are closed at once and the bench stops cleanly. Lab windows and the
+  cover are put at the bottom of the window stack (a window shown without activation still lands on top), never over
+  the user's windows.
 - `setup.ps1` installs uv from Astral's official release binaries, checked against their published SHA-256, instead of
   running Astral's installer script in a child PowerShell (`-ExecutionPolicy Bypass -Command "irm … | iex"`), a pattern
   that antivirus heuristics flag. Same place (`~\.local\bin`, added to the user PATH unless `UV_NO_MODIFY_PATH` is

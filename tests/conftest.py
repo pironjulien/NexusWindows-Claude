@@ -18,6 +18,7 @@ def log_isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(log, "IMAGE_DIR", home / "logs" / "images")
     monkeypatch.setattr(launch, "PROFILES", home / "devtools-profiles")
     monkeypatch.setenv("NEXUS_JOURNAL_HOME", str(tmp_path / "journal-commun"))  # jamais le vrai journal commun
+    monkeypatch.setenv("NEXUS_UPDATE_CHECK", "off")  # aucune requête PyPI pendant les tests
 
 
 @pytest.fixture(autouse=True)

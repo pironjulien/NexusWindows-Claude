@@ -446,6 +446,11 @@ def child_command() -> list[str]:
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--version"]:  # préparation d'une mise à jour (updates.prepare) : version seule, pas de serveur
+        from . import __version__
+
+        print(__version__)
+        return
     if os.environ.get(ENV) is not None:  # déjà l'enfant d'un superviseur : le serveur lui-même
         from .server import main as serve
 

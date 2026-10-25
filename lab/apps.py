@@ -1,7 +1,8 @@
 """Lancement des applications du labo (une par famille d'interface) et lecture de leur statut.
 
 Chaque application affiche un contrôle « Statut » mis à jour à chaque événement (clic, coche, saisie…) et l'écrit
-sur stdout en JSON. Toutes s'affichent sans activation et tout en bas de l'empilement.
+sur stdout en JSON. Toutes s'affichent sans activation et sont posées au bas de l'empilement (send_to_bottom), sous les fenêtres
+de Julien.
 
 Banc intrusif malgré tout (mesuré : Edge et Tk prennent le premier plan ≈1,3 s au lancement, SW_SHOWNOACTIVATE
 ignoré) : le labo ne se lance que si Julien n'a touché ni clavier ni souris depuis IDLE_REQUIRED_S secondes, et le
@@ -92,6 +93,83 @@ def require_julien_away(idle_required_s: float = IDLE_REQUIRED_S) -> None:
         )
 
 
+# --- Présence de Julien pendant tout le banc (incident du 25/10 : une fenêtre du labo au premier plan pendant qu'il
+# travaillait ; l'absence n'était vérifiée qu'au lancement de chaque famille) -----------------------------------------
+_LIVE: set[LabApp] = set()  # applications du labo ouvertes
+_ON_RETURN: list[Callable[[], None]] = []  # fermetures à faire dès que Julien revient (couverture du banc…)
+_RETURNED = threading.Event()
+_ARMED_AT = [0.0]
+
+
+class _Presence:
+    """Surveille les entrées PHYSIQUES de Julien (Raw Input) tant que le labo est ouvert : à la première, toutes les
+    applications du labo et leurs couvertures sont fermées sur-le-champ et le banc s'arrête proprement
+    (check_presence lève JulienActive) ; il ne reprend qu'après une nouvelle absence de IDLE_REQUIRED_S."""
+
+    def __init__(self) -> None:
+        self._thread = threading.Thread(target=self._run, name="lab-presence", daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        from nexus_windows import physical
+
+        while True:
+            time.sleep(0.1)
+            armed = _ARMED_AT[0]
+            if not armed or _RETURNED.is_set() or not physical.available():
+                continue
+            if physical.idle_s() < time.monotonic() - armed:  # entrée physique depuis l'armement
+                _RETURNED.set()
+                close_everything()
+
+
+_PRESENCE: list[_Presence] = []
+
+
+def arm_presence() -> None:
+    """Julien vient d'être vu absent : surveillance armée à partir de maintenant."""
+    from nexus_windows import physical
+
+    physical.start()
+    if not _PRESENCE:
+        _PRESENCE.append(_Presence())
+    _RETURNED.clear()
+    _ARMED_AT[0] = time.monotonic()
+
+
+def check_presence() -> None:
+    """À appeler avant chaque tâche du banc : Julien revenu → JulienActive (le labo est déjà fermé)."""
+    if _RETURNED.is_set():
+        raise JulienActive("Julien est revenu : labo fermé aussitôt, banc interrompu jusqu'à sa prochaine absence.")
+
+
+def on_return(close: Callable[[], None]) -> Callable[[], None]:
+    """Fermeture à faire dès que Julien revient ; renvoie de quoi la retirer."""
+    _ON_RETURN.append(close)
+    return lambda: _ON_RETURN.remove(close) if close in _ON_RETURN else None
+
+
+def close_everything() -> None:
+    for close in list(_ON_RETURN):
+        try:
+            close()
+        except Exception:  # noqa: BLE001 - chaque fermeture est tentée
+            pass
+    for app in list(_LIVE):
+        try:
+            app.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def send_to_bottom(hwnd: int) -> None:
+    """Fenêtre du labo au bas de l'empilement, sans activation : jamais par-dessus une fenêtre de Julien (une fenêtre
+    affichée sans activation se pose quand même en HAUT de l'empilement : WinForms, WPF, Electron)."""
+    import ctypes
+
+    ctypes.windll.user32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(1), 0, 0, 0, 0, 0x1 | 0x2 | 0x10)
+
+
 class _ForegroundGuard:
     """Rend le premier plan à Julien dès qu'un processus du labo (lancé ou descendant) le prend, du lancement jusqu'à
     GUARD_TAIL_S après l'apparition de la fenêtre."""
@@ -127,7 +205,7 @@ class _ForegroundGuard:
         self._thread.join(tail_s + 1.0)
 
 
-@dataclass
+@dataclass(eq=False)  # par identité : rangée dans _LIVE
 class LabApp:
     kind: str
     proc: subprocess.Popen
@@ -162,6 +240,7 @@ class LabApp:
             self.events.get_nowait()
 
     def close(self) -> None:
+        _LIVE.discard(self)
         if self.proc.poll() is None:
             self.proc.terminate()
             try:
@@ -268,6 +347,7 @@ def launch(kind: str, x: int = 120, y: int = 120, cdp_port: int = 0, timeout_s: 
     from nexus_windows import win32 as w
 
     require_julien_away()
+    arm_presence()
     user_fg = w.foreground()  # relevé AVANT le lancement : une fenêtre du labo peut le prendre dès sa création
     app, ready = _start(kind, x, y, cdp_port)
     guard = _ForegroundGuard(app.proc.pid, user_fg, app.pids)
@@ -275,8 +355,12 @@ def launch(kind: str, x: int = 120, y: int = 120, cdp_port: int = 0, timeout_s: 
         _wait_window(app, ready, timeout_s)
     finally:
         guard.finish(GUARD_TAIL_S if app.hwnd else 0.0)
+    _LIVE.add(app)
+    if app.hwnd:
+        send_to_bottom(app.hwnd)
     app.extra["cdp_port"] = cdp_port
     app.extra["foreground_taken"] = guard.taken
+    check_presence()  # Julien revenu pendant le lancement : déjà refermé, rien n'est mesuré
     return app
 
 

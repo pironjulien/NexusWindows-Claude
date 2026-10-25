@@ -48,6 +48,7 @@ from . import (
     snapshot,
     stop,
     uia,
+    updates,
     worker,
 )  # fmt: skip
 from . import launch as launcher
@@ -1546,6 +1547,8 @@ def main() -> None:
     threading.Thread(target=launcher.prune_profiles, name="nexus-prune-profiles", daemon=True).start()
     # Routines des autres PC de Julien (miroir NexusWindows/claude/routines) : fusionnées par date, sans bloquer le démarrage.
     threading.Thread(target=_sync_routines, name="nexus-sync-routines", daemon=True).start()
+    # Mise à jour par le serveur lui-même (contrat commun du 26/10) : PyPI au plus une fois par jour, état écrit.
+    updates.start()
     # Liste du menu Démarrer préchargée (PowerShell, ~1 s) pour que le premier launch soit rapide.
     threading.Thread(target=launcher.start_apps, name="nexus-start-apps", daemon=True).start()
     mcp.run("stdio")

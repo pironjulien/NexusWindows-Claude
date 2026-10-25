@@ -226,7 +226,7 @@ class Cover:
         )  # fmt: skip
         self.hwnd = int(handle or 0)
         if self.hwnd:
-            user32.SetWindowPos(ctypes.c_void_p(self.hwnd), None, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+            self.raise_()
         self._ready.set()
         msg = ctypes.create_string_buffer(64)
         while user32.GetMessageW(msg, None, 0, 0) > 0:
@@ -236,15 +236,33 @@ class Cover:
     def __enter__(self) -> Cover:
         self._thread.start()
         self._ready.wait(5)
+        self._forget = apps.on_return(self.close)  # Julien revient : couverture fermée avec le labo
         return self
 
-    def raise_(self) -> None:
-        """Remet la couverture devant la fenêtre du labo (qui a pu remonter), toujours sans activation."""
+    def close(self) -> None:
         if self.hwnd:
-            flags = 0x0001 | 0x0002 | 0x0010 | 0x0040  # NOSIZE | NOMOVE | NOACTIVATE | SHOWWINDOW
-            ctypes.windll.user32.SetWindowPos(ctypes.c_void_p(self.hwnd), None, 0, 0, 0, 0, flags)
+            ctypes.windll.user32.PostMessageW(ctypes.c_void_p(self.hwnd), 0x0010, 0, 0)  # WM_CLOSE
+
+    def raise_(self) -> None:
+        """Remet la couverture juste devant la fenêtre du labo, toujours sans activation, et les deux au BAS de
+        l'empilement : jamais par-dessus une fenêtre de Julien (incident du 25/10 : posée tout en haut, elle et le
+        labo couvraient son travail). Le labo, remonté par un essai, est d'abord renvoyé en bas."""
+        if not self.hwnd:
+            return
+        user32 = ctypes.windll.user32
+        user32.GetWindow.restype = ctypes.c_void_p
+        flags = 0x0001 | 0x0002 | 0x0010 | 0x0040  # NOSIZE | NOMOVE | NOACTIVATE | SHOWWINDOW
+        apps.send_to_bottom(self.target)
+        above = user32.GetWindow(ctypes.c_void_p(self.target), 3)  # GW_HWNDPREV : la fenêtre juste au-dessus du labo
+        if above and int(above) != self.hwnd:
+            # Insérée juste sous `above`, donc juste au-dessus du labo.
+            user32.SetWindowPos(ctypes.c_void_p(self.hwnd), ctypes.c_void_p(above), 0, 0, 0, 0, flags)
+        elif not above:  # labo seul (aucune fenêtre au-dessus) : couverture en bas, puis labo encore dessous
+            user32.SetWindowPos(ctypes.c_void_p(self.hwnd), ctypes.c_void_p(1), 0, 0, 0, 0, flags)
+            apps.send_to_bottom(self.target)
 
     def __exit__(self, *exc: object) -> None:
+        self._forget()
         if self.hwnd:
             ctypes.windll.user32.PostMessageW(ctypes.c_void_p(self.hwnd), 0x0010, 0, 0)  # WM_CLOSE
             ctypes.windll.user32.PostThreadMessageW(self._thread.native_id, 0x0012, 0, 0)  # WM_QUIT

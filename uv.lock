@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "nexus-windows-claude"
-version = "3.2.2"
+version = "3.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "comtypes", marker = "sys_platform == 'win32'" },

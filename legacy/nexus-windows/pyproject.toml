@@ -2,13 +2,13 @@
 # working: it only installs nexus-windows-claude at the same version, which provides the `nexus-windows` command.
 [project]
 name = "nexus-windows"
-version = "3.2.2"
+version = "3.3.0"
 description = "Former name of nexus-windows-claude (NexusWindows for Claude): installs it"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = ["nexus-windows-claude==3.2.2"]
+dependencies = ["nexus-windows-claude==3.3.0"]
 classifiers = [
     "Development Status :: 7 - Inactive",
     "License :: OSI Approved :: MIT License",

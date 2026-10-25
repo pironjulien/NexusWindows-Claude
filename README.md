@@ -459,8 +459,11 @@ it), and a `click` on a closed WPF list is `~` where `expand` is `✓`.
 
 ## Privacy
 
-NexusWindows for Claude runs entirely on your PC. It has no account, no telemetry, no analytics and makes no network
-requests of its own (DevTools connections stay on `127.0.0.1`).
+NexusWindows for Claude runs entirely on your PC. It has no account, no telemetry and no analytics. Its only network
+request of its own is the update check: at most once a day, at startup and in the background, it reads the latest
+version number from PyPI (`https://pypi.org/pypi/nexus-windows-claude/json`, nothing sent but the request itself) and,
+when it was started by `uvx`, prepares that version in uv's cache for the next start of Claude.
+`NEXUS_UPDATE_CHECK=off` turns this off. DevTools connections stay on `127.0.0.1`.
 
 - **What it reads**: window titles, the UI Automation tree and window images of the applications Claude works in,
   only when a tool is called. Password managers and the secure desktop are never inspected
@@ -474,7 +477,8 @@ requests of its own (DevTools connections stay on `127.0.0.1`).
   14 days (tools, techniques, durations, errors; typed text is replaced by its length), the routines you chose to
   remember, and throwaway browser profiles created by `devtools=true` (deleted afterwards). Images are written to the
   log only if you set `NEXUS_WINDOWS_DEBUG_IMAGES=1`. Under `%USERPROFILE%\.nexus\`: the shared foreground token and
-  emergency-stop state. Under `%LOCALAPPDATA%\NexusJournal\windows\claude\` (or `NEXUS_JOURNAL_HOME`): a short
+  emergency-stop state, and `status\windows-claude.json` (installed and latest version, update state) with the date of
+  the last check in `windows-claude\update.json`. Under `%LOCALAPPDATA%\NexusJournal\windows\claude\` (or `NEXUS_JOURNAL_HOME`): a short
   monthly JSONL journal, in the same format as the other NexusWindows tools (app executable name, framework, action,
   technique, outcome, duration, whether the foreground was used, and the first words of an error, cut before any
   quote, colon or bracket); never typed text, screen text, labels, titles or paths. The server never deletes it.
