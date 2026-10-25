@@ -61,17 +61,40 @@ bench.
 
 ## Installation
 
-Requirements: Windows 10 or 11, [uv](https://docs.astral.sh/uv/), Python 3.14.
+Windows 10 or 11. You do not need Python: [uv](https://docs.astral.sh/uv/) downloads Python 3.14 by itself.
 
-From [PyPI](https://pypi.org/project/nexus-windows-claude/), with Claude Code (no clone needed):
+**One step** (installs uv if missing, downloads and checks the server, registers it with Claude Code when it is
+installed): open **Windows PowerShell** (Start menu, type `powershell`) and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/setup.ps1 | iex
+```
+
+Then close Claude completely and open it again. [`setup.ps1`](https://github.com/pironjulien/NexusWindows-Claude/blob/main/setup.ps1)
+is short and can be read first; running it again only does what is missing.
+
+**Claude Code plugin** (the same server, plus a skill; uv required):
+
+```text
+/plugin marketplace add pironjulien/nexus-plugins
+/plugin install nexus-windows@nexus-plugins
+```
+
+**By hand.** Install uv ([official installer](https://docs.astral.sh/uv/getting-started/installation/)):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+then restart Claude so that it sees uv, and register the server from [PyPI](https://pypi.org/project/nexus-windows-claude/).
+Claude Code:
 
 ```powershell
 claude mcp add --scope user -e PYTHONUTF8=1 --transport stdio nexus-windows -- uvx --python 3.14 nexus-windows-claude
 ```
 
-Until 3.0.0 the package was named `nexus-windows`; that name still works and installs `nexus-windows-claude`.
-
-For Claude Desktop, in `claude_desktop_config.json`:
+Claude Desktop: Settings → Developer → Edit Config, add this to `claude_desktop_config.json` (inside the existing
+`mcpServers` if there is one), save, then quit Claude completely and reopen it:
 
 ```json
 {
@@ -84,6 +107,9 @@ For Claude Desktop, in `claude_desktop_config.json`:
   }
 }
 ```
+
+The first start downloads about 100 MB (Python 3.14 and the server's dependencies); later starts take under a
+second. Until 3.0.0 the package was named `nexus-windows`; that name still works and installs `nexus-windows-claude`.
 
 From a clone (development):
 

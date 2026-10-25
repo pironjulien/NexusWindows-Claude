@@ -6,6 +6,17 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Added
+- `setup.ps1`: one-step setup for a fresh PC (`irm …/setup.ps1 | iex` in Windows PowerShell): installs uv with
+  Astral's official installer when it is missing, downloads the server and Python 3.14 and checks that it loads,
+  registers it with Claude Code (user scope) when the `claude` command exists, and prints the Claude Desktop
+  configuration. Idempotent. Tested on an empty profile without Python, uv or Claude Code, then with Claude Code:
+  `claude mcp list` reports the server connected.
+
+### Changed
+- README: installation rewritten for beginners (one-step script, Claude Code plugin, manual route with the official
+  uv installer; Python is not a prerequisite; where Claude Desktop's configuration lives; first start about 100 MB).
+
 ## [3.1.5] - 2026-10-25 — Maintenance
 
 ### Fixed
