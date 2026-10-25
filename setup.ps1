@@ -103,13 +103,24 @@ def claude_code():
     return "absent"
 
 
+def folder_left(folder):
+    return (p for p in folder.iterdir() if p.is_file() and p.name.startswith(".user-data-left."))
+
+
 def claude_desktop():
     roaming = pathlib.Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
     local = pathlib.Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local"))
-    # Classic install, then the Store (MSIX) ones, whose AppData is redirected into their package.
-    folders = [roaming / "Claude", *sorted((local / "Packages").glob("*Claude_*/LocalCache/Roaming/Claude"))]
+    # Classic install, the Store (MSIX) ones (AppData redirected into their package), and the newer Store layout whose
+    # data lives in %LOCALAPPDATA%\Claude-Data\<package>; a folder the app has left holds only a
+    # ".user-data-left.<package>" marker and is skipped (it is no longer read).
+    data = local / "Claude-Data"
+    folders = [
+        roaming / "Claude",
+        *sorted((local / "Packages").glob("*Claude_*/LocalCache/Roaming/Claude")),
+        *(sorted(f for f in data.iterdir() if f.is_dir()) if data.is_dir() else []),
+    ]
     results = []
-    for folder in (f for f in folders if f.is_dir()):
+    for folder in (f for f in folders if f.is_dir() and not any(folder_left(f))):
         path = folder / "claude_desktop_config.json"
         data = load(path)
         servers = data.setdefault("mcpServers", {})

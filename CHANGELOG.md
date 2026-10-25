@@ -6,6 +6,11 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Fixed
+- `setup.ps1`: recent Store installs of Claude Desktop read their configuration from
+  `%LOCALAPPDATA%\Claude-Data\<package>`; those folders are now declared, and a folder the app has left (it holds a
+  `.user-data-left.*` marker) is skipped. Existing keys such as `preferences` are kept.
+
 ### Added
 - `mcpb/`: Claude Desktop extension (`.mcpb`, manifest 0.4, `uv` server type so Claude Desktop manages uv; the PyPI
   server pinned to the same version; Python 3.14). Validated with `@anthropic-ai/mcpb`; its launch command, run cold
