@@ -63,8 +63,9 @@ bench.
 
 Windows 10 or 11. You do not need Python: [uv](https://docs.astral.sh/uv/) downloads Python 3.14 by itself.
 
-**One step** (installs uv if missing, downloads and checks the server, registers it with Claude Code when it is
-installed): open **Windows PowerShell** (Start menu, type `powershell`) and paste:
+**One step** (installs uv if missing, downloads and checks the server, registers it with Claude Code and declares it
+in Claude Desktop's configuration, merged after a backup; an entry of your own is kept, and with the Claude Code
+plugin enabled no second server is added): open **Windows PowerShell** (Start menu, type `powershell`) and paste:
 
 ```powershell
 irm https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/setup.ps1 | iex

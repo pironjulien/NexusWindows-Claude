@@ -6,6 +6,14 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Changed
+- `setup.ps1`: declares the server in Claude Desktop's `claude_desktop_config.json` (classic and Store installs;
+  merged, backup in `~\.claude\nexus-windows-setup-backups`, an entry of your own kept) instead of only printing it.
+  With the `nexus-windows` Claude Code plugin enabled, no `claude mcp add` (two servers otherwise) and an entry the
+  script added earlier is removed. `NEXUS_PACK=1` (Nexus pack installer): no question, no window, exit code 0 or 1,
+  last line `NEXUS_PACK_RESULT Claude Code=…; Claude Desktop=…`. Tested on an empty profile: Desktop only, rerun,
+  Claude Code added, then the plugin enabled (one server, connected).
+
 ## [3.2.1] - 2026-10-25 — File picker wait
 
 ### Fixed

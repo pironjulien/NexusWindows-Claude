@@ -2,8 +2,12 @@
 #   irm https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/setup.ps1 | iex
 # 1. installs uv (Astral's official installer) when it is missing; uv then fetches Python 3.14 by itself;
 # 2. downloads the server from PyPI and checks that it loads (first start of Claude is then instant);
-# 3. registers it with Claude Code when the `claude` command exists, otherwise prints what to paste in Claude Desktop.
+# 3. Claude Code: registers it (user scope), unless the nexus-windows plugin is enabled (then an entry this script
+#    added earlier is removed: it would start a second server); Claude Desktop: declares it in
+#    claude_desktop_config.json (merged, backup first, an entry of your own is kept).
 # Nothing else is changed; run it again at any time (it only does what is missing).
+# NEXUS_PACK=1 (Nexus pack installer): no question, no wait, no window; exit code 0 = done; last line
+# "NEXUS_PACK_RESULT Claude Code=...; Claude Desktop=...".
 $ErrorActionPreference = 'Stop'
 $package = 'nexus-windows-claude'
 
@@ -30,36 +34,120 @@ uvx --python 3.14 --refresh-package $package --from $package python -c 'import n
 if ($LASTEXITCODE) { throw "$package did not load: please open an issue at https://github.com/pironjulien/NexusWindows-Claude/issues" }
 Say "$package ready." Green
 
-# 3. Claude Code: user scope, so every project sees it. Already registered: left as it is.
-$claude = Get-Command claude -ErrorAction SilentlyContinue
-if ($claude) {
-    # Windows PowerShell 5.1 turns a redirected native stderr into a terminating error under 'Stop'.
-    $ErrorActionPreference = 'Continue'
-    claude mcp get nexus-windows *> $null
-    $missing = $LASTEXITCODE -ne 0
-    $ErrorActionPreference = 'Stop'
-    if ($missing) {
-        claude mcp add --scope user -e PYTHONUTF8=1 --transport stdio nexus-windows -- uvx --python 3.14 $package
-        if ($LASTEXITCODE) { throw 'claude mcp add failed.' }
-        Say 'Registered with Claude Code (user scope).' Green
-    } else {
-        Say 'Already registered with Claude Code.' Green
-    }
+# 3. Claude Code and Claude Desktop, by a short Python script run with uv's Python (JSON merged, files backed up).
+$register = @'
+import datetime, json, os, pathlib, shutil, subprocess, sys
+
+NAME, PACKAGE = "nexus-windows", sys.argv[1]
+ENTRY = {"command": "uvx", "args": ["--python", "3.14", PACKAGE], "env": {"PYTHONUTF8": "1"}}
+home = pathlib.Path.home()
+backups = home / ".claude" / "nexus-windows-setup-backups"
+
+
+def ours(current):
+    return current is None or (isinstance(current, dict) and PACKAGE in [str(a) for a in current.get("args", [])])
+
+
+def load(path):
+    return json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() and path.stat().st_size else {}
+
+
+def save(path, data):
+    if path.exists():
+        backups.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(path, backups / f"{path.parent.name}-{path.name}-{stamp}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".nexus-tmp")
+    temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def plugin_enabled():
+    try:
+        enabled = load(home / ".claude" / "settings.json").get("enabledPlugins", {})
+    except (OSError, ValueError):
+        return False
+    return any(key.split("@")[0] == NAME and on for key, on in enabled.items())
+
+
+def claude_code():
+    cli = shutil.which("claude")
+    config = home / ".claude.json"
+    current = load(config).get("mcpServers", {}).get(NAME) if config.exists() else None
+    if plugin_enabled():
+        if current is None or not ours(current):
+            return "plugin"
+        if cli:
+            subprocess.run([cli, "mcp", "remove", NAME, "--scope", "user"], capture_output=True, check=False)
+        else:
+            data = load(config)
+            del data["mcpServers"][NAME]
+            save(config, data)
+        return "plugin (earlier entry removed)"
+    if not ours(current):
+        return "kept (your own entry)"
+    if current is not None:
+        return "already declared"
+    if cli:
+        added = subprocess.run(
+            [cli, "mcp", "add", "--scope", "user", "-e", "PYTHONUTF8=1", "--transport", "stdio", NAME, "--",
+             "uvx", "--python", "3.14", PACKAGE], capture_output=True, text=True, check=False,
+        )
+        return "declared" if added.returncode == 0 else "failed: " + (added.stderr or added.stdout).strip()[:200]
+    if config.exists():
+        data = load(config)
+        data.setdefault("mcpServers", {})[NAME] = {"type": "stdio", **ENTRY}
+        save(config, data)
+        return "declared"
+    return "absent"
+
+
+def claude_desktop():
+    roaming = pathlib.Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
+    local = pathlib.Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local"))
+    # Classic install, then the Store (MSIX) ones, whose AppData is redirected into their package.
+    folders = [roaming / "Claude", *sorted((local / "Packages").glob("*Claude_*/LocalCache/Roaming/Claude"))]
+    results = []
+    for folder in (f for f in folders if f.is_dir()):
+        path = folder / "claude_desktop_config.json"
+        data = load(path)
+        servers = data.setdefault("mcpServers", {})
+        if not ours(servers.get(NAME)):
+            results.append("kept (your own entry)")
+        elif servers.get(NAME) == ENTRY:
+            results.append("already declared")
+        else:
+            servers[NAME] = ENTRY
+            save(path, data)
+            results.append("declared")
+    return ", ".join(results) or "absent"
+
+
+results = {}
+for client, declare in (("Claude Code", claude_code), ("Claude Desktop", claude_desktop)):
+    try:
+        results[client] = declare()
+    except Exception as error:  # noqa: BLE001 - one client's failure is reported, the other is still tried
+        results[client] = f"failed: {error}"
+print("NEXUS_PACK_RESULT " + "; ".join(f"{k}={v}" for k, v in results.items()))
+sys.exit(1 if any(v.startswith("failed") for v in results.values()) else 0)
+'@
+$script = Join-Path ([IO.Path]::GetTempPath()) "nexus-windows-register-$PID.py"
+[IO.File]::WriteAllText($script, $register)
+try {
+    $result = uv run --no-project --python 3.14 python $script $package | Select-Object -Last 1
+    $code = $LASTEXITCODE
+} finally { Remove-Item $script -ErrorAction SilentlyContinue }
+if ($result -match 'Claude Code=(plugin|declared|already)') { Say 'Claude Code: ready.' Green }
+if ($result -match 'Claude Desktop=(declared|already)') { Say 'Claude Desktop: ready.' Green }
+if ($result -match 'Claude Code=absent' -and $result -match 'Claude Desktop=absent') {
+    Say 'Neither Claude Code nor Claude Desktop was found: install one (https://claude.ai/download), then run this again.' Yellow
 }
-Say ''
-Say 'Claude Desktop: Settings > Developer > Edit Config, then put this in claude_desktop_config.json' Yellow
-Say '(merge it into "mcpServers" if the file already has one), save, and quit Claude completely:' Yellow
-Say @"
-{
-  "mcpServers": {
-    "nexus-windows": {
-      "command": "uvx",
-      "args": ["--python", "3.14", "$package"],
-      "env": { "PYTHONUTF8": "1" }
-    }
-  }
+if ($env:NEXUS_PACK -ne '1') {
+    Say ''
+    Say 'Last step: close Claude completely (also from the notification area) and open it again,' Yellow
+    Say 'then ask: "Open Notepad and write a shopping list: milk, eggs, bread."' Yellow
 }
-"@
-Say ''
-Say 'Last step: close Claude completely (also from the notification area) and open it again,' Yellow
-Say 'then ask: "Open Notepad and write a shopping list: milk, eggs, bread."' Yellow
+Write-Output $result
+if ($code) { throw "Registration failed: $result" }
