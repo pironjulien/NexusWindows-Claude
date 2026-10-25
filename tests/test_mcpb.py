@@ -1,5 +1,6 @@
-"""Extension Claude Desktop (mcpb/) : même version partout, serveur PyPI épinglé à cette version, mêmes outils que le
-serveur, Python 3.14 seulement (uv prendrait sinon la plus récente : 3.15 relevé le 25/10)."""
+"""Extension Claude Desktop (mcpb/) : même version partout dans l'extension, serveur PyPI épinglé à cette version (la
+dernière publiée : elle suit le serveur d'une publication, son verrou ne peut viser qu'une version déjà sur PyPI),
+mêmes outils que le serveur, Python 3.14 seulement (uv prendrait sinon la plus récente : 3.15 relevé le 25/10)."""
 
 from __future__ import annotations
 
@@ -18,9 +19,10 @@ MCPB = ROOT / "mcpb"
 def test_versions_and_pin_follow_the_server():
     manifest = json.loads((MCPB / "manifest.json").read_text(encoding="utf-8"))
     project = tomllib.loads((MCPB / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert manifest["version"] == project["version"] == __version__
-    assert project["dependencies"] == [f"nexus-windows-claude=={__version__}"]
-    assert f'name = "nexus-windows-claude"\nversion = "{__version__}"' in (MCPB / "uv.lock").read_text(encoding="utf-8")
+    version = manifest["version"]
+    assert project["version"] == version and project["dependencies"] == [f"nexus-windows-claude=={version}"]
+    assert f'name = "nexus-windows-claude"\nversion = "{version}"' in (MCPB / "uv.lock").read_text(encoding="utf-8")
+    assert tuple(map(int, version.split("."))) <= tuple(map(int, __version__.split(".")))
     assert project["requires-python"] == manifest["compatibility"]["runtimes"]["python"] == ">=3.14,<3.15"
 
 

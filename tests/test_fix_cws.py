@@ -167,3 +167,43 @@ def test_link_next_to_the_field_is_not_what_enter_triggers():
     field = _form(link)
     ex = executor(make_view(field, link), FakeAuto())
     ex._confirm_text(ex.resolve_element("Description*", set(), "x"), "a\nb")
+
+
+# --- Banc commun du 25/10 : molette Electron en butée -------------------------------------------------------------
+def test_scroll_item_never_scrolls_the_outer_area_when_the_inner_one_is_at_its_end(monkeypatch):
+    """Zone A sous le point, en bout de course (lignes cachées au-dessus seulement), dans une page qui a encore des
+    lignes cachées en dessous : la page défilait à la place de A, annoncée « ✓ ». Désormais refus, rien n'est envoyé."""
+    from test_contract import FakeAuto as _Auto
+
+    sent = []
+
+    class Pattern:
+        def ScrollIntoView(self):  # noqa: N802  (nom COM)
+            sent.append("invoke")
+
+    class Auto(_Auto):
+        def tree(self, hwnd):
+            page = node("Document", "page", rect=(0, 0, 400, 300))
+            area = node("Group", "A", rect=(0, 0, 200, 100))
+            area.parent = page
+            page.children.append(area)
+            for i in range(3):  # lignes de A : deux au-dessus de la zone (défilées), une visible
+                line = node("Text", f"A{i}", rect=(0, -100 + i * 60, 150, 20))
+                line.parent = area
+                area.children.append(line)
+            for i in range(3):  # lignes de la page, dont deux sous le bas de la page
+                line = node("Text", f"P{i}", rect=(220, 200 + i * 80, 150, 20))
+                line.parent = page
+                page.children.append(line)
+            return page
+
+        def pattern(self, element, name):
+            return Pattern()
+
+    view = make_view()
+    view.framework = "Chromium"
+    ex = executor(view, Auto())
+    monkeypatch.setattr(ex, "_window_under", lambda x, y: 1)
+    with pytest.raises(act_chromium.methods.MethodError, match="already at its end"):
+        ex._scroll_by_item(50, 50, "down", 1)
+    assert sent == []

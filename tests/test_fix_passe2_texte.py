@@ -337,10 +337,12 @@ def test_win32_scroll_sends_lines_per_notch_small_steps(monkeypatch):
 
 
 def test_wpf_keeps_its_small_steps(monkeypatch):
+    """Petits pas, jamais SetScrollPercent ; un seul par cran depuis le banc commun du 25/10 (trois pas = trois
+    défilements reçus par l'application)."""
     auto = XamlScrollAuto()
     ex, pane = _settings_like(monkeypatch, auto, framework="WPF")
-    ex.scroll("Pane:Contenu", "down", 1)
-    assert auto.set_to == [] and auto.calls == [("scroll", pane.element)] * 3
+    ex.scroll("Pane:Contenu", "down", 2)
+    assert auto.set_to == [] and auto.calls == [("scroll", pane.element)] * 2
 
 
 def test_horizontal_notch_uses_the_characters_setting(monkeypatch):

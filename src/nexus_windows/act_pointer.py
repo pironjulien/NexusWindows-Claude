@@ -375,14 +375,16 @@ class PointerActions(ExecutorBase):
             lines = _lines_of(node)
             if rect is not None and len(lines) >= 2:
                 placed = [(n, r) for n in lines if (r := n.rect) is not None]  # _lines_of : feuilles placées
-                if direction == "down":
-                    below = sorted((p for p in placed if p[1].bottom > rect.bottom + 1), key=lambda p: p[1].top)
-                    hidden = [n for n, _ in below]
-                else:
-                    above = sorted((p for p in placed if p[1].top < rect.top - 1), key=lambda p: -p[1].bottom)
-                    hidden = [n for n, _ in above]
+                below = sorted((p for p in placed if p[1].bottom > rect.bottom + 1), key=lambda p: p[1].top)
+                above = sorted((p for p in placed if p[1].top < rect.top - 1), key=lambda p: -p[1].bottom)
+                hidden = [n for n, _ in (below if direction == "down" else above)]
                 if hidden:
                     break
+                if below or above:
+                    # Zone sous le point qui défile, mais en butée dans ce sens : jamais la zone qui l'englobe (la page),
+                    # qu'on ferait défiler à sa place (banc commun du 25/10, Electron : « ✓ ligne déplacée de +120 px »,
+                    # la zone visée n'avait pas bougé).
+                    raise methods.MethodError(f"the area under the point is already at its end ({direction})")
             node = node.parent
         if not hidden:
             raise methods.MethodError("no area under the point has hidden lines in this direction")
@@ -538,6 +540,11 @@ class PointerActions(ExecutorBase):
             if lines == 0:
                 raise ActionError("Windows is set to scroll 0 lines per wheel notch: nothing was sent.")
             step, back, repeat = (3, 0, 1) if lines < 0 else (4, 1, lines)
+            if self.view.framework == "WPF" and lines > 0:
+                # WPF : chaque petit pas UIA est un défilement à part entière pour l'application (ScrollChanged) ; trois
+                # pas par cran en faisaient trois (banc commun du 25/10 : « défil » reçu trois fois, compté faux succès).
+                # Un pas par cran, comme Antigravity et Codex ; seul XAML (pas animés, mesurés) suit le réglage Windows.
+                repeat = 1
 
             def _scroll_uia() -> str:
                 before = self.auto.scroll_percent(container.element)

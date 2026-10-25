@@ -6,6 +6,20 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-10-25 — Common bench fixes
+
+### Fixed
+- `act` `scroll` in WPF: one notch is one UI Automation step again. Three small steps per notch reached the
+  application as three separate scrolls (common bench of October 25: three `ScrollChanged`, counted as a false
+  success). XAML (Settings, WinUI) still follows the Windows lines-per-notch setting, measured and set in one call.
+- `act` `scroll` in Chromium apps without DevTools: when the scrolling area under the point is already at its end in
+  that direction, the scroll is refused instead of moving the page around it. The page used to scroll in its place and
+  the step was reported `✓` (common bench, Electron).
+
+### Changed
+- `mcpb/`: the extension follows the server by one release, since its lock file can only pin a version already on
+  PyPI; its test checks the extension's own consistency.
+
 ### Fixed
 - `setup.ps1`: recent Store installs of Claude Desktop read their configuration from
   `%LOCALAPPDATA%\Claude-Data\<package>`; those folders are now declared, and a folder the app has left (it holds a
