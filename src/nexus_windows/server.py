@@ -718,31 +718,35 @@ def _check_actionable_window(hwnd: int) -> None:
         )
 
 
+def window_row(info: snapshot.WindowInfo) -> str:
+    """Une ligne de l'outil windows ; une fenêtre possédée (boîte de dialogue) est rattachée à sa propriétaire."""
+    if info.surface:
+        return f'{info.hwnd} "{info.surface}" — Windows shell ({info.process}): window="{info.surface.lower()}"'
+    state = f' [dialog of {info.owner} "{snapshot.clip(w.window_text(info.owner), 40)}"]' if info.owner else ""
+    state += " [minimized]" if info.minimized else ""
+    state += " [hidden: never shown on screen, drivable]" if info.hidden else ""
+    state += " [foreground]" if info.foreground else ""
+    return (
+        f'{info.hwnd} "{snapshot.clip(info.title, 90)}" — {info.process}, {info.framework}, '
+        f"{info.rect.width}×{info.rect.height}{state}"
+    )
+
+
 # --- Outils -------------------------------------------------------------------------------------------------
 @mcp.tool(meta=ALWAYS, annotations=_hints("List windows", read_only=True, idempotent=True), structured_output=False)
 async def windows(filter: str | None = None) -> str:
     """List application windows (front to back): hwnd, title, process, UI framework (Win32, WPF, Chromium…),
-    size; [hidden] = Store app Windows never shows (launched in the background), readable and drivable all the same.
+    size; [dialog of N "title"] = dialog or other window owned by window N (file picker, "Open", "Save as");
+    [hidden] = Store app Windows never shows (launched in the background), readable and drivable all the same.
     Then Windows itself: window="taskbar" and window="desktop" (icons). filter: part of a title or process name."""
 
     def job(_auto):
         with log.Call("windows", {"filter": filter}):
-            rows = []
-            for info in snapshot.app_windows() + snapshot.shell_surfaces():
-                if filter and filter.lower() not in (info.title + " " + info.process + " " + info.surface).lower():
-                    continue
-                if info.surface:
-                    rows.append(
-                        f'{info.hwnd} "{info.surface}" — Windows shell ({info.process}): window="{info.surface.lower()}"'
-                    )
-                    continue
-                state = " [minimized]" if info.minimized else ""
-                state += " [hidden: never shown on screen, drivable]" if info.hidden else ""
-                state += " [foreground]" if info.foreground else ""
-                rows.append(
-                    f'{info.hwnd} "{snapshot.clip(info.title, 90)}" — {info.process}, {info.framework}, '
-                    f"{info.rect.width}×{info.rect.height}{state}"
-                )
+            rows = [
+                window_row(info)
+                for info in snapshot.app_windows() + snapshot.shell_surfaces()
+                if not filter or filter.lower() in (info.title + " " + info.process + " " + info.surface).lower()
+            ]
             return "\n".join(rows) or "No window."
 
     return await _run(job, reads_only=True)

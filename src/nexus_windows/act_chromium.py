@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import time
+import unicodedata
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -21,10 +23,32 @@ from .act_base import (
     ActionError,
     ExecutorBase,
     NoEffect,
+    NoVisibleEffect,
     Outcome,
+    Unconfirmed,
     _short,
     framework_of,
 )
+
+# Déclencheur d'un sélecteur de fichiers (bouton d'<input type=file>, zone de dépôt, « Parcourir ») : Chromium n'ouvre
+# ce sélecteur que sur une vraie activation de l'utilisateur ; un clic DOM (UIA Invoke) est accepté sans rien ouvrir.
+# Relevé le 25/10 dans Chrome (fiche du Chrome Web Store) : « changement visible » annoncé, aucun sélecteur ouvert.
+FILE_PICKER = re.compile(
+    r"\b(choose (a |your )?files?|select (a |the |your )?files?|browse|upload|attach|add (a )?files?|drop|"
+    r"choisi(r|ssez) (un |des |les |votre |vos )?fichiers?|selectionne(r|z) (un |des |les |votre |vos )?fichiers?|"
+    r"parcouri?r|parcourez|televers(er|ez)|import(er|ez)|joindre|ajoute(r|z) (un |des |votre |vos )?fichiers?|"
+    r"depos(er|ez)|gliss(er|ez))\b"
+)
+PICKER_ROLES = {"Button", "Hyperlink", "Group", "Custom", "Text", "Image", "Pane", "SplitButton"}
+FILE_DIALOG_S = 2.0  # le sélecteur de Windows s'ouvre en ~0,3 s (mesuré) ; au-delà, il ne viendra plus
+
+
+def opens_file_picker(e: snapshot.Element) -> bool:
+    """L'élément ouvre-t-il un sélecteur de fichiers (d'après son libellé, anglais ou français) ?"""
+    if e.role not in PICKER_ROLES:
+        return False
+    label = unicodedata.normalize("NFKD", str(e.props.get("name") or "")).encode("ascii", "ignore").decode().lower()
+    return bool(FILE_PICKER.search(" ".join(label.split())))
 
 
 class ChromiumActions(ExecutorBase):
@@ -90,7 +114,77 @@ class ChromiumActions(ExecutorBase):
         if page is not None:
             chain.append(("DevTools", lambda: self._cdp_click(page, *self._point_of(e))))
         chain.append(("click by messages", self._watched(lambda: self._post_click(*self._point_of(e)))))
-        return self._try_or_foreground(chain, what, lambda: realinput.click(*self._point_of(e)))
+        real = lambda: realinput.click(*self._point_of(e))  # noqa: E731
+        if opens_file_picker(e):
+            if page is not None:  # clic DevTools = entrée de confiance (activation de l'utilisateur) : d'abord
+                chain.insert(0, chain.pop(-2))
+            return self._click_file_picker(chain, what, real)
+        return self._try_or_foreground(chain, what, real)
+
+    def _dialogs(self) -> set[int]:
+        """Fenêtres affichées que possède la cible (boîtes de dialogue, sélecteur de fichiers)."""
+        return {
+            h
+            for h in w.enum_windows()
+            if foreground.owned_by(h, {self.hwnd}) and w.IsWindowVisible(h) and not w.is_cloaked(h)
+        }
+
+    def _new_dialog(self, before: set[int], wait_s: float = FILE_DIALOG_S) -> int:
+        deadline = time.monotonic() + wait_s
+        while True:
+            fresh = self._dialogs() - before
+            if fresh:
+                return min(fresh)
+            if time.monotonic() >= deadline:
+                return 0
+            time.sleep(0.08)
+            worker.check_cancelled()
+
+    def _picker_step(self, fn: Callable[[], Any]) -> Callable[[], str]:
+        """Une technique de clic sur un déclencheur de sélecteur : prouvée seulement par l'ouverture d'une boîte de la
+        cible, attendue jusqu'à FILE_DIALOG_S (mesuré le 25/10 dans Edge : la boîte arrive après la seconde de relecture
+        habituelle, l'outil concluait « aucun effet »). Sans boîte : technique suivante (NoEffect)."""
+
+        def run() -> str:
+            before = self._dialogs()
+            try:
+                fn()
+            except NoEffect, NoVisibleEffect:
+                pass  # l'image n'a pas bougé : seule la boîte, qui arrive plus tard, compte
+            dialog = self._new_dialog(before)
+            if not dialog:
+                raise NoEffect("no file dialog opened")
+            return f'read back ✓ file dialog "{snapshot.clip(w.window_text(dialog), 40)}" opened'
+
+        return run
+
+    def _click_file_picker(self, chain, what: str, real: Callable[[], None]) -> Outcome:
+        """Clic sur un déclencheur de sélecteur de fichiers : réussi seulement si une boîte de dialogue de la cible
+        s'ouvre (✓, relue). Un changement à l'image (survol, focus) ne prouve rien : sans boîte, échec franc qui dit
+        pourquoi (Chromium exige une vraie activation) et propose foreground=true, ou vraie souris si elle est permise."""
+        steps = [(name, self._picker_step(fn)) for name, fn in chain]
+        hint = (
+            "Chromium opens a file picker only on a real user click (user activation): with the user's consent, run "
+            "again with foreground=true."
+        )
+        try:
+            return self._try(steps, what)
+        except Unconfirmed as error:  # clic posté sans boîte : issue inconnue, rien de rejoué, la voie est dite
+            raise Unconfirmed(f"{error} {hint}") from None
+        except ActionError as error:
+            if not self.allow_foreground:
+                raise ActionError(f"{error} {hint}") from None
+        before = self._dialogs()
+        done = self._foreground_or_fail(what, real)
+        if dialog := self._new_dialog(before):
+            done.line = (
+                f'{what} (real mouse — read back ✓ file dialog "{snapshot.clip(w.window_text(dialog), 40)}" opened)'
+            )
+            done.verified = True
+        else:
+            done.line += " — no file dialog appeared"
+            done.verified = None
+        return done
 
     @staticmethod
     def _clickable_descendant(e: snapshot.Element) -> uia.Node | None:

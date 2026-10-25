@@ -166,6 +166,7 @@ class WindowInfo:
     framework: str
     hidden: bool = False  # application Store jamais affichée par Windows (lancée sans activation), pilotable quand même
     surface: str = ""  # surface de Windows (« taskbar », « desktop »…) plutôt qu'une application
+    owner: int = 0  # fenêtre possédée (boîte de dialogue, sélecteur de fichiers) : la fenêtre qui la possède
 
     def label(self) -> str:
         return f'"{clip(self.title, 80)}" ({self.process}, {self.framework})'
@@ -220,6 +221,20 @@ def is_app_window(hwnd: int) -> bool:
         return False
     rect = w.frame_rect(hwnd)
     return w.IsIconic(hwnd) or (rect.width > 1 and rect.height > 1)
+
+
+def owner_of_dialog(hwnd: int) -> int:
+    """Fenêtre possédée affichée, qu'Alt+Tab ne montre pas (boîte de dialogue, sélecteur de fichiers, « Ouvrir » de
+    Chrome) : la fenêtre qui la possède, 0 sinon. Relevé le 25/10 dans Chrome : la boîte « Ouvrir » n'était pas
+    listée par windows, il avait fallu la viser par son hwnd. Jamais une fenêtre outil (bulle, info-bulle)."""
+    parent = w.owner(hwnd)
+    if not parent or not w.IsWindowVisible(hwnd) or w.is_cloaked(hwnd) or w.IsIconic(hwnd):
+        return 0
+    ex = w.ex_style(hwnd)
+    if ex & w.WS_EX_APPWINDOW or ex & w.WS_EX_TOOLWINDOW or not w.window_text(hwnd):
+        return 0  # APPWINDOW : déjà une fenêtre d'application (is_app_window)
+    rect = w.frame_rect(hwnd)
+    return parent if rect.width > 1 and rect.height > 1 else 0
 
 
 UWP_CORE_CLASS = "Windows.UI.Core.CoreWindow"
@@ -325,7 +340,8 @@ def shell_surfaces() -> list[WindowInfo]:
 
 
 def app_windows() -> list[WindowInfo]:
-    """Fenêtres d'application (ordre Z), applications Store cachées comprises (marquées hidden)."""
+    """Fenêtres d'application (ordre Z), applications Store cachées comprises (marquées hidden), boîtes de dialogue
+    et autres fenêtres possédées comprises (owner : la fenêtre qui les possède)."""
     handles = w.enum_windows()
     minimized = {w.window_text(h) for h in handles if _minimized_frame(h)}
     # Application réduite : son cadre est listé [minimized], sa CoreWindow détachée n'est pas une appli « cachée ».
@@ -339,6 +355,10 @@ def app_windows() -> list[WindowInfo]:
             out.append(info)
         elif is_app_window(h) and not (titles and _empty_frame_of(h, titles)):
             out.append(window_info(h))
+        elif parent := owner_of_dialog(h):
+            info = window_info(h)
+            info.owner = parent
+            out.append(info)
     return out
 
 

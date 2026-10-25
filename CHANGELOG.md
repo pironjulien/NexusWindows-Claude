@@ -6,12 +6,29 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-25 — Dialogs listed, file pickers proven
+
 ### Added
+- `windows` lists dialogs and other owned windows (a file picker "Open" or "Save as" owned by Chrome, for example),
+  attached to their owner: `[dialog of <hwnd> "owner title"]`. A dialog can be targeted by its title; a process name
+  still targets the main window first. Seen on October 25 in Chrome: the "Open" dialog was missing from the list and
+  had to be targeted by its hwnd.
 - `setup.ps1`: one-step setup for a fresh PC (`irm …/setup.ps1 | iex` in Windows PowerShell): installs uv with
   Astral's official installer when it is missing, downloads the server and Python 3.14 and checks that it loads,
   registers it with Claude Code (user scope) when the `claude` command exists, and prints the Claude Desktop
   configuration. Idempotent. Tested on an empty profile without Python, uv or Claude Code, then with Claude Code:
   `claude mcp list` reports the server connected.
+
+### Fixed
+- `act` `click` on a file picker trigger in a Chromium app ("Choose file", "Browse", "Upload", a drop zone; English
+  and French labels): it now succeeds only when a dialog of the target opens (`✓ file dialog "Open" opened`, waited
+  for up to 2 s, DevTools tried first when available since it is trusted input). Chromium opens a file picker only on
+  a real user click; a hover or focus change used to be reported as a "visible change". Without a dialog: `✗` (or `~`
+  when a posted click may still act) "no file dialog opened", suggesting `foreground=true` with the user's consent.
+- Confirmation guard: a line break typed in a field is no longer taken for Enter on a nearby help button ("Why can't
+  I submit this item?"). A neighbour counts only when it is a button with a command label (at most five words, no
+  question mark), in UI Automation and in DevTools pages alike; a messaging composer next to "Send" stays guarded.
+  The refusal or accord summary now names the field (`line break typed in "Description*"`).
 
 ### Changed
 - README: installation rewritten for beginners (one-step script, Claude Code plugin, manual route with the official

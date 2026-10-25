@@ -131,6 +131,17 @@ def _live_trigger(node: uia.Node) -> bool:
     )
 
 
+NEIGHBOR_ROLES = {"Button", "SplitButton"}
+COMMAND_WORDS = 5  # libellé d'un bouton d'envoi : une commande courte (« Envoyer », « Publier le post »)
+
+
+def command_label(label: str) -> bool:
+    """Libellé d'une commande, pas d'une question ni d'une phrase : un bouton d'aide voisin (« Pourquoi ne puis-je pas
+    envoyer cet élément ? », relevé le 25/10 sur le Chrome Web Store) n'est pas ce qu'Entrée déclenche dans un champ."""
+    text = " ".join(str(label).split())
+    return bool(text) and "?" not in text and len(text.split()) <= COMMAND_WORDS
+
+
 def _all_nodes(view: snapshot.View) -> list[uia.Node]:
     return [node for _window, roots in _roots_top_down(view) for root in roots for node in root.walk()]
 
@@ -173,7 +184,11 @@ def key_triggers(view: snapshot.View, field: uia.Node | None, kind: str) -> list
             if int(node.props.get("legacy_state") or 0) & STATE_SYSTEM_DEFAULT:
                 out.append((label_of(node), "default button of the window"))
     if field is not None:
-        out += [(label_of(node), "action button next to the field") for node in _neighbors(field)]
+        out += [
+            (label_of(node), "action button next to the field")
+            for node in _neighbors(field)
+            if node.control_type in NEIGHBOR_ROLES and command_label(label_of(node))
+        ]
     return out
 
 
@@ -191,7 +206,9 @@ _DOM_KEY_JS = (
     " const form = a && (a.form || (a.closest && a.closest('form')));"
     " if (form) form.querySelectorAll('button:not([type=button]):not([type=reset]),input[type=submit],input[type=image]').forEach(b => out.push(lab(b)));"
     " let anc = a; for (let i = 0; i < 3 && anc && anc.parentElement && anc.parentElement !== document.body; i++) anc = anc.parentElement;"
-    " if (anc && anc !== a) anc.querySelectorAll('button,[role=button],input[type=submit]').forEach(b => out.push(lab(b)));"
+    " const cmd = s => !!s && !s.includes('?') && s.split(/\\s+/).length <= " + str(COMMAND_WORDS) + ";"
+    " if (anc && anc !== a) anc.querySelectorAll('button,[role=button],input[type=submit]')"
+    ".forEach(b => { const l = lab(b); if (cmd(l)) out.push(l); });"
     " return out; })"
 )
 _DOM_POINT_JS = (
@@ -328,11 +345,15 @@ class ConfirmActions(ExecutorBase):
         located = _locate(view, uia.runtime_id(element.props))
         return located[0] if located else element.node
 
-    def _confirm_kinds(self, kinds: list[str], element: snapshot.Element | None, what: str) -> None:
+    def _confirm_kinds(
+        self, kinds: list[str], element: snapshot.Element | None, what: str, in_field: bool = False
+    ) -> None:
         kinds = [kind for kind in dict.fromkeys(kinds) if kind]
         if not kinds:
             return
         field = self._field_node(element if element is not None else self._focused_target_element())
+        if in_field:  # le résumé (refus, accord) nomme le champ où part le geste, pas seulement ce qu'il déclencherait
+            what += f' in "{snapshot.clip(label_of(field), 40)}"' if field is not None else " in the focused field"
         view = self._rebuild() if self.acted else self.view
         page = self._get_page()
         labels: list[tuple[str, str]] = []
@@ -352,7 +373,7 @@ class ConfirmActions(ExecutorBase):
     def _confirm_text(self, element: snapshot.Element | None, text: str) -> None:
         """Un saut de ligne tapé dans un champ vaut Entrée (envoi d'une messagerie, validation d'un formulaire)."""
         if "\n" in text or "\r" in text:
-            self._confirm_kinds(["submit"], element, "line break in the text")
+            self._confirm_kinds(["submit"], element, "line break typed", in_field=True)
 
     def _confirm_menu(self, path: str) -> None:
         """Menu par WM_COMMAND (sans clic d'élément contrôlé) : son entrée finale est contrôlée comme un clic."""

@@ -121,7 +121,11 @@ class Session:
         loose = snapshot.norm(text)
         exact = [c for c in candidates if c.title.lower() == text]
         exact_loose = [c for c in candidates if snapshot.norm(c.title).lower() == loose]
-        by_process = [c for c in candidates if c.process.lower() in (text, text + ".exe")]
+        # Processus : sa fenêtre principale d'abord, une boîte de dialogue qu'elle possède ensuite (visée par son titre).
+        by_process = sorted(
+            (c for c in candidates if c.process.lower() in (text, text + ".exe")),
+            key=lambda c: bool(getattr(c, "owner", 0)),
+        )
         partial = [c for c in candidates if text in c.title.lower()]
         partial_loose = [c for c in candidates if loose in snapshot.norm(c.title).lower()]
         for group in (exact, exact_loose, by_process, partial, partial_loose):
