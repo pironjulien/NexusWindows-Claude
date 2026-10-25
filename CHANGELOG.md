@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+### Changed
+- `setup.ps1` installs uv from Astral's official release binaries, checked against their published SHA-256, instead of
+  running Astral's installer script in a child PowerShell (`-ExecutionPolicy Bypass -Command "irm … | iex"`), a pattern
+  that antivirus heuristics flag. Same place (`~\.local\bin`, added to the user PATH unless `UV_NO_MODIFY_PATH` is
+  set). README: the manual route installs uv with winget.
+
 ## [3.2.2] - 2026-10-25 — Common bench fixes
 
 ### Fixed

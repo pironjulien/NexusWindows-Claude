@@ -1,6 +1,6 @@
 # One-step setup of NexusWindows for Claude on a fresh Windows PC, for people who never used a terminal:
 #   irm https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/setup.ps1 | iex
-# 1. installs uv (Astral's official installer) when it is missing; uv then fetches Python 3.14 by itself;
+# 1. installs uv (official release binaries, SHA-256 checked) when it is missing; uv then fetches Python 3.14 itself;
 # 2. downloads the server from PyPI and checks that it loads (first start of Claude is then instant);
 # 3. Claude Code: registers it (user scope), unless the nexus-windows plugin is enabled (then an entry this script
 #    added earlier is removed: it would start a second server); Claude Desktop: declares it in
@@ -15,15 +15,37 @@ function Say([string]$text, [string]$color = 'Gray') { Write-Host $text -Foregro
 
 if ($env:OS -ne 'Windows_NT') { throw 'NexusWindows for Claude runs on Windows 10 or 11 only.' }
 
-# 1. uv (https://docs.astral.sh/uv/): user install in ~\.local\bin, no administrator rights.
+# 1. uv (https://docs.astral.sh/uv/): user install in ~\.local\bin, no administrator rights. Astral's official release
+#    binaries, checked against their published SHA-256, then unpacked: no installer script is run (a child PowerShell
+#    running a downloaded script is what antivirus heuristics flag).
 $uvBin = Join-Path $HOME '.local\bin'
 if (-not (Get-Command uvx -ErrorAction SilentlyContinue)) {
     if (-not (Test-Path (Join-Path $uvBin 'uvx.exe'))) {
-        Say 'Installing uv (Astral official installer)...' Cyan
-        powershell -NoProfile -ExecutionPolicy ByPass -Command 'irm https://astral.sh/uv/install.ps1 | iex'
-        if ($LASTEXITCODE) { throw 'The uv installer failed: see https://docs.astral.sh/uv/getting-started/installation/' }
+        Say 'Installing uv (official release from GitHub, SHA-256 checked)...' Cyan
+        $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
+        $asset = "uv-$arch-pc-windows-msvc.zip"
+        $base = 'https://github.com/astral-sh/uv/releases/latest/download'
+        $work = Join-Path ([IO.Path]::GetTempPath()) "nexus-uv-$PID"
+        New-Item -ItemType Directory $work -Force | Out-Null
+        try {
+            $zip = Join-Path $work $asset
+            $ProgressPreference = 'SilentlyContinue'  # Windows PowerShell 5.1 downloads far slower with its progress bar
+            Invoke-WebRequest "$base/$asset" -OutFile $zip -UseBasicParsing
+            $expected = ([Text.Encoding]::ASCII.GetString((Invoke-WebRequest "$base/$asset.sha256" -UseBasicParsing).Content) -split '\s+')[0]
+            $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
+            if ($actual -ne $expected) { throw "uv download does not match its published SHA-256 ($asset): nothing was installed." }
+            Expand-Archive $zip (Join-Path $work 'uv') -Force
+            New-Item -ItemType Directory $uvBin -Force | Out-Null
+            Get-ChildItem (Join-Path $work 'uv') -Recurse -Include 'uv.exe', 'uvx.exe', 'uvw.exe' | Copy-Item -Destination $uvBin -Force
+        } finally { Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue }
+        if (-not $env:UV_NO_MODIFY_PATH) {  # like Astral's installer: ~\.local\bin on the user PATH, for new programs
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            if (($userPath -split ';') -notcontains $uvBin) {
+                [Environment]::SetEnvironmentVariable('Path', (@($uvBin) + ($userPath -split ';' | Where-Object { $_ })) -join ';', 'User')
+            }
+        }
     }
-    $env:PATH = "$uvBin;$env:PATH"  # this window only; the installer already added it for new programs
+    $env:PATH = "$uvBin;$env:PATH"  # this window
 }
 if (-not (Get-Command uvx -ErrorAction SilentlyContinue)) { throw "uv is installed but uvx was not found in $uvBin." }
 Say "uv: $(uv --version)" Green

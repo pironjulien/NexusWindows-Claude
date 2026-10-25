@@ -81,10 +81,10 @@ is short and can be read first; running it again only does what is missing.
 /plugin install nexus-windows@nexus-plugins
 ```
 
-**By hand.** Install uv ([official installer](https://docs.astral.sh/uv/getting-started/installation/)):
+**By hand.** Install uv ([official package](https://docs.astral.sh/uv/getting-started/installation/#winget)):
 
 ```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+winget install --id=astral-sh.uv -e
 ```
 
 then restart Claude so that it sees uv, and register the server from [PyPI](https://pypi.org/project/nexus-windows-claude/).
