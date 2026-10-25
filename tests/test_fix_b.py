@@ -399,8 +399,8 @@ def test_long_text_is_typed_in_short_slices(monkeypatch):
 def test_short_text_is_one_slice(monkeypatch):
     desk = Desk(monkeypatch)
     app = App(monkeypatch, desk)
-    typed = methods.type_in_slices(TARGET, {TARGET}, "Julien Piron", app.prepare, *as_reader(app.progress))
-    assert typed.complete and typed.slices == 1 and app.typed == "Julien Piron"
+    typed = methods.type_in_slices(TARGET, {TARGET}, "Alice Martin", app.prepare, *as_reader(app.progress))
+    assert typed.complete and typed.slices == 1 and app.typed == "Alice Martin"
     assert typed.detail().startswith("WM_CHAR keystrokes, brief activation")
 
 

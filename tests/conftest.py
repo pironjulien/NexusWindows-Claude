@@ -28,7 +28,7 @@ def routines_isolated(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def routines_mirror_isolated(monkeypatch, tmp_path):
-    """Miroir des routines (NexusClaude/routines, synchronisé par OneDrive) jamais écrit par un test : dossier à lui."""
+    """Miroir des routines (NexusWindows/claude/routines, synchronisé par OneDrive) jamais écrit par un test : dossier à lui."""
     monkeypatch.setattr(routines, "MIRROR", tmp_path / "routines-miroir")
 
 

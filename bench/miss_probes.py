@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT / "bench"))
 import apps  # noqa: E402
 import background_probes as probes  # noqa: E402
 import cua_vs_nexus as bench  # noqa: E402
+from redact import redact_home  # noqa: E402
 
 from nexus_windows import methods, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
@@ -412,5 +413,5 @@ if __name__ == "__main__":
             "liste-defil": lambda: list_web_scrollables("electron"),
         }[kind]()
     out = ROOT / "bench" / "results" / f"{datetime.now():%Y-%m-%d_%H%M}-miss-probes.json"
-    out.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    out.write_text(redact_home(json.dumps(results, ensure_ascii=False, indent=1)), encoding="utf-8")
     print(f"→ {out.name}")

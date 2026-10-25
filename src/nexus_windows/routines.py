@@ -15,13 +15,13 @@ tout texte fixe y est refusé à l'enregistrement. Au rejeu, un paramètre manqu
 remplies repassent la règle des cibles sémantiques.
 Fichiers : ~/.claude/nexus-claude/routines/<exécutable>.json (local au poste, hors OneDrive).
 
-Miroir entre les PC de l'utilisateur : NexusClaude/routines/<exécutable>.json dans le dépôt (synchronisé par OneDrive, suivi
+Miroir entre les PC de l'utilisateur : NexusWindows/claude/routines/<exécutable>.json dans le dépôt (synchronisé par OneDrive, suivi
 par Git). Il ne garde que la définition des routines (étapes, empreinte, titre, date d'enregistrement), jamais leurs
 statistiques de rejeu, et JAMAIS de texte saisi en clair : une routine dont un texte (`text`, `check.value`,
 `check.contains`) n'est pas fait que de modèles `{{x}}` reste locale au poste. Fusion par date : pour chaque routine, la
 version enregistrée (ou oubliée : pierre tombale datée) le plus récemment l'emporte, dans les deux sens. Le serveur
 synchronise au démarrage et réécrit le miroir de l'application à chaque routine enregistrée ou oubliée ;
-scripts/sync-routines.ps1 fait de même hors serveur (étape de Sync-NexusPoste).
+une synchronisation du poste peut faire de même hors serveur.
 """
 
 from __future__ import annotations
@@ -38,18 +38,20 @@ from . import foreground, log, snapshot
 from . import win32 as w
 
 ROOT = log.ROOT / "routines"
-_REPO = Path(__file__).resolve().parents[3]  # NexusClaude (sources lancées depuis le dépôt, installation éditable)
+# NexusWindows/claude (sources lancées depuis le dépôt privé, installation éditable ; .nexus-publish.toml n'est jamais
+# exporté : absent d'une copie publique ou d'un paquet).
+_PROJECT = Path(__file__).resolve().parents[2]
 
 
 def _default_mirror() -> Path | None:
-    """Miroir du dépôt : NEXUS_ROUTINES_MIRROR s'il est posé (vide : aucun) ; sinon NexusClaude/routines, sauf pour un
+    """Miroir du dépôt : NEXUS_ROUTINES_MIRROR s'il est posé (vide : aucun) ; sinon NexusWindows/claude/routines, sauf pour un
     serveur de test isolé (NEXUS_WINDOWS_HOME), qui ne doit jamais toucher aux routines de l'utilisateur."""
     explicit = os.environ.get("NEXUS_ROUTINES_MIRROR")
     if explicit is not None:
         return Path(explicit) if explicit.strip() else None
-    if os.environ.get("NEXUS_WINDOWS_HOME") or not (_REPO / "nexus-windows").is_dir():
+    if os.environ.get("NEXUS_WINDOWS_HOME") or not (_PROJECT / ".nexus-publish.toml").is_file():
         return None
-    return _REPO / "routines"
+    return _PROJECT / "routines"
 
 
 MIRROR: Path | None = _default_mirror()
@@ -300,7 +302,7 @@ def record_run(app: str, name: str, ok: bool) -> None:
         _save(app, data)
 
 
-# --- Miroir entre les PC (NexusClaude/routines) ------------------------------------------------------------------
+# --- Miroir entre les PC (NexusWindows/claude/routines) ------------------------------------------------------------------
 def plain_text(entry: dict[str, Any]) -> str:
     """Premier texte saisi en clair d'une routine (étape et champ), « » s'il n'y en a pas : un texte saisi ne passe
     dans le miroir que sous forme de modèle `{{x}}` (rempli au rejeu)."""

@@ -6,6 +6,20 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.1.5] - 2026-10-25 — Maintenance
+
+### Fixed
+- Auto-reload: when the server cannot restart on its new code, the message now says to reinstall nexus-windows
+  instead of pointing to an installer that is not part of this repository.
+- Test suite: the hygiene check (control and replacement characters) scans this project only, no longer the folder
+  around the checkout.
+
+### Changed
+- Bench reports go through a shared redaction step (`bench/redact.py`: user profile and Documents folder removed
+  before writing); obsolete raw bench results removed (cited and latest ones kept), two retired probes removed.
+- Bench and live tests aligned on the English reports (`read back ✓`, `Window N`, `the foreground is held by`).
+- Embedded shared policy updated to its current upstream version (header only, no rule change).
+
 ## [3.1.4] - 2026-10-24 — Right-click in File Explorer
 
 ### Fixed

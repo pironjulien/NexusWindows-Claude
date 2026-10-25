@@ -126,10 +126,10 @@ def test_verified_already_satisfied_and_observer_steps_continue(monkeypatch):
         server.Step(do="set", target="Nom", text="Julien", check=server.Check(target="Nom", value="Julien")),
         server.Step(do="wait", timeout=0.1),  # aucune entrée, seule la durée écoulée est prouvée
         server.Step(do="set", target="Ville", text="Paris"),
-        server.Step(do="set", target="Nom", text="Piron"),
+        server.Step(do="set", target="Nom", text="Martin"),
     )
     assert not failed and symbols == ["=", "✓", "✓", "✓"]
-    assert auto.calls == [("set_value", "Paris"), ("set_value", "Piron")]
+    assert auto.calls == [("set_value", "Paris"), ("set_value", "Martin")]
     assert "waited" in report[1] and not any("stopped" in line for line in report)
 
 
@@ -210,9 +210,9 @@ def test_absence_in_an_empty_reading_is_unknown():
 
 
 def test_compare_fields():
-    props = {"value": " Julien  Piron ", "toggle": 1, "expand": 0, "enabled": True, "has_value": True}
-    assert postcond._compare(props, {"target": "x", "value": "Julien Piron"}).state is True
-    assert postcond._compare(props, {"target": "x", "contains": "piron"}).state is True
+    props = {"value": " Alice  Martin ", "toggle": 1, "expand": 0, "enabled": True, "has_value": True}
+    assert postcond._compare(props, {"target": "x", "value": "Alice Martin"}).state is True
+    assert postcond._compare(props, {"target": "x", "contains": "martin"}).state is True
     assert postcond._compare(props, {"target": "x", "checked": True, "expanded": False}).state is True
     assert postcond._compare(props, {"target": "x", "checked": False}).state is False
     assert postcond._compare(props, {"target": "x", "focused": True}).state is None  # non publié : inconnu

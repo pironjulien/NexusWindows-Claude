@@ -550,7 +550,7 @@ def test_closed_tab_reconnects_and_never_internal_error(devtools):
     assert page is not None and page is not first and fake.port not in sess.dead_ports
     fake.kill_tab()
     line = click()
-    assert "erreur interne" not in line and "UIA Invoke" in line and auto.calls
+    assert "internal error" not in line.lower() and "UIA Invoke" in line and auto.calls
 
 
 def test_busy_page_is_reported_fast_and_port_stays_alive(devtools):
@@ -564,9 +564,9 @@ def test_busy_page_is_reported_fast_and_port_stays_alive(devtools):
     assert fake.port not in sess.dead_ports and HWND in sess.pages  # ni port mort, ni nouvelle connexion
     t0 = time.perf_counter()
     line = click()
-    assert "erreur interne" not in line and time.perf_counter() - t0 < 3
+    assert "internal error" not in line.lower() and time.perf_counter() - t0 < 3
     # Sans résolution paresseuse de la page dans click_element (actions.py) : refus explicite ; avec : UIA Invoke.
-    assert "UIA Invoke" in line or ("✗" in line and "ne répond pas" in line)
+    assert "UIA Invoke" in line or ("✗" in line and "did not answer" in line)
     fake.mode = "ok"
     assert "UIA Invoke" in click() and fake.port not in sess.dead_ports
 

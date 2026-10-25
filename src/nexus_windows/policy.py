@@ -1,4 +1,4 @@
-"""Politique de sécurité : la politique COMMUNE à Claude et Antigravity (NexusHarness/shared/garde-fous.json).
+"""Politique de sécurité : la politique COMMUNE à Claude et Antigravity (NexusHarness/NexusWindows/commun/garde-fous.json).
 
 Accord Claude–Antigravity du 18/10/2026 (journal de la trinité, « Garde-fous ») : un garde-fou n'existe que s'il
 empêche une auto-élévation ou une fuite de secrets, ou s'il demande l'accord avant un geste sans retour qui touche des
@@ -8,7 +8,7 @@ donc consoles, interpréteurs, Explorateur, barre des tâches, outils d'administ
 - BLOCAGE DUR (garde-fous.json, catégories de « claude ») : bureau sécurisé (UAC, verrouillage, ouverture de session),
   fenêtres d'identifiants Windows, gestionnaires de mots de passe. L'application Claude et la fenêtre d'Antigravity
   sont permises (relecture du 18/10 : aucune demande d'autorisation n'y passe en « ignorer les permissions »).
-- CONFIRMATION ÉTANCHE : confirm.py (mêmes motifs, même fichier).
+- CONFIRMATION ÉTANCHE : act_confirm.py (mêmes motifs, même fichier).
 - LANCEMENT : seulement ce qui exposerait une session de l'utilisateur (profil de navigateur choisi par le modèle, port
   DevTools ou extension chargée sur un navigateur ; devtools=true ouvre un profil neuf).
 Politique absente ou illisible : toute action refusée (échec fermé). `look` reste toujours permis, sauf blocage dur.
@@ -23,7 +23,7 @@ import threading
 from pathlib import Path
 
 from . import win32 as w
-from .codeprint import SHARED_DIR  # politique vivante (NexusHarness/shared) ou embarquée hors du dépôt
+from .codeprint import SHARED_DIR  # politique vivante (NexusHarness/NexusWindows/commun) ou embarquée hors du dépôt
 
 AGENT = "claude"
 if str(SHARED_DIR) not in sys.path:

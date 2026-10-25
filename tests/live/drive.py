@@ -99,7 +99,7 @@ SCENARIO = [
     ("click Valider", [{"do": "click", "target": "Valider"}], lambda e: e.startswith("clic")),
     ("check Option", [{"do": "check", "target": "Option"}], lambda e: e == "coche on"),
     ("uncheck Option", [{"do": "uncheck", "target": "Option"}], lambda e: e == "coche off"),
-    ("set Nom", [{"do": "set", "target": "champ:Nom", "text": "Julien Piron"}], None),
+    ("set Nom", [{"do": "set", "target": "champ:Nom", "text": "Alice Martin"}], None),
     ("type Nom", [{"do": "type", "target": "champ:Nom", "text": " 42"}], None),
     ("select Couleur", [{"do": "select", "target": "Couleur", "option": "Bleu"}], lambda e: e == "couleur Bleu"),
     ("click Charlie", [{"do": "click", "target": "Charlie"}], lambda e: e == "liste Charlie"),
@@ -129,9 +129,9 @@ LONG_TEXT = {
 WEB_ONLY = {"type Éditeur", "type Éditeur bis"} | LONG_TEXT
 NOT_WEB = {"menu"}
 # Saisies : la page web émet « nom … » ; les applications de bureau n'émettent rien pour ce champ.
-WEB_EXPECT = {"set Nom": lambda e: e == "nom Julien Piron", "type Nom": lambda e: e == "nom Julien Piron 42"}
+WEB_EXPECT = {"set Nom": lambda e: e == "nom Alice Martin", "type Nom": lambda e: e == "nom Alice Martin 42"}
 READ_BACK = {"set Nom", "type Nom", "set Notes 2 lignes"} | LONG_TEXT  # « relu ✓ » exigé dans le compte rendu
-DESKTOP_VALUE = {"set Nom": "Julien Piron", "type Nom": "Julien Piron 42"}  # valeur du champ relue à part
+DESKTOP_VALUE = {"set Nom": "Alice Martin", "type Nom": "Alice Martin 42"}  # valeur du champ relue à part
 
 
 def field_value(hwnd: int, name: str) -> str:
@@ -156,7 +156,7 @@ BATCH_EVENTS = ["clic", "coche on", "coche off", "couleur Vert", "liste Bravo"]
 
 def server_params() -> StdioServerParameters:
     """Serveur MCP réel, isolé : journaux et profils DevTools dans un dossier de test (jamais ceux de Julien). La
-    politique est la commune (shared/garde-fous.json)."""
+    politique est la commune (commun/garde-fous.json)."""
     home = apps.STATE / "server-home"
     home.mkdir(parents=True, exist_ok=True)
     env = {**os.environ, "NEXUS_WINDOWS_HOME": str(home), "PYTHONIOENCODING": "utf-8"}
@@ -242,7 +242,8 @@ async def wait_stable(client: Client, names: tuple[str, ...], timeout_s: float =
     while True:
         text = text_of(await client.call_tool("look", {"show": "elements", "max_elements": 600}))
         elements = [line.strip() for line in text.splitlines() if line.strip().startswith("[")]
-        if elements == previous and all(any(f"« {n} »" in line for line in elements) for n in names):
+        # snapshot.line_of : « [N] Rôle "nom" … »
+        if elements == previous and all(any(f'"{n}"' in line for line in elements) for n in names):
             return text
         if time.monotonic() >= deadline:
             return text

@@ -1,4 +1,4 @@
-"""Défauts relevés pendant le banc « texte d'abord » du 24/10 (shared/benchmarks/windows/passe2/TEXTE-DABORD.md) :
+"""Défauts relevés pendant le banc « texte d'abord » du 24/10 (commun/benchmarks/windows/passe2/TEXTE-DABORD.md) :
 
 1. menu Win32 (MainMenu WinForms de l'éditeur de test) : « Fichier > Enregistrer sous » ne trouvait pas l'entrée
    « Enregistrer sous... » (points de suspension), puis UIA Expand échouait ; la boîte ouverte restait « ~ » ;

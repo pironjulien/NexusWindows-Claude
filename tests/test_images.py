@@ -1,4 +1,4 @@
-"""Règle image commune des produits Nexus (shared/images.md, 24/10) : WebP, 1568 px / 1,15 Mpx, plafonds, pas de double."""
+"""Règle image commune des produits Nexus (NexusShared/images.md, 24/10) : WebP, 1568 px / 1,15 Mpx, plafonds, pas de double."""
 
 from __future__ import annotations
 

@@ -503,7 +503,7 @@ def test_devtools_write_scrolls_into_view_and_never_types(monkeypatch, moves):
     else:
         with pytest.raises(actions.ActionError, match="ScrollIntoView") as caught:
             ex.write("Éditeur", "Bonjour", replace=False)
-        assert "frappes" not in str(caught.value) and page.inserted == []
+        assert "keystrokes" not in str(caught.value) and page.inserted == []
     assert ("scroll_into_view", editor.element) in auto.calls
 
 
@@ -519,7 +519,7 @@ def test_devtools_select_never_falls_back_to_typing(monkeypatch):
     monkeypatch.setattr(actions.foreground, "brief_activation", lambda *a, **k: pytest.fail("activation brève"))
     with pytest.raises(actions.ActionError) as caught:
         ex.select("Couleur", "Bleu")
-    assert "DevTools ✗" in str(caught.value) and "frappes" not in str(caught.value)
+    assert "DevTools ✗" in str(caught.value) and "keystrokes" not in str(caught.value)
 
 
 # --- 16. Contenu web d'une fenêtre Chromium recouverte ---------------------------------------------------------------

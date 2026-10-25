@@ -21,6 +21,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "lab"))
 
 import apps  # noqa: E402
+from redact import redact_home  # noqa: E402
 
 from nexus_windows import cdp, foreground, methods, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
@@ -421,7 +422,9 @@ def main() -> None:
     out = HERE / "results"
     out.mkdir(exist_ok=True)
     stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M")
-    (out / f"{stamp}.json").write_text(json.dumps(all_rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    (out / f"{stamp}.json").write_text(
+        redact_home(json.dumps(all_rows, ensure_ascii=False, indent=1)), encoding="utf-8"
+    )
     print(f"Résultats : {out / (stamp + '.json')}")
 
 

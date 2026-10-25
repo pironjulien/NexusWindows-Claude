@@ -2,7 +2,7 @@
 
 Partagée par le superviseur (reloader : relance le serveur quand l'empreinte change) et par le serveur lui-même
 (freshness : refuse d'agir avec un code dépassé). Couvre les sources Python du paquet et le module de la politique
-commune (shared/garde_fous.py) ; ses DONNÉES (garde-fous.json) sont relues à chaque changement, sans redémarrage.
+commune (commun/garde_fous.py) ; ses DONNÉES (garde-fous.json) sont relues à chaque changement, sans redémarrage.
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ import re
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent
-# Source du paquet (installé en mode éditable) : NexusHarness/NexusClaude/nexus-windows/src/nexus_windows, la politique
-# vivante est NexusHarness/shared. Copie publique et paquet PyPI : pas de dossier commun voisin, la même politique est
+# Source du paquet (installé en mode éditable) : NexusHarness/NexusWindows/claude/src/nexus_windows, la politique
+# vivante est NexusHarness/NexusWindows/commun. Copie publique et paquet PyPI : pas de dossier commun voisin, la même politique est
 # embarquée dans le paquet (nexus_windows/shared, copiée par l'export public).
-_LIVE_SHARED = Path(os.environ.get("NEXUS_SHARED_DIR") or PACKAGE.parents[3] / "shared")
+_LIVE_SHARED = Path(os.environ.get("NEXUS_SHARED_DIR") or PACKAGE.parents[2] / "commun")
 _BUNDLED_SHARED = PACKAGE / "shared"
 SHARED_DIR = _LIVE_SHARED if (_LIVE_SHARED / "garde_fous.py").is_file() else _BUNDLED_SHARED
 SHARED_MODULE = SHARED_DIR / "garde_fous.py"

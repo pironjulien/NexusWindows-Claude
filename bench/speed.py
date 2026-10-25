@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "lab"))
 import apps  # noqa: E402
 import drive  # noqa: E402  (tests/live ajouté à sys.path juste au-dessus)
 from mcp import Client  # noqa: E402
+from redact import redact_home  # noqa: E402
 
 from nexus_windows import win32 as w  # noqa: E402
 
@@ -70,7 +71,7 @@ async def main(n: int, label: str) -> None:
             try:
                 for _ in range(50):  # arbre publié (Electron : quelques secondes au premier lancement)
                     look = await client.call_tool("look", {"window": app.hwnd, "show": "elements"})
-                    if "« Valider »" in drive.text_of(look):
+                    if '"Valider"' in drive.text_of(look):
                         break
                     await asyncio.sleep(0.2)
                 print(f"== {kind} ({w.window_text(app.hwnd)})")
@@ -78,7 +79,7 @@ async def main(n: int, label: str) -> None:
             finally:
                 app.close()
     out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-speed-{label}.json"
-    out.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    out.write_text(redact_home(json.dumps(results, ensure_ascii=False, indent=1)), encoding="utf-8")
     print("→", out.name)
 
 

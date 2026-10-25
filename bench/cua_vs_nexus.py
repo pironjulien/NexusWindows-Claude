@@ -24,7 +24,6 @@ import ctypes
 import datetime
 import json
 import os
-import re
 import sys
 import threading
 import time
@@ -41,6 +40,7 @@ import drive  # noqa: E402
 import editions  # noqa: E402
 import tally_cua  # noqa: E402
 from mcp import Client, StdioServerParameters  # noqa: E402
+from redact import redact_home  # noqa: E402  (bench/, dossier du script)
 
 from nexus_windows import foreground, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
@@ -278,7 +278,7 @@ TASKS: list[tuple[str, tuple[str, ...]]] = [
     ("défilement", WEB + ("tk",)),
 ]
 VALUES = {
-    "nexus": {"nom": "Julien Piron", "couleur": "Bleu", "item": "Charlie", "edit": "Bonjour"},
+    "nexus": {"nom": "Alice Martin", "couleur": "Bleu", "item": "Charlie", "edit": "Bonjour"},
     "cua": {"nom": "Cua Driver", "couleur": "Vert", "item": "Bravo", "edit": "Salut"},
     "wmcp": {"nom": "Windows MCP", "couleur": "Rouge", "item": "Alpha", "edit": "Hello"},
 }
@@ -332,17 +332,6 @@ def web_scroll_offset(app: apps.LabApp) -> int | None:
             first = next((c for c in node.children if c.name == "A ligne 1" and c.rect is not None), None)
             return None if first is None or first.rect is None else first.rect.top - node.rect.top
     return None
-
-
-def redact_home(text: str) -> str:
-    """Profil de l'utilisateur retiré d'un relevé, sous toutes ses écritures : barres obliques, contre-obliques simples,
-    échappées une ou plusieurs fois (réponse JSON d'un outil dans le JSON du relevé : chemins des captures de Codex, 24/10).
-    """
-    home = Path.home()
-    parts = [re.escape(part) for part in home.parts[1:]]  # « Users », nom de session
-    drive = re.escape(home.drive)
-    pattern = drive + r"(?:\\+|/)" + r"(?:\\+|/)".join(parts)
-    return re.sub(pattern, "~", text, flags=re.IGNORECASE)
 
 
 def target_in_front(app: apps.LabApp) -> bool:

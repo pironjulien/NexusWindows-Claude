@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "lab"))
 import apps  # noqa: E402
 import drive  # noqa: E402  (tests/live ajouté à sys.path juste au-dessus)
 from mcp import Client  # noqa: E402
+from redact import redact_home  # noqa: E402
 
 from nexus_windows import win32 as w  # noqa: E402
 
@@ -70,7 +71,7 @@ async def main(kind: str) -> None:
                 args = f'"{apps.LAB / "electron_main.js"}" --lab-x=150 --lab-y=110'
             result = await client.call_tool("launch", {"app": exe, "args": args, "then": "elements"})
             text = drive.text_of(result)
-            match = re.search(r"Fenêtre (\d+)", text)
+            match = re.search(r"Window (\d+)", text)  # comptes rendus en anglais depuis 0.10.0
             print(text.splitlines()[0][:160])
             if not match:
                 raise SystemExit(text[:400])
@@ -92,8 +93,8 @@ async def main(kind: str) -> None:
                 if expect is not None:
                     ok = ok and any(expect(e) for e in seen)
                 if label in drive.READ_BACK:
-                    ok = ok and "relu ✓" in report
-                without = "sans activation" in report or "activation simulée" in report
+                    ok = ok and "read back ✓" in report
+                without = "without activation" in report or "simulated activation" in report
                 rows.append(
                     {
                         "étape": label,
@@ -119,7 +120,8 @@ async def main(kind: str) -> None:
     intact = w.foreground() == fg0
     print(f"premier plan de Julien intact à la fin : {intact}")
     out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M}-chromium-sim-{kind}.json"
-    out.write_text(json.dumps({"lignes": rows, "premier_plan_intact": intact}, ensure_ascii=False, indent=1), "utf-8")
+    text = json.dumps({"lignes": rows, "premier_plan_intact": intact}, ensure_ascii=False, indent=1)
+    out.write_text(redact_home(text), "utf-8")
     passed = sum(r["ok"] for r in rows)
     print(f"{passed}/{len(rows)} réussies, {sum(r['sans_activation'] for r in rows)} sans activation → {out.name}")
 

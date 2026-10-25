@@ -23,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lab"))
 import apps  # noqa: E402
+from redact import redact_home  # noqa: E402
 
 from nexus_windows import cdp, foreground, launch, methods, uia  # noqa: E402
 from nexus_windows import win32 as w  # noqa: E402
@@ -386,7 +387,7 @@ def matrix_isolate(technique, auto, hwnd, page, notes) -> None:
 
 def save(rows: list[dict], mode: str) -> None:
     out = ROOT / "bench" / "results" / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}-chromium-input-{mode}.json"
-    out.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    out.write_text(redact_home(json.dumps(rows, ensure_ascii=False, indent=1)), encoding="utf-8")
     print("→", out.name)
 
 

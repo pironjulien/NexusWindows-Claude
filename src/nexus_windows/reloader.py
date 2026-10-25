@@ -354,7 +354,7 @@ class Supervisor:
             text = (
                 f"nexus-windows could not restart on its new code ({error}). Nothing was done. Code on disk "
                 f"broken or installation in progress: retry the call in a moment; if it persists, "
-                f"install.ps1. End of the error output:\n{tail[-1500:]}"
+                f"reinstall nexus-windows. End of the error output:\n{tail[-1500:]}"
             )
             if request_id is not None:
                 error_reply = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32603, "message": text}}

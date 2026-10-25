@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 from mcp import Client, StdioServerParameters
+from redact import redact_home
 
 from nexus_windows import win32 as w
 
@@ -55,7 +56,7 @@ async def main(devtools: bool, foreground: bool) -> list[dict]:
             menu = text_of(
                 await client.call_tool("look", {"window": "Steam", "show": "elements", "query": "Paramètres"})
             )
-            if "MenuItem « Paramètres »" in menu:  # menu déjà ouvert (un clic sur « Steam » le refermerait)
+            if 'MenuItem "Paramètres"' in menu:  # menu déjà ouvert (un clic sur « Steam » le refermerait)
                 steps = [{"do": "click", "target": "menuitem:Paramètres"}]
             else:
                 steps = [{"do": "menu", "path": "Steam > Paramètres"}]
@@ -124,5 +125,5 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
     out = asyncio.run(main("--devtools" in sys.argv, "--foreground" in sys.argv))
     path = ROOT / "results" / time.strftime("%Y-%m-%d_%H%M-steam.json")
-    path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    path.write_text(redact_home(json.dumps(out, ensure_ascii=False, indent=1)), encoding="utf-8")
     print(f"\n{sum(r['ok'] for r in out)}/{len(out)} étapes réussies → {path.name}")

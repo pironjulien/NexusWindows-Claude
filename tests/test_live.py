@@ -32,7 +32,7 @@ def test_scenario(kind):
     failures = [(label, report) for label, ok, report in rows if not ok and (kind, label) not in EXPECTED_REFUSALS]
     # État de Windows où AUCUNE activation n'est possible (Recherche masquée au premier plan) : les frappes Chromium
     # doivent alors être refusées avec la cause, jamais réussies en mentant ; le reste du scénario doit passer.
-    blocked = [f for f in failures if "premier plan est tenu par" in f[1]]
+    blocked = [f for f in failures if "the foreground is held by" in f[1]]
     others = [f for f in failures if f not in blocked and not (blocked and f[0] == "lot de 6 étapes")]
     assert not others, others
     if blocked:

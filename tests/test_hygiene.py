@@ -9,7 +9,7 @@ from __future__ import annotations
 import unicodedata
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 SUFFIXES = {".py", ".md", ".ps1", ".json", ".html", ".js", ".toml", ".txt"}
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".ruff_cache", ".pytest_cache"}
 ALLOWED = {"\t", "\n", "\r"}

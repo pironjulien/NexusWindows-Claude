@@ -1,4 +1,4 @@
-"""Banc réel du 16/10 (NexusHarness/shared/bench-2026-10-16.md), liste déroulante « Formule » ouverte :
+"""Banc réel du 16/10 (NexusHarness/NexusWindows/commun/bench-2026-10-16.md), liste déroulante « Formule » ouverte :
 
 1. WinForms : `expand` refusé (pas de motif ExpandCollapse) → CB_SHOWDROPDOWN relu par CB_GETDROPPEDSTATE ;
 2. liste ouverte : choisir puis fermer par CB_SHOWDROPDOWN FALSE ANNULE le choix (Windows rétablit la sélection
@@ -7,7 +7,7 @@
 3. liste ouverte, l'arbre UIA de la fenêtre enchaînait sur toutes les fenêtres du bureau (11-20 s puis échec, « aucun
    élément Formule » en 22 s) → la liste déroulante ouverte reste une feuille, jamais une fenêtre d'un autre processus ;
 4. WPF : la liste restait ouverte après le choix → refermée (et option publiée deux fois : une seule cible).
-Sans fenêtre réelle ; preuve réelle : essai sur les formulaires de NexusAGY/tests/desktop_fixtures.py (CHANGELOG).
+Sans fenêtre réelle ; preuve réelle : essai sur les formulaires de NexusWindows/agy/tests/desktop_fixtures.py (CHANGELOG).
 """
 
 from __future__ import annotations

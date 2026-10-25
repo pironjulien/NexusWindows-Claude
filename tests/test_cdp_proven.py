@@ -1,5 +1,5 @@
 """Molette DevTools dans une fenêtre Chromium que l'outil n'a pas lancée : page PROUVÉE avant toute entrée (recette B de
-Codex, banc commun et relectures de Codex du 21/10 ; mêmes cas que computer-use/tests/cdp.test.mjs de NexusCodex)."""
+Codex, banc commun et relectures de Codex du 21/10 ; mêmes cas que NexusWindows/codex/tests/cdp.test.mjs)."""
 
 from __future__ import annotations
 

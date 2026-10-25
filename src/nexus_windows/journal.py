@@ -1,4 +1,4 @@
-"""Journal commun des trois Nexus Windows (NexusHarness/shared/journal/FORMAT.md) : une ligne par étape d'un lot, sans
+"""Journal commun des trois Nexus Windows (NexusHarness/NexusShared/journal/FORMAT.md) : une ligne par étape d'un lot, sans
 texte d'écran (ni texte tapé, ni libellé, ni titre), en plus du journal détaillé de log.py. Jamais d'exception vers
 l'outil : un journal ne bloque pas une action."""
 

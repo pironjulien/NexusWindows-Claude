@@ -1,4 +1,4 @@
-"""Confirmation étanche (politique commune NexusHarness/shared/garde-fous.json, accord Claude–Antigravity du 18/10).
+"""Confirmation étanche (politique commune NexusHarness/NexusWindows/commun/garde-fous.json, accord Claude–Antigravity du 18/10).
 
 Un geste dont l'effet part chez un tiers, coûte de l'argent ou détruit (payer, envoyer, publier, supprimer
 définitivement, formater, désinstaller, réinitialiser, résilier, passer un dépôt en public) exige confirm=true sur

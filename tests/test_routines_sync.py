@@ -1,4 +1,4 @@
-"""Miroir des routines entre les PC de Julien (NexusClaude/routines) : fusion par date, oublis, jamais de texte en
+"""Miroir des routines entre les PC de Julien (NexusWindows/claude/routines) : fusion par date, oublis, jamais de texte en
 clair. Le miroir et le dossier local sont ceux de conftest (dossiers du test, jamais ceux du poste)."""
 
 from __future__ import annotations
@@ -38,13 +38,13 @@ def test_remember_writes_the_mirror_without_run_statistics():
 
 def test_plain_typed_text_never_reaches_the_mirror():
     with pytest.raises(routines.RoutineError, match="fixed typed text"):  # jamais gardé, même au poste
-        routines.remember("app.exe", "secret", [{"do": "set", "target": "Nom", "text": "Julien Piron"}], {}, "Fiche")
+        routines.remember("app.exe", "secret", [{"do": "set", "target": "Nom", "text": "Alice Martin"}], {}, "Fiche")
     routines.remember(
         "app.exe", "verif", [{"do": "click", "target": "OK", "check": {"target": "Nom", "value": "x"}}], {}, "F"
     )
     assert routines.names("app.exe") == ["verif"]  # gardée au poste
     mirror = (_mirror() / "app.exe.json").read_text(encoding="utf-8") if _mirror().exists() else ""
-    assert "Julien Piron" not in mirror and '"secret"' not in mirror and '"verif"' not in mirror
+    assert "Alice Martin" not in mirror and '"secret"' not in mirror and '"verif"' not in mirror
     assert routines.plain_text({"steps": [{"do": "set", "text": "{{prenom}} {{nom}}"}]}) == ""
 
 

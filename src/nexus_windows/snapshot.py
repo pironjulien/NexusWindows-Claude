@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 from . import capture, cdp, ocr, policy, steam, uia
 from . import win32 as w
 
-# Règle image commune des produits Nexus (shared/images.md, 24/10) : côté long ≤ 1568 px et ≤ 1,15 Mpx (limite standard
+# Règle image commune des produits Nexus (NexusShared/images.md, 24/10) : côté long ≤ 1568 px et ≤ 1,15 Mpx (limite standard
 # de Claude, aucune réduction de sa part ; GPT-5.x et Gemini 3 lisent la même), WebP sans perte, > 200 Ko → qualité 85
 # puis 70, jamais > 500 Ko. detail="high" (2000 px auparavant) suit la même limite : pour lire un petit texte, region
 # (zoom) plutôt qu'une grande image.
@@ -869,7 +869,7 @@ def lines(
 
 
 def line_of(e: Element, view: View, frame: Frame, coords: bool = True) -> str:
-    """Une ligne « [N] Rôle « nom » = valeur [états] @x,y » (sans retrait)."""
+    """Une ligne « [N] Rôle "nom" = "valeur" [états] @x,y » (sans retrait)."""
     rect = e.rect
     where = ""
     if rect is not None and coords:
@@ -1180,7 +1180,7 @@ def image_bytes(image: Image.Image) -> bytes:
 
 def image_print(image: Image.Image) -> bytes:
     """Empreinte EXACTE d'une image envoyée (dimensions et pixels RGB) : écran inchangé depuis la dernière image = pas
-    de double. Pas l'empreinte grise 64×64 de shared/images.md : un voyant rouge devenu vert y garde le même gris
+    de double. Pas l'empreinte grise 64×64 de NexusShared/images.md : un voyant rouge devenu vert y garde le même gris
     (relecture de Codex du 24/10) et disparaîtrait de la réponse."""
     rgb = image.convert("RGB")
     return hashlib.sha256(f"{rgb.width}x{rgb.height}:".encode() + rgb.tobytes()).digest()

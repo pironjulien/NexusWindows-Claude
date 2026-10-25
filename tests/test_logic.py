@@ -60,7 +60,7 @@ def test_frame_limits_per_detail():
     normal = snapshot.frame_for(w.Rect(0, 0, 1920, 1080), "normal")
     high = snapshot.frame_for(w.Rect(0, 0, 3840, 2160), "high")
     assert normal.image_size[0] * normal.image_size[1] <= 1_150_000
-    assert max(high.image_size) <= 2000 and high.image_size[0] * high.image_size[1] <= 3_750_000
+    assert max(high.image_size) <= 1568 and high.image_size[0] * high.image_size[1] <= 1_150_000
     wide = snapshot.frame_for(w.Rect(0, 0, 1568, 300), "normal")  # sous les deux limites : taille réelle
     assert wide.scale == 1.0
 

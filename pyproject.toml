@@ -1,6 +1,6 @@
 [project]
 name = "nexus-windows-claude"
-version = "3.1.4"
+version = "3.1.5"
 description = "Background Windows desktop control for Claude: an MCP server that sees and acts without taking the user's mouse, keyboard or foreground"
 authors = [{ name = "Julien Piron" }]
 license = "MIT"
@@ -77,4 +77,4 @@ addopts = "-m 'not live' -p no:cacheprovider"
 include = ["src", "tests", "bench", "lab"]
 pythonVersion = "3.14"
 # Les tests importent leurs voisins (test_contract, test_fix_b…, tests/live/drive) ; labo et banc, leurs modules frères.
-extraPaths = ["src", "tests", "tests/live", "lab", "bench", "../../shared"]
+extraPaths = ["src", "tests", "tests/live", "lab", "bench", "../commun"]

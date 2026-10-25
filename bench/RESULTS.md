@@ -73,8 +73,9 @@ de contrat ou de sécurité. Constats mesurés pendant leur correction :
 | DevTools Edge : la page change son titre à chaque événement, la fenêtre suit avec retard → port déclaré mort 30 s | page gardée si visible et titres concordants (avec relecture à 150 ms) ; une ambiguïté n'est plus un port mort |
 | Electron/Edge lancés par `launch(devtools=true)` : <select>, ctrl+k, champ multiligne, éditeur riche | 10/10 en 50–250 ms, sans activation ni vol de focus |
 
-Images limitées à 1,15 Mpx (normal) et 3,75 Mpx (high) : aucun modèle Claude ne les réduit, les coordonnées lues
-restent exactes.
+Images limitées alors à 1,15 Mpx (normal) et 3,75 Mpx (high). Règle actuelle : 1568 px de côté et 1,15 Mpx au plus pour
+les deux niveaux de détail (`snapshot.py`, `MAX_SIDE` et `MAX_PIXELS`) : aucun modèle Claude ne les réduit, les
+coordonnées lues restent exactes ; pour un petit texte, zoom par `region` plutôt qu'une grande image.
 
 ## Quatrième passage — avant finalisation (0.4.0 → 0.5.0)
 Mesure indépendante par le vrai serveur MCP, Julien absent (0 entrée physique) : 73 actions, 69 réussies, 5 refus
@@ -101,7 +102,8 @@ Saisie de 2 000 caractères avec 20 sauts de ligne :
 
 ## Cinquième passage — Steam, interface CEF dans des fenêtres SDL (0.6.0, 14 octobre)
 Steam réel de Julien, connecté, en lecture seule, fenêtres recouvertes par les siennes ; sonde
-`bench/steam_probe.py` par le vrai serveur MCP (résultats : `results/2026-10-14_*-steam.json`).
+`bench/steam_probe.py` par le vrai serveur MCP (relevés `results/*-steam.json` gardés privés : ils listent la
+bibliothèque de jeux du poste).
 
 | Constat mesuré | Conséquence dans le code |
 |---|---|
@@ -119,8 +121,8 @@ Steam réel de Julien, connecté, en lecture seule, fenêtres recouvertes par le
 | `launch(app="Steam", devtools=true)`, Steam déjà ouvert avec DevTools | port 8080 vérifié (steamwebhelper, 127.0.0.1) | enregistré | 0,45 s |
 | `menu` « Steam > Paramètres » | UIA Invoke (texte « Steam »), puis Invoke de l'entrée | fenêtre Paramètres ouverte ; premier plan pris 2 fois, rendu | 3,7 s |
 | onglet Téléchargements, puis Stockage | UIA action par défaut | ✓ relu sélectionné | 135–245 ms |
-| lecture du lecteur affiché | look | Disque local (C:), 357,3 Go libres sur 930,3 Go ; jeux 14,36 Go | 0,1–0,15 s |
-| liste des lecteurs ouverte puis refermée | UIA Invoke (✓ relu ouvert / fermé) | C: et Stockage (D:) 230,2 Go libres sur 476,9 Go, « Ajouter un disque » | 0,25–0,4 s |
+| lecture du lecteur affiché | look | lecteur, espace libre, capacité et taille des jeux lus | 0,1–0,15 s |
+| liste des lecteurs ouverte puis refermée | UIA Invoke (✓ relu ouvert / fermé) | les deux lecteurs et « Ajouter un disque » lus | 0,25–0,4 s |
 
 `act(foreground=true)` sur la même fenêtre Paramètres (sonde `--foreground`, Julien absent) : fenêtre gardée devant
 pendant chaque lot et le rendu final (« — premier plan » dans l'en-tête), onglets ✓ relus sélectionnés en 118–205 ms,
@@ -539,8 +541,8 @@ devant), 0 élément, « capture printwindow blank / capture wgc blank ». Journ
 | Constat mesuré | Conséquence dans le code |
 |---|---|
 | AppID « Logi.OptionsPlus.App » : ni chemin ni dossier connu, donc lancé par `explorer shell:AppsFolder\…`, sans `--disable-features=CalculateNativeWinOcclusion` | `launch._shortcut_target` lit l'exécutable et les arguments du raccourci (`System.Link.TargetParsingPath`, `System.Link.Arguments`, ~5 ms) |
-| Raccourcis Chromium à arguments propres : Chrome (profil), Antigravity (`--remote-debugging-port`), Gemini FR/US (profil) | jamais remplacés par l'exécutable seul ni complétés par l'outil ; note « switches NOT added » |
-| Sonde `covered_launch_probe.py`, couverture Win32 du labo agrandie et active, puis ChatGPT agrandi réel : par le raccourci, Logi peint 2 fois sur 2 en 10 s | défaut intermittent (écran de démarrage plus long, agent Logi lent) : la cause, l'absence des commutateurs, est corrigée, pas le symptôme |
+| Raccourcis Chromium à arguments propres (profil de navigateur, `--remote-debugging-port`) | jamais remplacés par l'exécutable seul ni complétés par l'outil ; note « switches NOT added » |
+| Sonde `covered_launch_probe.py`, couverture Win32 du labo agrandie et active, puis une application Electron agrandie : par le raccourci, Logi peint 2 fois sur 2 en 10 s | défaut intermittent (écran de démarrage plus long, agent Logi lent) : la cause, l'absence des commutateurs, est corrigée, pas le symptôme |
 | Même sonde après correction | « via executable », commutateurs présents, peint, 32 éléments |
 | Electron du labo sans commutateur, hors écran (x = −6000) | peint quand même : le cas « jamais dessiné » n'est pas reproductible à la demande ; note de `look` couverte par tests (captures unies simulées) |
 

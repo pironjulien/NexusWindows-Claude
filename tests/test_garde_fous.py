@@ -1,4 +1,4 @@
-"""Accord Claude–Antigravity « garde-fous » du 18/10/2026 : politique commune (shared/garde-fous.json) et confirmation
+"""Accord Claude–Antigravity « garde-fous » du 18/10/2026 : politique commune (commun/garde-fous.json) et confirmation
 étanche. Non-régression : un geste à confirmer est refusé AVANT toute entrée, quelle que soit sa forme (clic par nom,
 par [N], en coordonnées, Entrée, Espace, Ctrl+Entrée, Alt+lettre, saut de ligne tapé) ; confirm=true le laisse passer ;
 une routine ne garde jamais confirm=true ; le blocage dur s'applique aussi à la lecture."""
@@ -243,4 +243,5 @@ def test_hard_block_also_refuses_reading(monkeypatch):
 def test_policy_is_the_shared_one():
     assert policy.garde_fous.POLICY_FILE.name == "garde-fous.json"
     assert policy.garde_fous.POLICY_FILE.parent == policy.SHARED_DIR
-    assert policy.SHARED_DIR.name == "shared"
+    # dépôt privé : NexusWindows\commun ; copie publique : politique embarquée dans src/nexus_windows/shared
+    assert policy.SHARED_DIR.name in ("commun", "shared")
