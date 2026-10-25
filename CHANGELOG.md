@@ -6,6 +6,13 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-10-25 — File picker wait
+
+### Fixed
+- File picker triggers in Chromium apps: the dialog is now awaited for up to 4 s per technique (measured at more than
+  1.6 s after a background UIA Invoke in Edge). A shorter wait could report `✗` while the dialog was still coming, and
+  a retry with `foreground=true` would then open a second one.
+
 ## [3.2.0] - 2026-10-25 — Dialogs listed, file pickers proven
 
 ### Added

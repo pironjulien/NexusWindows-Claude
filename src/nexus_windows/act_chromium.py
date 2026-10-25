@@ -40,7 +40,9 @@ FILE_PICKER = re.compile(
     r"depos(er|ez)|gliss(er|ez))\b"
 )
 PICKER_ROLES = {"Button", "Hyperlink", "Group", "Custom", "Text", "Image", "Pane", "SplitButton"}
-FILE_DIALOG_S = 2.0  # le sélecteur de Windows s'ouvre en ~0,3 s (mesuré) ; au-delà, il ne viendra plus
+# Attente de la boîte par technique : mesurée à plus de 1,6 s après un UIA Invoke dans Edge (Codex, 25/10) ; trop
+# courte, un ✗ suivi d'un essai au premier plan ouvrirait deux boîtes.
+FILE_DIALOG_S = 4.0
 
 
 def opens_file_picker(e: snapshot.Element) -> bool:
