@@ -6,6 +6,12 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.3.2] - 2026-10-26 — Nexus family icon
+
+### Changed
+- Claude Desktop extension icon (`mcpb/icon.png`, 512 px): the NexusWindows screen pictogram in the julienpiron.fr
+  medallion, the same on the site and in every Nexus product. The busy indicator keeps its spinning π logo.
+
 ## [3.3.1] - 2026-10-26 — Documents opened by Store apps
 
 ### Fixed
