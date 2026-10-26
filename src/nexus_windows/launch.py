@@ -177,15 +177,26 @@ _shlwapi.AssocQueryStringW.argtypes = [
 _shlwapi.AssocQueryStringW.restype = ctypes.c_long
 ASSOCSTR_APPID = 21
 _shell32_items = ctypes.WinDLL("shell32")
-_UNKNOWN_OUT = ctypes.POINTER(ctypes.POINTER(comtypes.IUnknown))  # interface rendue : libérée par comtypes
-_shell32_items.SHCreateItemFromParsingName.argtypes = [
-    ctypes.c_wchar_p, ctypes.c_void_p, ctypes.POINTER(comtypes.GUID), _UNKNOWN_OUT
-]  # fmt: skip
-_shell32_items.SHCreateItemFromParsingName.restype = ctypes.c_long
-_shell32_items.SHCreateShellItemArrayFromShellItem.argtypes = [
-    ctypes.POINTER(comtypes.IUnknown), ctypes.POINTER(comtypes.GUID), _UNKNOWN_OUT
-]  # fmt: skip
-_shell32_items.SHCreateShellItemArrayFromShellItem.restype = ctypes.c_long
+_SHELL_TYPED: list[bool] = []
+
+
+def _shell_items_api():
+    """shell32 typé pour les éléments du shell, à la première ouverture (POINTER d'une interface comtypes : impossible
+    au chargement hors Windows, où comtypes est un bouchon)."""
+    if not _SHELL_TYPED:
+        out = ctypes.POINTER(ctypes.POINTER(comtypes.IUnknown))  # interface rendue : libérée par comtypes
+        _shell32_items.SHCreateItemFromParsingName.argtypes = [
+            ctypes.c_wchar_p, ctypes.c_void_p, ctypes.POINTER(comtypes.GUID), out
+        ]  # fmt: skip
+        _shell32_items.SHCreateItemFromParsingName.restype = ctypes.c_long
+        _shell32_items.SHCreateShellItemArrayFromShellItem.argtypes = [
+            ctypes.POINTER(comtypes.IUnknown), ctypes.POINTER(comtypes.GUID), out
+        ]  # fmt: skip
+        _shell32_items.SHCreateShellItemArrayFromShellItem.restype = ctypes.c_long
+        _SHELL_TYPED.append(True)
+    return _shell32_items
+
+
 IID_ISHELLITEM = comtypes.GUID("{43826d1e-e718-42ee-bc55-a1e261c37bfe}")
 IID_ISHELLITEMARRAY = comtypes.GUID("{b63ea76d-1f85-456f-a19c-48159efa858b}")
 
@@ -206,13 +217,12 @@ def _activate_for_file(app_id: str, path: Path) -> int:
     """IApplicationActivationManager::ActivateForFile → pid de l'application Store qui ouvre le document (celui de
     l'instance déjà ouverte si elle le prend). COMError si l'application n'a pas le contrat d'ouverture de fichiers
     (application empaquetée de bureau, Photos par exemple) : ShellExecute prend alors le relais."""
+    api = _shell_items_api()
     item, items = ctypes.POINTER(comtypes.IUnknown)(), ctypes.POINTER(comtypes.IUnknown)()
-    hr = _shell32_items.SHCreateItemFromParsingName(str(path), None, ctypes.byref(IID_ISHELLITEM), ctypes.byref(item))
+    hr = api.SHCreateItemFromParsingName(str(path), None, ctypes.byref(IID_ISHELLITEM), ctypes.byref(item))
     if hr or not item:
         raise OSError(f"no shell item for {path} ({hr & 0xFFFFFFFF:#x})")
-    hr = _shell32_items.SHCreateShellItemArrayFromShellItem(
-        item, ctypes.byref(IID_ISHELLITEMARRAY), ctypes.byref(items)
-    )
+    hr = api.SHCreateShellItemArrayFromShellItem(item, ctypes.byref(IID_ISHELLITEMARRAY), ctypes.byref(items))
     if hr or not items:
         raise OSError(f"no shell item array for {path} ({hr & 0xFFFFFFFF:#x})")
     manager = comtypes.client.CreateObject(
