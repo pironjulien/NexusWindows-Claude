@@ -8,6 +8,12 @@ const arg = (name, fallback) => {
   return hit ? hit.split('=')[1] : fallback;
 };
 
+// Fenêtre posée au bas de l'empilement, sous celles de Julien (règle du banc du 25/10) : sans ce réglage, Chromium la
+// juge cachée et cesse de dessiner et de publier sa page (relance du banc du 26/10 : famille electron à 0 pour les
+// trois outils, « Valider » introuvable). Même réglage que le labo Edge.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+
 app.whenReady().then(() => {
   if (process.argv.includes('--lab-a11y')) app.setAccessibilitySupportEnabled(true);
   const win = new BrowserWindow({
@@ -17,7 +23,7 @@ app.whenReady().then(() => {
     height: 640,
     show: false,
     title: 'Labo Electron',
-    webPreferences: { contextIsolation: true },
+    webPreferences: { contextIsolation: true, backgroundThrottling: false },
   });
   win.loadFile(path.join(__dirname, 'web_app.html'));
   win.once('ready-to-show', () => {

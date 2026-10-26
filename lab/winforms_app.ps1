@@ -25,11 +25,16 @@ public class LabDialog : Form {
 
 public class LabForm : Form {
     protected override bool ShowWithoutActivation { get { return true; } }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     Label status; int clicks;
     void Status(string text) { status.Text = text; Console.WriteLine("{\"event\":\"" + text.Replace("\"", "'") + "\"}"); }
 
     public LabForm(int x, int y) {
-        Text = "Labo WinForms"; StartPosition = FormStartPosition.Manual; Location = new Point(x, y);
+        // Affichée hors écran, mise au BAS de l'empilement, puis seulement placée : une fenêtre montrée sans activation
+        // se pose quand même en haut et passait un instant par-dessus les fenêtres de Julien (banc du 25/10).
+        Text = "Labo WinForms"; StartPosition = FormStartPosition.Manual; Location = new Point(-32000, -32000);
+        var place = new Point(x, y);
         ClientSize = new Size(560, 500); KeyPreview = true; Font = new Font("Segoe UI", 9f);
         var menu = new MenuStrip(); var file = new ToolStripMenuItem("Fichier");
         var action = new ToolStripMenuItem("Action menu"); action.Click += (s, e) => Status("menu action");
@@ -59,7 +64,11 @@ public class LabForm : Form {
         zone.MouseDown += (s, e) => Status("zone " + (e.Button == MouseButtons.Left ? "gauche" : "droit") + " " + e.X + "," + e.Y);
         zone.MouseWheel += (s, e) => Status("molette " + e.Delta); Controls.Add(zone);
         KeyDown += (s, e) => { if (e.Control && e.KeyCode == Keys.K) { Status("raccourci ctrl+k"); e.Handled = true; e.SuppressKeyPress = true; } };
-        Shown += (s, e) => { Console.WriteLine("{\"ready\":true,\"top\":" + Handle.ToInt64() + "}"); };
+        Shown += (s, e) => {
+            SetWindowPos(Handle, new IntPtr(1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);  // HWND_BOTTOM, NOSIZE|NOMOVE|NOACTIVATE
+            Location = place;  // déplacement sans changer l'empilement ni activer
+            Console.WriteLine("{\"ready\":true,\"top\":" + Handle.ToInt64() + "}");
+        };
     }
 }
 '@

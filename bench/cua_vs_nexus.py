@@ -551,6 +551,8 @@ async def wmcp_run(client: Client, task: str, app: apps.LabApp) -> tuple[Any, li
     names: list[str] = []
 
     async def call(name: str, args: dict) -> Any:
+        # Windows-MCP agit à l'écran : Julien revenu, le point visé serait l'une de ses fenêtres (labo déjà fermé).
+        apps.check_presence()
         names.append(name)
         return await client.call_tool(name, args)
 
@@ -596,6 +598,7 @@ async def run_task(
     if tool == "wmcp":
         attempts = ["premier plan"]  # aucun mode d'arrière-plan : la fenêtre est mise devant, à l'écran
     for attempt in attempts:
+        apps.check_presence()  # repli au premier plan de Cua compris : jamais avec Julien au poste
         if tool == "nexus" and attempt != "arrière-plan":
             break  # nexus choisit seul sa technique ; aucun premier plan sans l'accord de Julien
         events.reset()
@@ -740,8 +743,11 @@ async def bench_app(kind: str, nexus: Client, cua: Client | None, wmcp: Client |
                     # exigé AVANT chaque essai (W16, Codex), et la cible jamais déjà au premier plan : le relevé du premier
                     # plan ne verrait alors aucune prise (relecture de Codex du 24/10, lignes WPF laissées devant)
                     covers.append(covered(app) and not target_in_front(app))
+                    apps.check_presence()
                     try:
                         row[tool] = await run_task(client, tool, task, app, events, sizes[tool])
+                    except apps.JulienActive:
+                        raise  # famille interrompue, reprise entière à sa prochaine absence (main)
                     except Exception as exc:  # noqa: BLE001  (banc : une erreur d'un outil n'arrête pas l'autre)
                         row[tool] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
                         print(f"   {tool:5} ERREUR {task} : {exc}")
@@ -749,8 +755,11 @@ async def bench_app(kind: str, nexus: Client, cua: Client | None, wmcp: Client |
                 if wmcp is not None:
                     # Après le contrôle de couverture : Windows-MCP met la fenêtre devant par construction.
                     cover.raise_()
+                    apps.check_presence()
                     try:
                         row["wmcp"] = await run_task(wmcp, "wmcp", task, app, events, (1, 1))
+                    except apps.JulienActive:
+                        raise
                     except Exception as exc:  # noqa: BLE001
                         row["wmcp"] = {"erreur": f"{type(exc).__name__}: {exc}"[:300]}
                         print(f"   wmcp  ERREUR {task} : {exc}")
@@ -780,7 +789,13 @@ async def main(kinds: list[str], wait_s: float, nexus_only: bool = False) -> Non
         for kind in kinds:
             while True:
                 try:
-                    results.append(await bench_app(kind, nexus, cua, wmcp))
+                    try:
+                        results.append(await bench_app(kind, nexus, cua, wmcp))
+                    except Exception:
+                        # Labo fermé sous le banc par le retour de Julien (arbre illisible, fenêtre disparue…) : même
+                        # interruption propre que le banc commun (231d7cf) ; toute autre erreur reste une erreur.
+                        apps.check_presence()
+                        raise
                     break
                 except apps.JulienActive as exc:
                     print(f"== {kind} : {exc}", flush=True)

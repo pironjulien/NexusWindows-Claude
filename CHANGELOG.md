@@ -6,6 +6,28 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-26 — Documents opened by Store apps
+
+### Fixed
+- Opening a document whose default app is a Store app (for example an MP4 with Media Player) did nothing: no window,
+  "opening NOT verified". The default app is now read from the file association (its AppUserModelID) and activated
+  for the file with `IApplicationActivationManager::ActivateForFile`, which gives its process; apps without that
+  contract (Photos, Notepad) still open through ShellExecute. Their window is recognized by its process (the frame is
+  titled after the app, "Media Player", not after the file) and the document name is read in its UI Automation tree;
+  a CoreWindow first shown hidden is followed into its visible frame; suspended content is resumed as for any Store
+  app. When no window comes, the note says why and suggests opening it in the foreground with the user's consent.
+  Checked on a real MP4: cold start (new visible window, name read back, foreground given back, 1.4 s) and player
+  already open (2 s).
+- A reused window that already was the user's foreground window is no longer reported as "foreground NOT given back".
+- UI Automation tree read again (3 tries, 0.1 then 0.2 s) when Electron or Edge answers `EVENT_E_ALL_SUBSCRIBERS_FAILED`
+  while rebuilding its accessibility tree, instead of reporting the window unreadable; any other error is still
+  immediate.
+
+### Changed
+- Bench: `bench/cua_vs_nexus.py` checks for the user's return before every attempt and every Windows-MCP gesture;
+  the Electron lab keeps drawing when covered; the WinForms and WPF lab windows are created off screen, put at the
+  bottom of the window stack, then placed.
+
 ## [3.3.0] - 2026-10-26 — Updates by the server itself
 
 ### Added

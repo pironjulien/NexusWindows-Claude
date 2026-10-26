@@ -58,7 +58,10 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 </Window>
 '@
 $window = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xaml))
-$window.Left = $X; $window.Top = $Y
+# Affichée hors écran, mise au BAS de l'empilement, puis seulement placée (une fenêtre montrée sans activation se pose
+# quand même en haut : elle passait un instant par-dessus les fenêtres de Julien, banc du 25/10).
+$window.Left = -32000; $window.Top = -32000
+Add-Type -Namespace Labo -Name Z -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);' 
 $find = { param($n) $window.FindName($n) }
 $statut = & $find 'Statut'
 $script:clics = 0
@@ -115,6 +118,8 @@ foreach ($pair in @(@($defil, 'A'), @($defilExt, 'B'))) {
 $window.Add_KeyDown({ param($s, $e) if (($e.Key -eq 'K') -and ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control)) { Set-Statut 'raccourci ctrl+k'; $e.Handled = $true } })
 $window.Add_ContentRendered({
     $h = (New-Object System.Windows.Interop.WindowInteropHelper $window).Handle
+    [void][Labo.Z]::SetWindowPos($h, [IntPtr]1, 0, 0, 0, 0, 0x13)  # HWND_BOTTOM, NOSIZE|NOMOVE|NOACTIVATE
+    $window.Left = $X; $window.Top = $Y
     # Lignes par cran de molette (réglage Windows) : le banc en déduit le déplacement d'un cran, jamais supposé à 3.
     [Console]::WriteLine('{"ready":true,"top":' + $h.ToInt64() + ',"wheel_lines":' + [System.Windows.SystemParameters]::WheelScrollLines + '}')
 })

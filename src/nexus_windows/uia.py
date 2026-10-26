@@ -10,6 +10,7 @@ Réglages clés :
 from __future__ import annotations
 
 import contextlib
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -136,6 +137,10 @@ def _variant(value):
     return value
 
 
+# EVENT_E_ALL_SUBSCRIBERS_FAILED : le fournisseur UIA de l'application (Chromium, Electron) n'a pas répondu à cet
+# appel inter-processus, le temps de (re)construire son arbre d'accessibilité ; passager, l'appel suivant aboutit.
+TRANSIENT_HRESULTS = {-2147220991}
+TREE_ATTEMPTS = 3
 SELFLAG_TAKEFOCUS = 1  # IAccessible::accSelect : donner le focus à l'élément
 
 
@@ -187,10 +192,17 @@ class Automation:
         sa propre fenêtre, comme toute surgissante. Jamais une fenêtre de premier plan d'un autre processus dans
         l'arbre (fenêtres de l'utilisateur)."""
         pruned = w.dropped_combos(hwnd)
-        try:
-            root_el = self.uia.ElementFromHandleBuildCache(hwnd, self._cache_children if pruned else self._cache)
-        except comtypes.COMError as error:
-            raise UIAError(f"UI Automation tree unreadable for {hwnd}: {error}") from error
+        cache = self._cache_children if pruned else self._cache
+        attempt = 0
+        while True:
+            try:
+                root_el = self.uia.ElementFromHandleBuildCache(hwnd, cache)
+                break
+            except comtypes.COMError as error:
+                attempt += 1
+                if error.hresult not in TRANSIENT_HRESULTS or attempt == TREE_ATTEMPTS:
+                    raise UIAError(f"UI Automation tree unreadable for {hwnd}: {error}") from error
+                time.sleep(0.1 * attempt)
         state = {"count": 0, "cut": False, "root": hwnd, "pid": 0}
         if pruned:
             root = self._build_pruned(root_el, 0, None, pruned, state, max_nodes)

@@ -141,10 +141,21 @@ class IApplicationActivationManager(comtypes.IUnknown):
             (["in"], ctypes.c_ulong, "options"),
             (["out"], ctypes.POINTER(ctypes.c_ulong), "processId"),
         ),
+        comtypes.COMMETHOD(
+            [],
+            comtypes.HRESULT,
+            "ActivateForFile",
+            (["in"], ctypes.c_wchar_p, "appUserModelId"),
+            (["in"], ctypes.c_void_p, "itemArray"),
+            (["in"], ctypes.c_wchar_p, "verb"),
+            (["out"], ctypes.POINTER(ctypes.c_ulong), "processId"),
+        ),
     ]
-    if TYPE_CHECKING:  # méthode créée par comtypes depuis _methods_ (paramètre « out » rendu comme résultat)
+    if TYPE_CHECKING:  # méthodes créées par comtypes depuis _methods_ (paramètre « out » rendu comme résultat)
 
         def ActivateApplication(self, appUserModelId: str, arguments: str | None, options: int) -> int: ...
+
+        def ActivateForFile(self, appUserModelId: str, itemArray: ctypes.c_void_p, verb: str | None) -> int: ...
 
 
 CLSID_APPLICATION_ACTIVATION_MANAGER = comtypes.GUID("{45BA127D-10A8-46EA-8AB7-56EA9078943C}")
@@ -157,6 +168,57 @@ def _activate_packaged(app_id: str, args: str) -> int:
         CLSID_APPLICATION_ACTIVATION_MANAGER, interface=IApplicationActivationManager
     )
     return int(manager.ActivateApplication(app_id, args or None, AO_NOERRORUI))
+
+
+_shlwapi = ctypes.WinDLL("shlwapi")
+_shlwapi.AssocQueryStringW.argtypes = [
+    ctypes.c_uint, ctypes.c_uint, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_ulong)
+]  # fmt: skip
+_shlwapi.AssocQueryStringW.restype = ctypes.c_long
+ASSOCSTR_APPID = 21
+_shell32_items = ctypes.WinDLL("shell32")
+_UNKNOWN_OUT = ctypes.POINTER(ctypes.POINTER(comtypes.IUnknown))  # interface rendue : libérée par comtypes
+_shell32_items.SHCreateItemFromParsingName.argtypes = [
+    ctypes.c_wchar_p, ctypes.c_void_p, ctypes.POINTER(comtypes.GUID), _UNKNOWN_OUT
+]  # fmt: skip
+_shell32_items.SHCreateItemFromParsingName.restype = ctypes.c_long
+_shell32_items.SHCreateShellItemArrayFromShellItem.argtypes = [
+    ctypes.POINTER(comtypes.IUnknown), ctypes.POINTER(comtypes.GUID), _UNKNOWN_OUT
+]  # fmt: skip
+_shell32_items.SHCreateShellItemArrayFromShellItem.restype = ctypes.c_long
+IID_ISHELLITEM = comtypes.GUID("{43826d1e-e718-42ee-bc55-a1e261c37bfe}")
+IID_ISHELLITEMARRAY = comtypes.GUID("{b63ea76d-1f85-456f-a19c-48159efa858b}")
+
+
+def packaged_handler(path: Path) -> str:
+    """AppUserModelID de l'application Store qui ouvre ce type de document (« Paquet_éditeur!App »), vide si
+    l'association est un programme classique. Lecteur multimédia, Photos, Bloc-notes… : ShellExecute les active par
+    un DelegateExecute qui, lancé sans premier plan, peut ne rien ouvrir du tout (mesuré le 26/10 sur un MP4 : pid
+    0, aucune fenêtre)."""
+    size = ctypes.c_ulong(1024)
+    buffer = ctypes.create_unicode_buffer(size.value)
+    if _shlwapi.AssocQueryStringW(0, ASSOCSTR_APPID, path.suffix or path.name, "open", buffer, ctypes.byref(size)):
+        return ""
+    return buffer.value if "!" in buffer.value else ""
+
+
+def _activate_for_file(app_id: str, path: Path) -> int:
+    """IApplicationActivationManager::ActivateForFile → pid de l'application Store qui ouvre le document (celui de
+    l'instance déjà ouverte si elle le prend). COMError si l'application n'a pas le contrat d'ouverture de fichiers
+    (application empaquetée de bureau, Photos par exemple) : ShellExecute prend alors le relais."""
+    item, items = ctypes.POINTER(comtypes.IUnknown)(), ctypes.POINTER(comtypes.IUnknown)()
+    hr = _shell32_items.SHCreateItemFromParsingName(str(path), None, ctypes.byref(IID_ISHELLITEM), ctypes.byref(item))
+    if hr or not item:
+        raise OSError(f"no shell item for {path} ({hr & 0xFFFFFFFF:#x})")
+    hr = _shell32_items.SHCreateShellItemArrayFromShellItem(
+        item, ctypes.byref(IID_ISHELLITEMARRAY), ctypes.byref(items)
+    )
+    if hr or not items:
+        raise OSError(f"no shell item array for {path} ({hr & 0xFFFFFFFF:#x})")
+    manager = comtypes.client.CreateObject(
+        CLSID_APPLICATION_ACTIVATION_MANAGER, interface=IApplicationActivationManager
+    )
+    return int(manager.ActivateForFile(app_id, ctypes.cast(items, ctypes.c_void_p), None))
 
 
 def descendants(pid: int) -> set[int]:
@@ -583,6 +645,33 @@ def wait_content(auto: uia.Automation, hwnd: int, limit_s: float = CONTENT_LIMIT
         time.sleep(CONTENT_GAP_S)
 
 
+def _store_content(auto: uia.Automation, hwnd: int, pid: int, user_front: int, notes: list[str]) -> bool:
+    """Contenu d'une application Store ouverte sans activation : attendu, reprise si Windows l'a suspendue, sinon la
+    note dit pourquoi et comment la montrer. Renvoie True si le premier plan a été pris puis rendu pendant l'attente.
+
+    Jamais d'activation pour « montrer » une application Store : mesuré, elle ne l'affichait dans aucun des 17
+    lancements et coûtait environ 1 s de premier plan à Julien. Si Windows la laisse vide, la note le dit. Pendant
+    l'attente (jusqu'à 3 s), la garde rend aussitôt le premier plan si l'application le prend."""
+    with foreground.Watch(hwnd, front=user_front, tail_s=0) as watch:
+        ready = wait_content(auto, hwnd)
+        if not ready and packages.resume_suspended(hwnd, {pid} if pid else None):
+            # Suspendue par Windows (lancée sans activation) : reprise, sans premier plan, puis contenu relu.
+            notes.append("Store app suspended by Windows: resumed without foreground")
+            ready = wait_content(auto, hwnd)
+    if not ready:
+        if not uwp_unshown(hwnd):
+            notes.append("content not ready yet (interface still empty): look before acting")
+        elif _holds_front(hwnd):
+            notes.append("Store app never shown by Windows, although it holds the foreground")
+        else:
+            notes.append(
+                "Store app never shown by Windows (launched without activation, content suspended: waiting "
+                'changes nothing): showing it requires the foreground, window(action="front", '
+                "foreground=true) with the user's consent"
+            )
+    return bool(watch.stolen and not watch.failed)
+
+
 # --- Lancement -----------------------------------------------------------------------------------------------
 _KNOWN_FOLDER_ID = re.compile(r"(\{[0-9A-Fa-f-]{36}\})\\(.+)")
 
@@ -712,6 +801,8 @@ def _front_returned(user_front: int, hwnd: int) -> bool:
     devant, si la fenêtre lancée ne l'a pas, ou si l'utilisateur a lui-même changé de fenêtre."""
     if not user_front or not w.IsWindow(user_front):
         return True
+    if hwnd and w.root(hwnd) == w.root(_users(user_front)):
+        return True  # instance réutilisée qui était déjà la fenêtre de l'utilisateur : rien ne lui a été pris
     if hwnd:
         return not _holds_front(hwnd)
     fg = w.foreground()
@@ -891,6 +982,7 @@ def titled_windows(text: str) -> list[int]:
     return [h for h in w.enum_windows() if snapshot.is_app_window(h) and low in w.window_text(h).lower()]
 
 
+DOCUMENT_SHOWN_S = 3.0  # application Store : délai pour lire le nom du document dans sa fenêtre une fois ouverte
 REUSED_AFTER_S = (
     1.5  # une fenêtre déjà ouverte n'est retenue qu'après ce délai sans nouvelle fenêtre (onglet, instance)
 )
@@ -914,16 +1006,62 @@ def _opened_window(path: Path, folder: bool, before: set[int], waited_s: float) 
     return old[0] if old and waited_s >= REUSED_AFTER_S else 0
 
 
-def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> Launched:
+def shows_document(auto: uia.Automation | None, hwnd: int, path: Path) -> bool:
+    """La fenêtre montre-t-elle ce document ? Son titre ou un élément de son arbre UI Automation porte le nom du
+    fichier (une application Store titre son cadre à son nom : « Lecteur multimédia », le document est dans le
+    contenu, « globale, Lecture en cours »)."""
+    names = {path.name.lower(), path.stem.lower()} if len(path.stem) >= 3 else {path.name.lower()}
+    if any(name in w.window_text(hwnd).lower() for name in names):
+        return True
+    if auto is None:
+        return False
+    try:
+        return any(any(name in (node.name or "").lower() for name in names) for node in auto.tree(hwnd).walk())
+    except uia.UIAError, comtypes.COMError, OSError:
+        return False
+
+
+def _app_document_window(path: Path, pid: int, before: set[int], waited_s: float, auto: uia.Automation | None) -> int:
+    """Fenêtre de l'application Store activée pour ce document (arbre du pid rendu par l'activation, cadre UWP
+    compris, fenêtre cachée comprise) : une nouvelle fenêtre, ou après REUSED_AFTER_S une fenêtre déjà ouverte de
+    l'application qui montre le document (instance réutilisée)."""
+    pids = descendants(pid)
+    old = 0
+    for hwnd in w.enum_windows():
+        if not (snapshot.is_app_window(hwnd) or snapshot.is_hidden_store_window(hwnd)):
+            continue
+        if not _related(hwnd, pids, "", "", strict=True):
+            continue
+        if hwnd not in before:
+            return hwnd
+        old = old or hwnd
+    if old and waited_s >= REUSED_AFTER_S and shows_document(auto, old, path):
+        return old
+    return 0
+
+
+def open_path(
+    path: Path, wait_s: float, user_front: int, before: set[int], auto: uia.Automation | None = None
+) -> Launched:
     """Ouvre un dossier (Explorateur) ou un document (application associée) sans lui donner la main, et VÉRIFIE ce
-    qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), ou fenêtre dont le titre porte le
-    nom du document. Faute de preuve, la note le dit (jamais « ouvert » supposé)."""
+    qui s'est ouvert : dossier affiché par l'Explorateur relu (Shell.Application), fenêtre dont le titre porte le
+    nom du document, ou fenêtre de l'application Store activée pour ce document. Faute de preuve, la note le dit
+    (jamais « ouvert » supposé)."""
     global _CHOICE
     _CHOICE = foreground.UserChoice(user_front)
     folder = path.is_dir()
     via = "folder" if folder else "document"
     notes: list[str] = []
-    pid = shell_open(path)
+    store_app = "" if folder else packaged_handler(path)
+    pid = 0
+    if store_app:
+        try:
+            pid = _activate_for_file(store_app, path)
+            via = "document (Store app)"
+        except (comtypes.COMError, OSError) as error:
+            log.event("open-store-fallback", {"app": store_app, "error": str(error)[:160]})
+    if not pid:
+        pid = shell_open(path)
     start = time.monotonic()
     deadline = start + max(1.0, wait_s)
     took_back = False
@@ -942,10 +1080,14 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
                 w.class_name(w.root(fg)) in policy.EXPLORER_CLASSES
                 if folder
                 else path.stem.lower() in w.window_text(w.root(fg)).lower()
+                or (via != "document" and _related(w.root(fg), descendants(pid), "", "", strict=True))
             )  # jamais une fenêtre que Julien vient d'ouvrir lui-même : seulement celle du dossier ou du document
         ):
             took_back = foreground.give_back(_users(user_front), exclude={fg}) or took_back  # nouvelle fenêtre activée
-        hwnd = _opened_window(path, folder, before, time.monotonic() - start)
+        waited = time.monotonic() - start
+        hwnd = _opened_window(path, folder, before, waited)
+        if not hwnd and via != "document" and not folder:
+            hwnd = _app_document_window(path, pid, before, waited, auto)
         if hwnd or time.monotonic() >= deadline:
             break
         time.sleep(0.05)
@@ -961,6 +1103,8 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
             else ("window already open" if shared else "new window")
         )
         shown = f'folder shown "{path}"' if folder else f'title "{snapshot.clip(w.window_text(hwnd), 80)}"'
+        if via != "document" and not folder:
+            shown += ", window of the Store app activated for this document"
         notes.append(f"opening verified ({where}, {shown})")
         if shared:
             notes.append(
@@ -974,11 +1118,37 @@ def open_path(path: Path, wait_s: float, user_front: int, before: set[int]) -> L
                 took_back = foreground.give_back(_users(user_front), exclude=windows) or took_back
         if w.foreground() != hwnd and user_front and w.IsWindow(user_front) and hwnd not in before:
             w.SetWindowPos(hwnd, user_front, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOACTIVATE)
+        if via != "document" and not folder:
+            if uwp_unshown(hwnd):
+                hwnd = hidden_core_of(hwnd) or hwnd  # cadre vide : l'application est sa CoreWindow masquée
+            if auto is not None:
+                took_back = _store_content(auto, hwnd, pid, user_front, notes) or took_back
+            # Contenu chargé : le nom du document relu dans la fenêtre (le lecteur l'affiche après l'avoir ouvert).
+            # Mesuré sur le Lecteur multimédia lancé à froid : sa CoreWindow, masquée le temps du démarrage, est ensuite
+            # rattachée à un nouveau cadre visible ; c'est ce cadre que l'utilisateur voit et que l'on pilote.
+            deadline = time.monotonic() + DOCUMENT_SHOWN_S
+            while True:
+                if w.class_name(hwnd) == UWP_CORE_CLASS and w.root(hwnd) != hwnd:
+                    hwnd = w.root(hwnd)
+                seen = shows_document(auto, hwnd, path)
+                if (seen and w.class_name(hwnd) != UWP_CORE_CLASS) or time.monotonic() >= deadline:
+                    break
+                time.sleep(0.2)
+            notes.append(
+                "document name read in the window"
+                if seen
+                else "document name not read in the window yet (still loading?): look before acting"
+            )
     else:
-        notes.append(
-            f"opening NOT verified: no {'Explorer window on this folder' if folder else 'window bearing the document name'} "
-            f"within {max(1.0, wait_s):.0f} s (windows to look for it)"
-        )
+        what = "Explorer window on this folder" if folder else "window bearing the document name"
+        if via != "document" and not folder:
+            what = f"window of the Store app opened for it ({store_app})"
+        notes.append(f"opening NOT verified: no {what} within {max(1.0, wait_s):.0f} s (windows to look for it)")
+        if via == "document" and store_app:
+            notes.append(
+                f"the document opens with a Store app ({store_app}) that Windows did not activate in the background: "
+                "ask the user to open it, or with the user's consent bring it forward (foreground=true)"
+            )
     returned = _front_returned(user_front, hwnd)
     if not returned:
         notes.append("the window took the foreground and Windows refused to give it back (the guard retries)")
@@ -1019,7 +1189,7 @@ def launch(
     if document is not None:
         if args.strip() or devtools or restart:
             raise LaunchError("Opening a folder or a document: no args, no devtools, no restart.")
-        return open_path(document, wait_s, user_front, before)
+        return open_path(document, wait_s, user_front, before, auto)
     scheme = uri_scheme(candidate)
     if scheme and not Path(candidate).exists():
         if args.strip() or devtools or restart:
@@ -1161,28 +1331,7 @@ def launch(
         if profile is not None and proc is not None:
             guard_account(proc, port, profile, on_account_kill)
     if auto is not None and hwnd and (exe is None or snapshot.framework_of(hwnd) in ("UWP", "WinUI")):
-        # Jamais d'activation pour « montrer » une application Store : mesuré, elle ne l'affichait dans aucun des 17
-        # lancements et coûtait environ 1 s de premier plan à Julien. Si Windows la laisse vide, la note le dit.
-        # Pendant l'attente (jusqu'à 3 s), la garde rend aussitôt le premier plan si l'application le prend.
-        with foreground.Watch(hwnd, front=user_front, tail_s=0) as watch:
-            ready = wait_content(auto, hwnd)
-            if not ready and packages.resume_suspended(hwnd, {pid} if pid else None):
-                # Suspendue par Windows (lancée sans activation) : reprise, sans premier plan, puis contenu relu.
-                notes.append("Store app suspended by Windows: resumed without foreground")
-                ready = wait_content(auto, hwnd)
-        if watch.stolen:
-            took_back = took_back or not watch.failed
-        if not ready:
-            if not uwp_unshown(hwnd):
-                notes.append("content not ready yet (interface still empty): look before acting")
-            elif _holds_front(hwnd):
-                notes.append("Store app never shown by Windows, although it holds the foreground")
-            else:
-                notes.append(
-                    "Store app never shown by Windows (launched without activation, content suspended: waiting "
-                    'changes nothing): showing it requires the foreground, window(action="front", '
-                    "foreground=true) with the user's consent"
-                )
+        took_back = _store_content(auto, hwnd, pid, user_front, notes) or took_back
     # Premier plan relu en fin de lancement, jamais supposé : la note ne dit « rendu » que s'il l'est vraiment.
     returned = _front_returned(user_front, hwnd)
     if not returned and not hwnd:

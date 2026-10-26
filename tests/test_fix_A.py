@@ -893,3 +893,33 @@ def test_auto_attaches_the_image_when_the_tree_may_be_stale_or_cut(shifted, monk
     setattr(view, flag, True)  # en-tête : « rely on the image » / « incomplete list »
     monkeypatch.setattr(session, "view", lambda auto, hwnd, rebuild=False, detail=None: view)
     assert len(server.render(NO_AUTO, HWND, "auto")) == 2
+
+
+def test_tree_retries_transient_provider_failure(monkeypatch):
+    """Banc du 25/10 : Electron/Edge répond parfois EVENT_E_ALL_SUBSCRIBERS_FAILED le temps de reconstruire son arbre
+    d'accessibilité ; l'arbre est relu au lieu de déclarer la fenêtre illisible. Toute autre erreur reste immédiate."""
+    import comtypes
+
+    monkeypatch.setattr(uia.time, "sleep", lambda s: None)
+    root = type("ComEl", (), {"GetCachedPropertyValue": lambda _s, pid: None, "GetCachedChildren": lambda _s: None})()
+    calls = []
+
+    def build(_self, hwnd, cache):
+        calls.append(hwnd)
+        if len(calls) < uia.TREE_ATTEMPTS:
+            raise comtypes.COMError(-2147220991, "aucun abonné", (None, None, None, 0, None))
+        return root
+
+    auto = uia.Automation.__new__(uia.Automation)
+    vars(auto).update(_cache=None, uia=type("UIA", (), {"ElementFromHandleBuildCache": build})())
+    assert auto.tree(1).truncated is False and len(calls) == uia.TREE_ATTEMPTS
+
+    def denied(_self, hwnd, cache):
+        calls.append(hwnd)
+        raise comtypes.COMError(-2147024891, "accès refusé", (None, None, None, 0, None))
+
+    calls.clear()
+    vars(auto).update(uia=type("UIA", (), {"ElementFromHandleBuildCache": denied})())
+    with pytest.raises(uia.UIAError):
+        auto.tree(1)
+    assert len(calls) == 1
