@@ -81,6 +81,11 @@ is short and can be read first; running it again only does what is missing.
 /plugin install nexus-windows@nexus-plugins
 ```
 
+**Claude Desktop extension** (uv required): download `nexus-windows-claude-<version>.mcpb` from the
+[latest release](https://github.com/pironjulien/NexusWindows-Claude/releases/latest), then in Claude Desktop open
+Settings → Extensions and drop the file there (or Advanced settings → Install extension), and click Install. With the
+Microsoft Store version of Claude Desktop, double-clicking the file does not open it: Windows has no app for `.mcpb`.
+
 **By hand.** Install uv ([official package](https://docs.astral.sh/uv/getting-started/installation/#winget)):
 
 ```powershell
