@@ -272,7 +272,7 @@ wheels = [
 
 [[package]]
 name = "nexus-windows-claude"
-version = "3.3.0"
+version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "comtypes", marker = "sys_platform == 'win32'" },
@@ -288,21 +288,21 @@ dependencies = [
     { name = "winrt-windows-media-ocr", marker = "sys_platform == 'win32'" },
     { name = "winrt-windows-storage-streams", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/af/b2/d19b3eecf5ecfd4d1871e51189dc684d07f8efb800544d890de9094ef187/nexus_windows_claude-3.3.0.tar.gz", hash = "sha256:b43b6df212113451c2760d82abc98d277eb7611621675ff40ba9df91050946f8", size = 377102, upload-time = "2026-10-25T23:49:17.988Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/1f/491989a8eadc11c0b66d9162fed2d598dd59abe9f11ae9ef4beda7429203/nexus_windows_claude-3.3.1.tar.gz", hash = "sha256:7cc9180ed258eefea5d2c2d0c5738fdd164a714aea1195d6e99745cda3fd75e5", size = 381280, upload-time = "2026-10-26T15:00:20.474Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/bb/bc88a08091b853a3c16d26bbf32b8002816e872a74bf65993fd4d71b6ae4/nexus_windows_claude-3.3.0-py3-none-any.whl", hash = "sha256:f81fef18c5f8f13fac3b7de58238d4ae3d805fd87b6b13e39a1583698260e2bf", size = 382605, upload-time = "2026-10-25T23:49:15.418Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/65/6c18eb95e23c25dc9b7302bf1f381e0035c61d4b51f127f022129fcdec0c/nexus_windows_claude-3.3.1-py3-none-any.whl", hash = "sha256:541faacb903f83eb71b7476452ec4fed25dae9a9cc4f934506da7e326ca92bed", size = 385972, upload-time = "2026-10-26T15:00:17.901Z" },
 ]
 
 [[package]]
 name = "nexus-windows-claude-extension"
-version = "3.3.0"
+version = "3.3.1"
 source = { virtual = "." }
 dependencies = [
     { name = "nexus-windows-claude" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "nexus-windows-claude", specifier = "==3.3.0" }]
+requires-dist = [{ name = "nexus-windows-claude", specifier = "==3.3.1" }]
 
 [[package]]
 name = "numpy"
