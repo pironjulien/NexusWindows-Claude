@@ -374,6 +374,25 @@ PC, October 2026; the notes in `RESULTS.md` are in French).
 | Final render of an `act` (0.7.0 vs 0.6.1) | Win32 418 → 221 ms, Electron 341 → 205 ms (window-settle detection replaces a fixed 300 ms wait) |
 | Open drop-down list, choose in it (WinForms and WPF forms, real MCP server) | 8/8 scenarios, the application received the choice every time; `select` in an open WinForms list 113 ms (was 22 s and a failure); 0 foreground take sampled every 5 ms, cursor never moved |
 
+### Cross-agent parity bench (October 26, 2026)
+
+The three NexusWindows editions (this one, [for Codex](https://github.com/pironjulien/NexusWindows-Codex) and for
+Antigravity) ran the same 33 tasks, 3 rounds each, on the Electron, WinForms and WPF lab windows, placed at the bottom
+of the z-order under an opaque cover, nobody at the PC (the bench stops the moment the user touches the mouse or
+keyboard). The effect is judged by the application (event received or value read back), never by the tool's report.
+Raw results: `bench/results/2026-10-26_1045-parity.json` (summary in French next to it).
+
+| | Exact effect | Without intrusion | False success | Median | p95 |
+|---|---|---|---|---|---|
+| nexus-windows for Claude 3.3.0 | 84/99 | 83/99 | 0 | 957 ms | 5.6 s |
+| NexusWindows for Codex | 84/99 | 82/99 | 0 | 691 ms | 3.8 s |
+| NexusWindows for Antigravity | 84/99 | 80/99 | 0 | 817 ms | 3.4 s |
+
+Gap between the three: 0. Every Electron task 3/3 for all three. The 15 failures are the same for all three and are
+background limits refused honestly, not false successes: WPF raw click, Ctrl+K in WPF, WPF context menu, and double
+click in WinForms and WPF (the cover sits over the point; WinForms ignores a double click posted to a covered point).
+"Intrusion" means the foreground was taken, the cursor moved or the clipboard was written during the attempt.
+
 Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
 ## Side by side with Cua Driver and Windows-MCP (October 23, 2026)
