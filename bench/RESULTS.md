@@ -546,3 +546,24 @@ devant), 0 élément, « capture printwindow blank / capture wgc blank ». Journ
 | Même sonde après correction | « via executable », commutateurs présents, peint, 32 éléments |
 | Electron du labo sans commutateur, hors écran (x = −6000) | peint quand même : le cas « jamais dessiné » n'est pas reproductible à la demande ; note de `look` couverte par tests (captures unies simulées) |
 
+
+## Quatorzième passage — trois outils, versions du jour (3.3.0, 26 octobre)
+Même banc (`cua_vs_nexus.py`), Julien absent (2 min sans entrée physique exigées, arrêt à la première ; 7 refus au
+lancement puis banc complet), retour de Julien vérifié avant chaque essai et chaque geste de Windows-MCP. Cua Driver
+passé de 0.36.0 (binaire trouvé installé) à 0.38.0 depuis sa release officielle (SHA-256 vérifiée), Windows-MCP 0.8.8
+(dernière). Relevé `results/2026-10-26_1210-cua-vs-nexus.json` (51 lignes, toutes comptées : cible recouverte avant et
+après chaque essai).
+
+| 51 lignes | nexus-windows 3.3.0 | Cua Driver 0.38.0 | Windows-MCP 0.8.8 |
+|---|---|---|---|
+| Effet prouvé en arrière-plan | 44 | 26 (+1 par clics, +6 en premier plan) | 0 (10 au premier plan) |
+| Faux succès | 0 | 4 | 36 « fait » sans effet (bascule échouée, voir ci-dessous) |
+| Défilement de liste recouverte (Tk, Electron, Edge) | 3/3 | 0/3 | 0/3 |
+| Premier plan pris | 0 | 3 | 15 (jamais rendu) |
+| Curseur réel déplacé | 0 | 0 | 34 |
+| Médiane d'une action réussie | 598 ms | 728 ms | 1 478 ms |
+
+Windows-MCP : 9/9 en Win32 après `App switch` ; ailleurs la fenêtre est restée derrière 30 fois et son clic ou sa
+saisie a visé la fenêtre du dessus (couverture du banc) en rapportant le clic ; 5 erreurs de l'adaptateur (élément de
+liste ou de menu ouvert introuvable). Ratés de nexus : WPF clic brut, molette et Ctrl+K, molette sur canevas recouvert
+(Tk, Electron, Edge), Win32 Ctrl+K cette fois (« ~ », jamais annoncé fait).

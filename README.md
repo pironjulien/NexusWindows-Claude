@@ -395,31 +395,41 @@ click in WinForms and WPF (the cover sits over the point; WinForms ignores a dou
 
 Offline test suite: see the Tests badge (`test.ps1` on Windows, plus a startup check on Linux).
 
-## Side by side with Cua Driver and Windows-MCP (October 23, 2026)
+## Side by side with Cua Driver and Windows-MCP (October 26, 2026)
 
 [Cua Driver](https://github.com/trycua/cua) 0.38.0 is the closest other tool: it also works in the background by
 default. [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) 0.8.8 is the most used Windows MCP server; it has no
 background mode. All three were driven through their real MCP servers (`bench/cua_vs_nexus.py`) on the same lab
-windows, covered by an opaque window, nobody at the PC; each was used the way its own guide tells an agent (Cua:
-background first, then clicks, then its foreground fallback; Windows-MCP: bring the window forward, then act on the
-screen). The effect is judged by the application (event received or value read back), never by the tool's report.
-51 tasks across Win32, WinForms, WPF, Tk, Electron and Edge (`bench/tally_cua.py`, raw results in
-`bench/results/2026-10-23_2351-cua-vs-nexus.json`).
+windows, covered by an opaque window, nobody at the PC (the bench refuses to start before 2 minutes without physical
+input and stops at the first one); each was used the way its own guide tells an agent (Cua: background first, then
+clicks, then its foreground fallback; Windows-MCP: bring the window forward with `App switch`, then act on the screen).
+The effect is judged by the application (event received or value read back), never by the tool's report. Foreground
+changes are sampled every millisecond, the real cursor before and after each attempt. 51 tasks across Win32, WinForms,
+WPF, Tk, Electron and Edge (`bench/tally_cua.py`, raw results in `bench/results/2026-10-26_1210-cua-vs-nexus.json`).
+To reproduce: `python bench/cua_vs_nexus.py` on an idle Windows PC, with Cua Driver and Windows-MCP installed as
+described at the top of the script.
 
-| All 51 tasks | nexus-windows 3.0.2 | Cua Driver 0.38.0 |
-|---|---|---|
-| Effect proven in the background | 44 | 28 (+1 by clicks, +8 after taking the foreground) |
-| False success (reported done, the app got nothing) | 0 | 4 |
-| Scrolling a covered list (Tk, Electron, Edge) | 3/3 | 0/3 |
-| Foreground taken | 0 | 5 |
-| Median time of a successful action | 542 ms | 759 ms |
+| All 51 tasks, target covered | nexus-windows 3.3.0 | Cua Driver 0.38.0 | Windows-MCP 0.8.8 |
+|---|---|---|---|
+| Effect proven in the background | **44** | 26 (+1 by clicks, +6 after taking the foreground) | 0 (no background mode; 10 effects in the foreground) |
+| False success (reported done, the app got nothing) | **0** | 4 | not comparable, see below |
+| Scrolling a covered list (Tk, Electron, Edge) | **3/3** | 0/3 | 0/3 |
+| Foreground taken | **0** | 3 | 15 (never given back) |
+| Real cursor moved | **0** | 0 | 34 |
+| Median time of a successful action | **598 ms** | 728 ms | 1,478 ms |
 
-Windows-MCP left the lab window in the foreground several times, so 13 rows were not covered when the next tool ran;
-on the 38 rows covered before and after each attempt: 35 against 20, false successes 0 against 2. Windows-MCP works on
-the screen with the real mouse and keyboard, which this bench is designed to avoid: it reached no effect in the
-background, took the foreground 10 times and moved the real cursor 36 times; its counts are in `bench/RESULTS.md`.
+Windows-MCP reached the effect on all 9 Win32 tasks once its `App switch` brought the window forward. On the
+WinForms, WPF, Tk, Electron and Edge windows the switch left the window behind 30 times, and its click or typing then
+landed on the window on top (here the bench's cover; in real use, the user's own window) while it reported the click:
+36 "done" answers with no effect, which says more about the absence of a background mode than about its reporting,
+so they are not counted as false successes in the table. 5 more attempts failed in the bench adapter (an item of an
+open list or menu was not found on screen).
 
-From 3.0.1 (35 of 45 covered rows) to 3.0.2: Tk clicks and shortcuts, Win32 Ctrl+K, and scrolling covered lists. Still
+Misses of this server in this run: WPF raw click, wheel and Ctrl+K, a wheel on a covered canvas (Tk, Electron,
+Edge), and Win32 Ctrl+K this time; each was reported as refused or as an unknown outcome (`~`), never as done.
+
+History, from 3.0.1 (35 of 45 covered rows) to 3.0.2 (October 23, 44 of 51 against Cua's 28, details in
+`bench/RESULTS.md`): Tk clicks and shortcuts, Win32 Ctrl+K, and scrolling covered lists. Still
 refused, with the cause read in each toolkit's source and measured: WPF clicks, wheel and shortcuts, a wheel on a
 covered canvas, input at a point of a hidden Electron page. Taken from Cua: reading only what changed
 (`then="changes"`). Not taken: its injected WPF click (moves the user's real cursor), CDP clicks in an already open
