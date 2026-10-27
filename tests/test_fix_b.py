@@ -667,7 +667,7 @@ def test_hotkey_note_heads_look(monkeypatch):
 def test_logs_show_server_state(tmp_path, monkeypatch):
     monkeypatch.setattr(server.log, "LOG_DIR", tmp_path)
     monkeypatch.setattr(freshness, "stale_reason", lambda: "")
-    out = asyncio.run(server.logs(5))
+    out = server.result_text(asyncio.run(server.logs(5)))
     lines = out.splitlines()
     assert "up to date" in lines[0] and lines[1].startswith("Automatic reload: ")
     assert lines[2].startswith("Emergency stop") and lines[3].startswith("User input")

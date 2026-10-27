@@ -41,6 +41,9 @@ def test_initialize_and_list_tools(tmp_path):
             hints = {name: tool.annotations for name, tool in tools.items()}
             assert hints["look"] and hints["look"].read_only_hint
             assert hints["act"] and hints["act"].destructive_hint
+            for name in ("windows", "notifications", "logs"):  # sortie structurée publiée (outputSchema)
+                schema = tools[name].output_schema
+                assert schema is not None and schema["type"] == "object", name
             if sys.platform != "win32":
                 result = await session.call_tool("windows", {})
                 assert result.is_error

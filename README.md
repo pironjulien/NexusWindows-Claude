@@ -2,6 +2,8 @@
 
 <!-- mcp-name: io.github.pironjulien/nexus-windows-claude -->
 
+<img src="https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/mcpb/icon.png" alt="NexusWindows icon" width="96">
+
 [![Release](https://img.shields.io/github/v/release/pironjulien/NexusWindows-Claude)](https://github.com/pironjulien/NexusWindows-Claude/releases)
 [![PyPI](https://img.shields.io/pypi/v/nexus-windows-claude)](https://pypi.org/project/nexus-windows-claude/)
 [![Tests](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/NexusWindows-Claude/actions/workflows/tests.yml)
@@ -19,7 +21,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 3.0.2 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.4.0 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -167,6 +169,9 @@ Step actions: `click`, `double_click`, `right_click`, `type`, `set`, `clear`, `k
 `toggle`, `expand`, `collapse`, `scroll`, `focus`, `menu`, `wait`, `drag`, `hover`. A target is an `[N]` from the last
 `look`, a visible name (`"OK"`), a role-qualified name (`"button:OK"`, `"edit:Name"`, `"checkbox:Subscribe"`) or an
 `x,y` point in the last image.
+
+`windows`, `notifications` and `logs` also return structured content (MCP `outputSchema` and `structuredContent`:
+window rows, notifications, log records) beside the same text, for clients that read data rather than prose.
 
 ## Usage
 

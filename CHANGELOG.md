@@ -6,6 +6,17 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-10-27 — Structured output
+
+### Added
+- Structured output (MCP `outputSchema` and `structuredContent`) for the tools that return data: `windows` (hwnd,
+  title, process, UI family, size, states, owner of a dialog), `notifications` (app, arrival time in ISO 8601, texts
+  with security codes masked) and `logs` (version, pid, server state, call records). The text the model reads is
+  unchanged; `look`, `act`, `launch` and `window` keep their text and image report without a schema.
+
+### Changed
+- README: the NexusWindows medallion at the top.
+
 ## [3.3.2] - 2026-10-26 — Nexus family icon
 
 ### Changed

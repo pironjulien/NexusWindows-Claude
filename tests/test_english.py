@@ -97,8 +97,8 @@ def test_error_and_refusal_texts_have_no_french(monkeypatch):
         texts["unknown window"] = _error_text(lambda: asyncio.run(server.look(window="zz-no-such-window")))
         texts["no current window"] = _error_text(lambda: asyncio.run(server.act(steps=[server.Step(do="click")])))
         texts["invalid step"] = _error_text(lambda: anyio.run(server.mcp.call_tool, "act", {"steps": [{"do": "fly"}]}))
-        texts["windows empty"] = str(asyncio.run(server.windows(filter="zz-no-such-window")))
-        texts["logs"] = asyncio.run(server.logs())
+        texts["windows empty"] = server.result_text(asyncio.run(server.windows(filter="zz-no-such-window")))
+        texts["logs"] = server.result_text(asyncio.run(server.logs()))
         monkeypatch.setattr(freshness, "stale_reason", lambda: f"{freshness.STALE} (test)")
         texts["stale"] = _error_text(lambda: asyncio.run(server._run(lambda auto: "done")))
     finally:
