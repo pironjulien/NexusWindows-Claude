@@ -100,12 +100,13 @@ jobs:
       # Former registry name, before the family naming: every version marked deprecated, pointing to the new one.
       # Only when a version is still not deprecated (the registry refuses a status change that changes nothing).
       - run: |
-          left=$(curl -fsS "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.pironjulien/nexus-windows" | python3 -c '
+          curl -fsS -o servers.json "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.pironjulien/nexus-windows"
+          left=$(python3 -c '
           import json, sys
           old = "io.github.pironjulien/nexus-windows"
           meta = "io.modelcontextprotocol.registry/official"
           servers = json.load(sys.stdin).get("servers", [])
-          print(sum(s["server"]["name"] == old and s.get("_meta", {}).get(meta, {}).get("status") != "deprecated" for s in servers))')
+          print(sum(s["server"]["name"] == old and s.get("_meta", {}).get(meta, {}).get("status") != "deprecated" for s in servers))' < servers.json)
           if [ "$left" != "0" ]; then
             ./mcp-publisher status --status deprecated --all-versions --yes               --message "Renamed to io.github.pironjulien/nexus-windows-claude (PyPI: nexus-windows-claude)"               io.github.pironjulien/nexus-windows
           fi

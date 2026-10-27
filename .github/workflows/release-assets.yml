@@ -1,0 +1,66 @@
+# Signed releases: the exact package files the registry serves for a release (PyPI wheel and sdist) are attached to the GitHub
+# release with their Sigstore bundle (GitHub artifact attestation, keyless; verify a file with
+# `gh attestation verify <file> --repo pironjulien/NexusWindows-Claude`), plus SHA256SUMS.txt. Runs when a release is published
+# (after the registry serves the version) and by hand for an older tag. Nothing is built here: the attested bytes are
+# the ones users install.
+name: Release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to sign (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Registry files of the release
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
+          version="${TAG#v}"
+          mkdir dist
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null "https://pypi.org/pypi/nexus-windows-claude/$version/json"; then break; fi
+            echo "waiting for PyPI to serve nexus-windows-claude $version"; sleep 30
+          done
+          # Every file PyPI serves for this version, checked against the SHA-256 that PyPI publishes.
+          curl -fsS -o release.json "https://pypi.org/pypi/nexus-windows-claude/$version/json"
+          python3 -c '
+          import hashlib, json, pathlib, urllib.request
+          for f in json.load(open("release.json"))["urls"]:
+              body = urllib.request.urlopen(f["url"]).read()
+              if hashlib.sha256(body).hexdigest() != f["digests"]["sha256"]:
+                  raise SystemExit("digest mismatch: " + f["filename"])
+              pathlib.Path("dist", f["filename"]).write_bytes(body)
+          '
+          ls -l dist
+          [ -n "$(ls dist)" ] || { echo "No file for $version"; exit 1; }
+          (cd dist && sha256sum -- * > SHA256SUMS.txt)
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        id: attest
+        with:
+          subject-path: dist/*
+      - name: Attach the files and their Sigstore bundle to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          cp "$BUNDLE" "dist/nexus-windows-claude-$version.sigstore.json"
+          gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"

@@ -6,6 +6,19 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.7.1] - 2026-10-27
+
+### Fixed
+- Guardrails: an invisible format character (zero-width space, soft hyphen, direction mark, variation selector) or a
+  Cyrillic or Greek look-alike letter no longer lets a word that needs confirmation slip through ("Env\u200boyer"
+  displays as "Envoyer"). Look-alikes count for detection only.
+
+### Security
+- CodeQL code scanning; release files (the wheel and sdist PyPI serves) attached to each GitHub release with a
+  Sigstore attestation and SHA256SUMS.txt (`gh attestation verify <file> --repo pironjulien/NexusWindows-Claude`);
+  SECURITY.md states response times and coordinated disclosure; the last workflow step that piped a download into
+  Python now reads a file.
+
 ## [3.7.0] - 2026-10-27 — Tk mouse wheel in the background
 
 ### Added
