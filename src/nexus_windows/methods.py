@@ -292,6 +292,142 @@ def post_wheel(top: int, x: int, y: int, delta: int, horizontal: bool = False) -
     return target
 
 
+OFFSCREEN_SETTLE_S, OFFSCREEN_HOLD_S = 0.15, 0.3  # mesurés le 27/10 (sonde du labo Tk recouvert)
+SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE = 0x0001, 0x0004, 0x0010
+
+
+# Styles qui ne prouvent pas l'opacité : translucide (LAYERED), traversée (TRANSPARENT), composition sans bitmap
+# (NOREDIRECTIONBITMAP : client possiblement entièrement transparent, relecture de Codex du 27/10).
+NOT_OPAQUE = 0x00000020 | 0x00080000 | 0x00200000
+WS_EX_LAYERED = 0x00080000
+
+
+def _corner(hwnd: int) -> int:
+    """Rayon des coins arrondis DWM de la fenêtre, majoré : 8 px à 100 %, linéaire avec l'échelle de son MONITEUR (12 à
+    150 %, 16 à 200 %…), plus 2 px de marge. DPI du moniteur, pas celui de la fenêtre : GetDpiForWindow rend 96 pour
+    une application non adaptée au DPI, le DPI système pour une application « system aware », quel que soit l'écran
+    (relecture de Codex du 27/10). Illisible : 0, la fenêtre ne compte pas comme couverture."""
+    dpi = w.monitor_dpi(hwnd, default=0)
+    return -(-8 * max(dpi, w.GetDpiForWindow(hwnd)) // 96) + 2 if dpi else 0
+
+
+class WindowNotRestored(RuntimeError):
+    """La fenêtre n'a pas pu revenir à sa place : échec de l'étape, jamais une issue simplement incertaine (le défilement
+    vu par expect ne la rend pas réussie ; relecture de Codex du 27/10)."""
+
+
+def _minus(rect: w.Rect, cut: w.Rect) -> list[w.Rect]:
+    """rect privé de cut : jusqu'à quatre rectangles (bandes haute, basse, gauche, droite)."""
+    if cut.left >= rect.right or cut.right <= rect.left or cut.top >= rect.bottom or cut.bottom <= rect.top:
+        return [rect]
+    out = []
+    if cut.top > rect.top:
+        out.append(w.Rect(rect.left, rect.top, rect.right, cut.top))
+    if cut.bottom < rect.bottom:
+        out.append(w.Rect(rect.left, cut.bottom, rect.right, rect.bottom))
+    top, bottom = max(rect.top, cut.top), min(rect.bottom, cut.bottom)
+    if cut.left > rect.left:
+        out.append(w.Rect(rect.left, top, cut.left, bottom))
+    if cut.right < rect.right:
+        out.append(w.Rect(cut.right, top, rect.right, bottom))
+    return out
+
+
+def fully_covered(top: int) -> bool:
+    """Aucun pixel de la fenêtre n'est visible : son cadre, privé du cadre de chaque fenêtre au-dessus d'elle dans
+    l'empilement réel, est vide. Prudence : seules les fenêtres visibles, non masquées par DWM, non réduites, sans style
+    qui laisse voir à travers (NOT_OPAQUE), sans région SetWindowRgn (forme et trous inconnus) comptent comme
+    couverture, coins arrondis DWM exclus à l'échelle de leur moniteur ; une bande visible, même d'un pixel, suffit à
+    refuser (relectures de Codex du 27/10 : grille de points qui manquait une bande étroite, fenêtre en anneau)."""
+    left = [w.frame_rect(top)]
+    above = w.handle(w.GetWindow(top, w.GW_HWNDPREV))
+    while above and left:
+        if (
+            w.IsWindowVisible(above)
+            and not w.IsIconic(above)
+            and not w.is_cloaked(above)
+            and not w.ex_style(above) & NOT_OPAQUE
+            and not w.has_window_region(above)
+            and (k := _corner(above))  # échelle de son écran illisible : rayon des coins inconnu, jamais comptée
+        ):
+            c = w.frame_rect(above)
+            # la croix du cadre sans ses quatre coins (arrondis par DWM, la fenêtre du dessous s'y voit)
+            for cover in (
+                w.Rect(c.left + k, c.top, c.right - k, c.bottom),
+                w.Rect(c.left, c.top + k, c.right, c.bottom - k),
+            ):
+                left = [piece for rect in left for piece in _minus(rect, cover)]
+        above = w.handle(w.GetWindow(above, w.GW_HWNDPREV))
+    return not left
+
+
+def _same_place(top: int, r: w.Rect) -> bool:
+    now = w.window_rect(top)
+    return (now.left, now.top, now.right, now.bottom) == (r.left, r.top, r.right, r.bottom)
+
+
+def post_wheel_offscreen(top: int, x: int, y: int, delta: int, horizontal: bool = False) -> int:
+    """Molette Tk d'une fenêtre entièrement recouverte : Tk renvoie la molette à la fenêtre visible AU POINT du message
+    (tkWinX.c), si bien que recouverte, elle est perdue. La fenêtre est déplacée au-delà du bureau virtuel (sans
+    activation ni changement d'ordre), là où rien ne la recouvre ; la molette y est postée au point correspondant, puis
+    la fenêtre revient à sa place, relue au pixel près. Mesuré le 27/10 : molette reçue, premier plan et curseur
+    intacts ; témoin recouvert : rien reçu. Refusé, rien n'est envoyé : fenêtre en partie visible, agrandie ou réduite,
+    autre enfant au point une fois dehors, fenêtre ramenée au premier plan par l'utilisateur pendant le déplacement. Le délai tenu dehors n'est
+    pas un accusé de traitement : l'effet reste relu à l'image. Limite : Tk calcule event.x/event.y depuis la position
+    du curseur (GetMessagePos), pas depuis le message ; seuls delta et le widget visé sont sûrs."""
+    if w.IsZoomed(top) or w.IsIconic(top):
+        raise MethodError("A maximized or minimized window is never moved: nothing was sent.")
+    if not fully_covered(top):
+        raise MethodError("The window is partly visible: it is never moved off screen; nothing was sent.")
+    r = w.window_rect(top)
+    expected = w.deepest_child_at(top, x, y)  # enfant visé, relevé AVANT le déplacement (relecture de Codex)
+    if not expected:
+        raise MethodError("No child window of the target under the point: nothing was sent.")
+    right = w.GetSystemMetrics(w.SM_XVIRTUALSCREEN) + w.GetSystemMetrics(w.SM_CXVIRTUALSCREEN)
+    dx = right + 50 - r.left
+    flags = SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+    thread = w.window_thread(top)
+    worker.check_cancelled()  # arrêt d'urgence : la fenêtre n'a pas bougé
+    posted = False
+    failure: BaseException | None = None
+    try:
+        if not w.SetWindowPos(top, 0, r.left + dx, r.top, 0, 0, flags):
+            raise MethodError("The window could not be moved off screen: nothing was sent.")
+        time.sleep(OFFSCREEN_SETTLE_S)
+        if (
+            w.deepest_child_at(top, x + dx, y) != expected
+            or w.handle(w.WindowFromPoint(w.POINT(x + dx, y))) != expected
+        ):
+            raise MethodError("Off screen, the point does not fall on the same control: nothing was sent.")
+        worker.check_cancelled()
+        # Dehors, la fenêtre n'est plus sous la souris de l'utilisateur ; seul un Alt+Tab peut l'atteindre : ramenée
+        # au premier plan entre-temps, rien n'est envoyé (relecture de Codex du 27/10).
+        front = w.foreground()
+        if front and w.window_thread(front) == thread:
+            raise MethodError("The user brought this window forward meanwhile: nothing was sent.")
+        msg = w.WM_MOUSEHWHEEL if horizontal else w.WM_MOUSEWHEEL
+        post(expected, msg, (delta & 0xFFFF) << 16, w.make_lparam(x + dx, y))
+        posted = True
+        time.sleep(OFFSCREEN_HOLD_S)
+    except BaseException as error:  # noqa: BLE001  (rendue après le retour de la fenêtre)
+        failure = error
+    # Retour relu (rectangle entier : un changement de taille ou de DPI se voit aussi), quelle que soit l'issue ;
+    # refusé ou corrigé par l'application (WM_WINDOWPOSCHANGING) : un second essai de placement, jamais une seconde molette.
+    back = bool(w.SetWindowPos(top, 0, r.left, r.top, 0, 0, flags)) and _same_place(top, r)
+    if not back:
+        time.sleep(0.05)
+        back = bool(w.SetWindowPos(top, 0, r.left, r.top, r.width, r.height, SWP_NOZORDER | SWP_NOACTIVATE))
+        back = back and _same_place(top, r)
+    if not back:
+        sent = "the wheel was sent, its effect is unknown" if posted else "nothing was sent"
+        raise WindowNotRestored(
+            f"The window could not be put back exactly at ({r.left}, {r.top}): {sent}. Look at it before anything else."
+        ) from failure
+    if failure is not None:
+        raise failure
+    return expected
+
+
 # --- Contrôles Win32 standard : notifications directes au parent ----------------------------------------------
 def _notify_parent(control: int, code: int) -> None:
     parent = w.handle(w.GetParent(control))

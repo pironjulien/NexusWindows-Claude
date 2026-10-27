@@ -624,6 +624,14 @@ class PointerActions(ExecutorBase):
             # Molette Tk renvoyée à la fenêtre sous le point (recouverte : perdue) ; une barre de défilement native
             # (tk.Scrollbar) défile par ses messages de ligne, position relue (mesuré le 23/10).
             chain.append(("scroll bar lines", lambda: self._scroll_by_bar(*aim, direction, amount)))
+            # Sans barre native : fenêtre entièrement recouverte déplacée hors écran le temps de la molette (mesuré le
+            # 27/10) ; en partie visible, agrandie ou réduite : refus, rien n'est envoyé.
+            chain.append(
+                (
+                    "wheel off screen",
+                    self._watched(lambda: methods.post_wheel_offscreen(self.hwnd, *aim, delta, horizontal)),
+                )
+            )
         process = w.process_name(w.window_pid(self.hwnd)).lower()
         if view.framework not in NO_WHEEL_MESSAGES and process not in BROWSERS_WITHOUT_MESSAGE_WHEEL:
             chain.append(

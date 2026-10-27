@@ -928,6 +928,7 @@ def _dispatch(ex: actions.Executor, step: Step) -> actions.Outcome:
 
 STEP_ERRORS = (
     actions.ActionError,
+    methods.WindowNotRestored,  # fenêtre déplacée pour la molette Tk et pas revenue : échec, lot arrêté
     keys.KeyParseError,
     realinput.ForegroundError,
     WindowError,

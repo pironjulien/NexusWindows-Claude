@@ -6,6 +6,20 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-27 — Tk mouse wheel in the background
+
+### Added
+- Mouse wheel on a covered Tk window, without the foreground or the real mouse (until now no background technique
+  existed, in any tool we measured). Tk sends the wheel to the window visible at the point of the message
+  (tkWinX.c), so on a covered window it was lost. A Tk window that is ENTIRELY covered is moved beyond the virtual
+  desktop (no activation, no z-order change), the wheel is posted to the same control there, and the window comes
+  back to its place, read back to the pixel. Coverage is exact: the target frame minus the frame of each window above
+  it; only windows proven opaque count (not layered, transparent, without redirection bitmap or shaped by
+  SetWindowRgn), with rounded DWM corners left out at their monitor's scale; a one-pixel visible strip is enough to
+  refuse. Also refused, nothing sent: maximized or minimized window, another control under the point once moved,
+  window brought forward by the user meanwhile. A window that cannot be put back fails the step and stops the batch.
+  Benchmark: Tk wheel 3/3 on a covered window, no foreground taken, cursor untouched.
+
 ## [3.6.1] - 2026-10-27 — Invoked on slow WPF windows
 
 ### Fixed

@@ -21,7 +21,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 3.6.1 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.7.0 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -269,7 +269,10 @@ with the file name. Scripts, shortcuts and installers are refused.
 - **Tk**: no UI Automation; its text is found by the OCR fallback. Clicks are sent with the mouse button marked
   pressed for Tk's thread only (Tk reads it with `GetKeyState`), keys and shortcuts get a simulated focus
   (`WM_SETFOCUS` to that window only, never `WM_ACTIVATE`), lists scroll through their native scroll bar; all read
-  back. A wheel on a covered Tk canvas is lost (Tk routes it to the window on top) and refused.
+  back. A wheel on a covered Tk canvas would be lost (Tk routes it to the window visible at the point): a Tk window
+  that is entirely covered is moved beyond the desktop for the gesture (no activation), the wheel is posted to the
+  same control there, and the window comes back to its place, read back to the pixel; a partly visible, maximized
+  or minimized window is never moved (refused).
 - **Scrolling a covered Chromium page without DevTools**: the wheel is dropped by Chromium when another window is on
   top, and scrolling areas expose no ScrollPattern; the next hidden line of the area is brought into view (UI
   Automation ScrollItem) and the line's offset inside its area is read back.
@@ -540,8 +543,8 @@ Questions or concerns: open an issue on this repository.
 - WPF: raw clicks on a point, the mouse wheel and keyboard shortcuts are refused in the background (WPF drops a click
   while the real cursor is not over its window, and takes the foreground when given focus); controls with UI
   Automation patterns work.
-- A mouse wheel on a covered Chromium or Tk canvas has no effect (both route it to the window on top); it is refused
-  or reported as `~`, never as a success. Lists and scrolling areas scroll without the wheel (see Per UI family).
+- A mouse wheel on a covered Chromium canvas has no effect (Chromium routes it to the window on top); it is refused
+  or reported as `~`, never as a success. On Tk, it works only when the window is entirely covered (see Per UI family). Lists and scrolling areas scroll without the wheel (see Per UI family).
 - A covered Electron page that has gone `hidden` (it had the foreground once, then lost it) stops rendering: clicks at
   a point are reported as `~`.
 - Store apps that Windows suspends in the background are resumed (`IPackageDebugSettings.Resume`, no foreground);

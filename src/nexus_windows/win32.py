@@ -166,6 +166,7 @@ GetClassNameW = _fn(user32, "GetClassNameW", ctypes.c_int, w.HWND, w.LPWSTR, cty
 GetWindowThreadProcessId = _fn(user32, "GetWindowThreadProcessId", w.DWORD, w.HWND, ctypes.POINTER(w.DWORD))
 GetWindowRect = _fn(user32, "GetWindowRect", w.BOOL, w.HWND, ctypes.POINTER(RECT))
 GetClientRect = _fn(user32, "GetClientRect", w.BOOL, w.HWND, ctypes.POINTER(RECT))
+GetWindowRgnBox = _fn(user32, "GetWindowRgnBox", ctypes.c_int, w.HWND, ctypes.POINTER(RECT))
 ClientToScreen = _fn(user32, "ClientToScreen", w.BOOL, w.HWND, ctypes.POINTER(POINT))
 ScreenToClient = _fn(user32, "ScreenToClient", w.BOOL, w.HWND, ctypes.POINTER(POINT))
 GetForegroundWindow = _fn(user32, "GetForegroundWindow", w.HWND)
@@ -437,6 +438,12 @@ def style(hwnd: int) -> int:
     return GetWindowLongPtrW(hwnd, GWL_STYLE) & 0xFFFFFFFF
 
 
+def has_window_region(hwnd: int) -> bool:
+    """Fenêtre façonnée par SetWindowRgn (forme quelconque, trous possibles). GetWindowRgnBox rend ERROR (0) sans
+    région, mais aussi si l'appel échoue : ce cas ne se distingue pas et compte comme « sans région »."""
+    return GetWindowRgnBox(hwnd, ctypes.byref(RECT())) != 0
+
+
 def ex_style(hwnd: int) -> int:
     return GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & 0xFFFFFFFF
 
@@ -667,12 +674,13 @@ def dpi_awareness(hwnd: int) -> int:
         return -1
 
 
-def monitor_dpi(hwnd: int) -> int:
-    """DPI effectif du moniteur qui affiche la fenêtre (MONITOR_DEFAULTTONEAREST, MDT_EFFECTIVE_DPI)."""
+def monitor_dpi(hwnd: int, default: int = 96) -> int:
+    """DPI effectif du moniteur qui affiche la fenêtre (MONITOR_DEFAULTTONEAREST, MDT_EFFECTIVE_DPI) ; illisible :
+    `default`."""
     dpi_x, dpi_y = w.UINT(), w.UINT()
     if GetDpiForMonitor(MonitorFromWindow(hwnd, 2), 0, ctypes.byref(dpi_x), ctypes.byref(dpi_y)) == 0:
-        return dpi_x.value or 96
-    return 96
+        return dpi_x.value or default
+    return default
 
 
 def window_dpi_scale(hwnd: int) -> float:
