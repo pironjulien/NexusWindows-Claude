@@ -6,6 +6,7 @@ Le contrat complet (statuts, cibles, ordre des techniques) est décrit dans acti
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import hashlib
 import time
@@ -101,6 +102,12 @@ class NoVisibleEffect(methods.MethodError):
     def __init__(self, message: str, still_unchanged: Callable[[], bool] | None = None) -> None:
         super().__init__(message)
         self.still_unchanged = still_unchanged or (lambda: False)
+
+
+class CoveredUnverifiable(NoVisibleEffect):
+    """Action par messages envoyée à une fenêtre Chromium/Electron/CEF recouverte qui ne se redessine pas (suivi
+    d'occlusion actif) : son image ne peut pas changer, l'absence d'effet visible ne dit rien (cas réel du 27/10 :
+    l'objectif de Codex Desktop était bien passé « en cours »)."""
 
 
 class NoEffect(methods.MethodError):
@@ -261,6 +268,13 @@ class ExecutorBase:
         # Document web visé quand la fenêtre en porte plusieurs (Steam : cadre « Steam » et magasin) : sa page
         # DevTools et sa zone de rendu, pas celles du titre de la fenêtre.
         self.document: uia.Node | None = None
+        # Élément visé par la dernière résolution, tel que relu juste avant l'action : la relecture automatique d'après
+        # l'action (server._seen_change) y cherche une transition propre à lui (disparu, coché, sélectionné…).
+        self.aimed: dict[str, Any] | None = None
+        # Écoute de l'événement UIA « Invoqué » de l'élément visé, ouverte à sa résolution quand le serveur la demande
+        # (listen : clic sans preuve demandée) et fermée par lui après la relecture.
+        self.listen = False
+        self.heard: uia.Listener | None = None
         self._sim_current: methods.SimulatedActivation | None = None  # activation simulée en cours (act_chromium)
         # confirm=true de l'étape en cours (ordre explicite ou oui de Julien) : lève la confirmation de act_confirm.
         self.confirm = False
@@ -392,10 +406,22 @@ class ExecutorBase:
         return frame.to_image(x, y, w.frame_rect(self.hwnd))
 
     # --- Outils internes ----------------------------------------------------------------------------------------
+    def _acknowledged(self, what: str, name: str, attempts: list[str]) -> Outcome | None:
+        """La technique précédente n'a rien montré, mais le contrôle a signalé « Invoqué » : le clic est arrivé, aucune
+        autre technique n'est envoyée par-dessus (doublon ; relecture de Codex du 27/10). Issue laissée à la relecture
+        automatique (server._seen_change), qui en fait la preuve."""
+        if self.heard is None or not self.heard.fired:
+            return None
+        return Outcome(True, f"{what} ({name} — no visible change, nothing else sent)", name, attempts, None)
+
     def _try(self, chain: list[tuple[str, Callable[[], Any]]], what: str) -> Outcome:
         attempts: list[str] = []
+        last = ""
         for name, fn in chain:
             worker.check_cancelled()
+            if last and (done := self._acknowledged(what, last, attempts)):
+                return done
+            last = name
             sent_before = methods.accepted_posts()
             try:
                 detail = fn()
@@ -416,6 +442,13 @@ class ExecutorBase:
                     if error.still_unchanged():
                         continue
                     return Outcome(True, f"{what} ({name} — visible change, delayed)", name, attempts, None)
+                if isinstance(error, CoveredUnverifiable):
+                    # Image figée : rien n'est vérifiable par elle, et rien n'est rejoué (relecture du 27/10).
+                    raise Unconfirmed(
+                        f"{what}: sent; unverifiable: window covered and not redrawn, so its image cannot show the "
+                        "effect. Do not send it again: check the result another way (expect or check on its "
+                        "accessibility tree, its DevTools page). " + snapshot.covered_remedy(self.hwnd)
+                    ) from None
                 # L'action par messages a pu prendre effet plus tard : ne rien rejouer par-dessus (doublon possible).
                 raise Unconfirmed(
                     f"{what}: no visible effect within 0.6 s ({'; '.join(attempts)}). The effect may have arrived later: "
@@ -436,6 +469,8 @@ class ExecutorBase:
             verified = True if text.startswith("read back ✓") else None
             extra = f" — {text}" if text else ""
             return Outcome(True, f"{what} ({name}{extra})", name, attempts, verified)
+        if last and (done := self._acknowledged(what, last, attempts)):
+            return done
         raise ActionError(f"{what}: no technique worked ({'; '.join(attempts) or 'none applicable'}).")
 
     def fresh(self, e: snapshot.Element, expected: tuple | None = None) -> snapshot.Element:
@@ -476,6 +511,7 @@ class ExecutorBase:
             screen = frame.to_screen(*point, w.frame_rect(self.hwnd))
             hit = self._hit(self.view, *screen)
             self._aim(hit[0] if hit else None)
+            self.aimed = None  # point : l'élément est relu encore avant l'envoi, sans preuve automatique (Codex, 27/10)
             return "point", screen
         ident = None
         if isinstance(spec, int):
@@ -500,6 +536,8 @@ class ExecutorBase:
                 return self._ocr_point(element)
             target = self.fresh(element, expected=shown.displayed[ident])
             self._aim(element.node)
+            self.aimed = dict(target.props)
+            self._arm(target)
             return "element", target
         # Par nom : instantané frais (reconstruit au premier nom de l'appel et après chaque action).
         view = self._rebuild() if self.acted else self.view
@@ -519,7 +557,24 @@ class ExecutorBase:
             self.notes.append(note)
         target = self.fresh(element)
         self._aim(element.node)
+        self.aimed = dict(target.props)
+        self._arm(target)
         return "element", target
+
+    def _arm(self, target: snapshot.Element) -> None:
+        """Écoute « Invoqué » sur l'élément qui va être actionné (relecture automatique, server._seen_change). Une écoute
+        impossible ne bloque jamais l'action : la preuve se cherche alors par relecture seule."""
+        self.disarm()
+        listen = getattr(self.auto, "listen_invoked", None)
+        if not self.listen or listen is None or not target.props.get("has_invoke"):
+            return
+        with contextlib.suppress(uia.UIAError):
+            self.heard = listen(target.node.element)
+
+    def disarm(self) -> None:
+        if self.heard is not None:
+            self.heard.close()
+            self.heard = None
 
     def _ocr_named(self, spec: str) -> snapshot.Element | None:
         """Texte lu par OCR dans la dernière liste montrée (fenêtre sans élément UIA), désigné par son nom."""
@@ -748,11 +803,26 @@ class ExecutorBase:
                         time.sleep(0.4)
                         return self._fingerprint() == before
 
+                    if self._covered_unredrawn():
+                        raise CoveredUnverifiable("sent; unverifiable: window covered and not redrawn", still_unchanged)
                     raise NoVisibleEffect(
                         "no visible effect: the application probably ignores these messages", still_unchanged
                     )
 
         return run
+
+    def _covered_unredrawn(self) -> bool:
+        """Fenêtre Chromium, Electron ou CEF recouverte par une autre, sans les commutateurs qui la gardent dessinée :
+        son image ne prouve rien, ni effet ni absence d'effet."""
+        if self.view.framework not in ("Chromium", "Electron", "CEF"):
+            return False
+        try:
+            return (
+                snapshot.covered_by_window(self.hwnd)
+                and snapshot.occlusion_disabled(w.window_pid(self.hwnd)) is not True
+            )
+        except OSError, comtypes.COMError:
+            return False
 
     @staticmethod
     def _settle(done: Callable[[], bool], max_s: float = 0.4) -> None:

@@ -6,6 +6,30 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-10-27 — Proven clicks
+
+### Added
+- A click or menu choice without `expect` or `check` is proven on its own when the clicked element allows it, instead
+  of ending `~` (46 % of our steps were `~` over three days, almost all of them clicks that had worked):
+  - the UI Automation "Invoked" event that the application itself raises when the control receives the click,
+    listened to on that element only (target by name, `[N]`, `x,y` point or menu entry), from its resolution to the
+    end of the step. Raised by WPF and by Chromium/Electron. **WinForms (.NET Framework) and Win32 do not raise it**
+    (measured, neither through UI Automation Invoke nor `BN_CLICKED`): their buttons stay `~` without `expect`. The
+    report says the click arrived and that its result is not read (`expect` checks it);
+  - the element's own state, tracked by its UI Automation runtime id in a complete and fresh read: checkbox checked
+    or unchecked, item expanded or collapsed, list item or tab selected.
+  Any other change (title, another element, a value, an element gone, a window opened or closed) is only reported:
+  a clock, a notification or a streaming reply changes a window too. No extra read before the action; a WPF button
+  now ends `✓` in about 130 ms instead of `~` after 0.8 s. In our benchmark, the Electron button went from 3/3
+  uncertain to 3/3 `✓`, with no false success.
+
+### Fixed
+- A click the control acknowledged ("Invoked") is never sent again by a fallback technique, with or without
+  `expect`/`check`, including the opening of an intermediate menu entry (which a second input would close).
+- A click by messages on a covered Chromium, Electron or CEF window started without the occlusion switches said
+  "the application probably ignores these messages". Its frozen image cannot show any effect: the report now says
+  "sent; unverifiable: window covered and not redrawn", gives the remedy and does not invite to send it again.
+
 ## [3.5.0] - 2026-10-27 — Sharper images
 
 ### Changed

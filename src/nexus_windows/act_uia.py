@@ -917,6 +917,8 @@ class UiaActions(ExecutorBase):
                         time.sleep(0.15)
                 if last:
                     clicked = True
+                    self.aimed = dict(item.props)  # relecture automatique d'après l'action (server._seen_change)
+                    self._arm(item)
                     outcome = self.click_element(item)
                 else:
                     fw = framework_of(item, self.view)
@@ -929,7 +931,11 @@ class UiaActions(ExecutorBase):
                         chain.append(
                             ("UIA Legacy", lambda item=item: self.auto.legacy_default_action(item.node.element))
                         )
+                    # « Invoqué » écouté sur l'entrée intermédiaire aussi : une ouverture reçue n'est jamais rejouée par
+                    # la technique suivante, qui refermerait le menu (relecture de Codex du 27/10).
+                    self._arm(item)
                     self._try(chain, f'menu "{name}" opened')
+                    self.disarm()
                     opened.append(item)
                     time.sleep(0.2)
         except worker.Cancelled:

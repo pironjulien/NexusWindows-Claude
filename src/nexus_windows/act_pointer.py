@@ -197,6 +197,9 @@ class PointerActions(ExecutorBase):
                 and element.rect.width * element.rect.height < window_area / 4
             ):
                 self._aim_at = (element, (x, y))
+                # « Invoqué » écouté sur l'élément relu sous le point : cette preuve ne dépend d'aucun état lu avant
+                # l'envoi (aimed reste vide pour un point ; relectures de Codex du 27/10).
+                self._arm(element)  # l'élément relu sous le point lui-même, jamais un ancêtre non relu (Codex, 27/10)
                 try:
                     outcome = self.click_element(element, button, count)
                 finally:

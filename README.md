@@ -21,7 +21,7 @@
 and Claude Code see and operate Windows desktop applications while the user keeps their mouse, keyboard and
 foreground window.
 
-Version 3.5.0 · Windows 10/11 · Python 3.14 · MIT licence
+Version 3.6.0 · Windows 10/11 · Python 3.14 · MIT licence
 
 Part of the Nexus family: [NexusWindows](https://julienpiron.fr/nexuswindows/)
 ([Claude](https://github.com/pironjulien/NexusWindows-Claude) ·
@@ -211,7 +211,11 @@ targeted by number or by name (click at its position, recomputed if the window m
 
 Each step is reported as one of:
 
-- `✓` the effect was read back (value, state, window, image);
+- `✓` the effect was read back (value, state, window, image). A click or menu choice with no `expect` or `check` is
+  also proven on its own, by the clicked element only: its own state read back (checked, expanded, selected), or the
+  UI Automation "Invoked" event the application raises when the control receives the click (WPF, Chromium,
+  Electron; not WinForms or Win32, whose buttons stay `~`). "Invoked" says the click arrived, not what it produced:
+  `expect` checks that. A click the control acknowledged is never sent again by another technique;
 - `=` the state requested by the step's `check` was already true, so nothing was sent;
 - `~` the input was sent but its effect could not be read (never counted as a success);
 - `✗` failure, refusal, or postcondition not met; the batch stops there.

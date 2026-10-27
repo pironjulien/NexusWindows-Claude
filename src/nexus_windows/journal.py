@@ -53,6 +53,17 @@ def issue(fields: dict[str, Any]) -> str:
     return "✓" if fields.get("verified") else "~"
 
 
+def preuve(fields: dict[str, Any]) -> str | None:
+    """`auto` : ✓ par la relecture automatique (état relu) ; `invoque` : ✓ par l'événement « Invoqué » que
+    l'application émet (clic reçu) ; `absente` / `impossible` : ~ sans preuve demandée ni effet vu, ou preuve demandée
+    illisible (FORMAT.md). Rien pour les autres issues."""
+    valeur = fields.get("preuve")
+    attendu = {"✓": ("auto", "invoque"), "~": ("absente", "impossible")}.get(issue(fields), ())
+    if valeur in attendu:
+        return valeur
+    return "absente" if issue(fields) == "~" else None
+
+
 def etape(appel: str, contexte: dict[str, Any], fields: dict[str, Any]) -> None:
     """Une étape (fields : ceux de log.Call.step) dans le journal commun ; contexte : app et cadre de la fenêtre."""
     try:
@@ -68,6 +79,7 @@ def etape(appel: str, contexte: dict[str, Any], fields: dict[str, Any]) -> None:
             "action": fields.get("do"),
             "technique": method,
             "issue": issue(fields),
+            "preuve": preuve(fields),
             "ms": fields.get("ms"),
             "premier_plan": bool(method and _FOREGROUND.search(method)),
             "erreur": erreur_propre(fields.get("error")),

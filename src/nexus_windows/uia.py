@@ -10,6 +10,7 @@ Réglages clés :
 from __future__ import annotations
 
 import contextlib
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -91,6 +92,99 @@ PATTERNS = {
 
 class UIAError(RuntimeError):
     pass
+
+
+INVOKED = U.UIA_Invoke_InvokedEventId
+WINDOW_OPENED = U.UIA_Window_WindowOpenedEventId
+
+
+class _Heard(comtypes.COMObject):
+    """Gestionnaire d'événement UIA, appelé sur un thread de UI Automation : note l'événement (et le processus de son
+    émetteur pour une fenêtre ouverte), sans rien faire d'autre (aucun appel UIA lent dans un gestionnaire)."""
+
+    _com_interfaces_ = [U.IUIAutomationEventHandler]  # noqa: RUF012 - attribut de classe attendu par comtypes
+
+    def __init__(self, pids: set[int] | None = None) -> None:
+        super().__init__()
+        self.pids = pids
+        self.fired = threading.Event()
+
+    def HandleAutomationEvent(self, sender, eventId) -> None:  # noqa: N802, N803 - nom imposé par l'interface COM
+        if self.pids is not None:
+            try:
+                if sender.CurrentProcessId not in self.pids:
+                    return
+            except comtypes.COMError:
+                return
+        self.fired.set()
+
+
+# Inscriptions et retraits d'écoutes : un seul à la fois dans le processus (Microsoft : Add/Remove simultanés au
+# comportement indéfini), y compris entre un thread de travail abandonné encore bloqué et son remplaçant ; attente
+# bornée, l'écoute est alors simplement omise (relecture de Codex du 27/10).
+_REGISTRY = threading.Lock()
+REGISTRY_WAIT_S = 0.5
+_ORPHANS: list[Listener] = []  # retraits échoués, retentés au prochain passage (jamais perdus)
+
+
+class Listener:
+    """Écoute d'un événement UIA, ouverte avant l'action et fermée après : `fired` dit s'il est arrivé. Ce n'est pas
+    le client qui l'émet mais le fournisseur de l'application (WPF Button.OnClick, Chromium sur le « click » DOM) : il
+    dit que le contrôle a reçu l'action, pas ce qu'elle a produit."""
+
+    def __init__(self, uia, event_id: int, element, scope: int, pids: set[int] | None = None) -> None:
+        self._uia, self._event, self._element = uia, event_id, element
+        self._handler = _Heard(pids)
+        self._open = False
+        if not _REGISTRY.acquire(timeout=REGISTRY_WAIT_S):
+            raise UIAError("UI Automation event registration busy")
+        try:
+            uia.AddAutomationEventHandler(event_id, element, scope, None, self._handler)
+            self._open = True
+        finally:
+            _REGISTRY.release()
+
+    @property
+    def fired(self) -> bool:
+        return self._handler.fired.is_set()
+
+    def wait(self, timeout_s: float) -> bool:
+        return self._handler.fired.wait(max(0.0, timeout_s))
+
+    def close(self) -> None:
+        """Retrait de l'écoute, après l'action ; s'il échoue (ou si le verrou est pris), elle est gardée et retentée
+        plus tard, une seule ancienne par fermeture : la dette de nettoyage n'est jamais sur le chemin d'une action
+        (relecture de Codex du 27/10). Un appel COM déjà engagé, lui, ne peut être borné."""
+        if not self._open:
+            return
+        if not _REGISTRY.acquire(timeout=REGISTRY_WAIT_S):
+            if self not in _ORPHANS:
+                _ORPHANS.append(self)
+            return
+        try:
+            self._remove()
+            _retry_one_orphan(self)
+        finally:
+            _REGISTRY.release()
+
+    def _remove(self) -> None:
+        try:
+            self._uia.RemoveAutomationEventHandler(self._event, self._element, self._handler)
+            self._open = False
+        except comtypes.COMError, OSError:
+            if self not in _ORPHANS:
+                _ORPHANS.append(self)
+
+
+def _retry_one_orphan(current: Listener) -> None:
+    """Le plus ancien retrait resté en suspens, retenté une fois (appelé verrou tenu, après le retrait courant)."""
+    for listener in list(_ORPHANS):
+        if listener is current:
+            continue
+        _ORPHANS.remove(listener)
+        if listener._open:
+            listener._remove()  # échec : il repasse en fin de file
+        return
 
 
 @dataclass
@@ -314,6 +408,21 @@ class Automation:
 
     def invoke(self, element) -> None:
         self.pattern(element, "invoke").Invoke()
+
+    # --- Événements ---------------------------------------------------------------------------------------------
+    def listen_invoked(self, element) -> Listener:
+        """« Invoqué » émis par CET élément (bouton, commande, lien) quand l'application a traité l'activation."""
+        try:
+            return Listener(self.uia, INVOKED, element, TreeScope_Element)
+        except comtypes.COMError as error:
+            raise UIAError(f"Cannot listen to the element: {error}") from error
+
+    def listen_windows(self, pids: set[int]) -> Listener:
+        """Nouvelle fenêtre de premier niveau d'un de ces processus (boîte de dialogue, fenêtre ouverte par l'action)."""
+        try:
+            return Listener(self.uia, WINDOW_OPENED, self.uia.GetRootElement(), TreeScope_Children, set(pids))
+        except comtypes.COMError as error:
+            raise UIAError(f"Cannot listen to new windows: {error}") from error
 
     def toggle(self, element) -> None:
         self.pattern(element, "toggle").Toggle()

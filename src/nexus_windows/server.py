@@ -16,6 +16,7 @@ import threading
 import time
 import traceback
 import unicodedata
+from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 if sys.platform != "win32":  # annuaires MCP (conteneur Linux) : démarrer et lister les outils, sans rien piloter
@@ -63,8 +64,9 @@ INSTRUCTIONS = """The user's Windows desktop, in the background: they keep worki
 Fast flow: look(window="title or process") → act(steps=[...]) in one call for several actions; each act returns the
 updated list and image. Target: [N] from the last look, visible name ("Save", "button:OK"), or point "x,y" in pixels
 of the window's last image.
-Per-step report: ✓ effect read back, ~ sent without read-back (batch stopped; inspect the state, never replay blindly),
-✗ failed or refused.
+Per-step report: ✓ effect read back, or "invoked" (the application acknowledged the click; its result is checked
+only by expect/check), ~ sent without read-back (batch stopped; inspect the state, never replay blindly), ✗ failed or
+refused.
 The server picks the safe technique for each app (Win32, WinForms, WPF, UWP/WinUI, Chromium/Electron) and gives the
 foreground back to the user if an app takes it. Never the real mouse/keyboard without foreground=true, reserved for
 what the user allowed. Password fields: typing always refused. Password managers and the secure desktop (UAC,
@@ -993,12 +995,38 @@ def _gesture_of(step: Step) -> str:
 
 
 Fingerprint = dict[tuple[str, str, str], int]
-SEEN_WINDOW_S = 0.8  # relecture après un clic sans preuve propre
+SEEN_WINDOW_S = 0.8  # relecture après une action sans preuve demandée
+WATCHED = ("click", "double_click", "right_click", "menu")  # actions relues d'elles-mêmes sans expect ni check
+SELECT_ROLES = {"ListItem", "TreeItem", "DataItem", "TabItem", "RadioButton"}
+
+
+@dataclass
+class Probe:
+    """La fenêtre juste avant une action sans preuve demandée : ce qu'elle montre et son titre."""
+
+    shown: Fingerprint
+    title: str
+
+
+@dataclass
+class Seen:
+    """Relecture automatique d'après l'action : transition propre à l'élément visé (preuve ; vide : aucune),
+    changement ailleurs dans la fenêtre (observation seulement), et si une lecture entière et fraîche a été faite."""
+
+    proof: str = ""
+    change: str = ""
+    readable: bool = False
 
 
 def _complete(view: snapshot.View) -> bool:
     """Lecture entière : une absence dans un arbre coupé ou illisible ne dit rien (relecture de Codex)."""
     return not (view.truncated or view.unreadable or view.web_missing)
+
+
+def _provable(view: snapshot.View) -> bool:
+    """Lecture qui peut servir de preuve : entière et fraîche (un arbre Chromium recouvert peut être périmé et publier
+    plus tard un état sans rapport avec l'action ; relecture de Codex du 27/10)."""
+    return _complete(view) and not view.stale
 
 
 def _fingerprint(view: snapshot.View) -> Fingerprint:
@@ -1010,31 +1038,103 @@ def _fingerprint(view: snapshot.View) -> Fingerprint:
     return out
 
 
-def _seen_change(executor: actions.Executor, before: Fingerprint, hwnd: int) -> str:
-    """Après un clic sans preuve propre (UIA Invoke) : ce qui a changé dans la fenêtre en SEEN_WINDOW_S (élément apparu,
-    disparu, valeur changée), pour le compte rendu. Ce n'est JAMAIS une preuve : une horloge ou une réponse tardive
-    change aussi la fenêtre (relecture de Codex du 22/10) ; seule une postcondition (expect, check) prouve le clic."""
+def _probe(executor: actions.Executor, hwnd: int) -> Probe | None:
+    """Relevé d'avant l'action (None : lecture coupée, illisible ou périmée, rien de comparable). C'est la lecture que
+    la résolution de la cible ferait de toute façon : aucune lecture en plus."""
+    view = executor._rebuild() if executor.acted else executor.view
+    if not _provable(view):
+        return None
+    return Probe(_fingerprint(view), w.window_text(hwnd))
+
+
+def _difference(before: Probe, after: Fingerprint, title: str) -> str:
+    added = [k for k in after if after[k] > before.shown.get(k, 0)]
+    removed = [k for k in before.shown if before.shown[k] > after.get(k, 0)]
+
+    def show(k: tuple[str, str, str]) -> str:
+        label = k[2] or k[1]
+        return f'{k[0]} "{snapshot.clip(label, 40)}"' if label else k[0]
+
+    parts = [f'title "{snapshot.clip(title, 40)}"'] if title != before.title else []
+    parts += [f"+{show(k)}" for k in added[:2]] + [f"-{show(k)}" for k in removed[:2]]
+    more = len(added) + len(removed) - min(len(added), 2) - min(len(removed), 2)
+    return ", ".join(parts) + (f" (+{more})" if more > 0 else "")
+
+
+def _own_transition(do: str, aimed: dict[str, Any], after: snapshot.View) -> str:
+    """Transition ATTENDUE pour un clic sur CETTE instance (relectures de Codex du 27/10) ; vide : aucune. L'instance est
+    suivie par son identifiant d'exécution UIA (sans lui, rien n'est prouvé) et doit garder son identité (rôle, nom,
+    identifiant d'automatisation) : un élément recyclé n'est plus elle. Seuls comptent : la case visée cochée ou
+    décochée, l'élément visé déplié ou replié, l'élément de liste ou l'onglet visé sélectionné. Jamais une valeur (un
+    champ s'actualise seul), une disparition (lecture partielle silencieuse, liste virtualisée, boîte fermée seule), un
+    double clic ou un clic droit (ils sélectionnent en chemin ; le menu contextuel est prouvé par le moteur,
+    act_uia._menu_proven)."""
+    rid = uia.runtime_id(aimed)
+    ident = snapshot.identity(aimed)
+    if do not in ("click", "menu") or rid is None or not (ident[1] or ident[2]):
+        return ""
+    live = [node.props for root in after.roots.values() for node in root.walk() if uia.runtime_id(node.props) == rid]
+    if len(live) != 1 or snapshot.identity(live[0]) != ident:
+        return ""
+    state = live[0]
+    role = uia.CONTROL_TYPES.get(aimed.get("control_type") or 0, "element")
+    label = f'{role} "{snapshot.clip(ident[1] or ident[2], 40)}"'
+    if aimed.get("toggle") in (0, 1) and state.get("toggle") in (0, 1) and state["toggle"] != aimed["toggle"]:
+        return f"{label} {'checked' if state['toggle'] == 1 else 'unchecked'}"
+    opened = {0: False, 1: True, 2: True}
+    if aimed.get("expand") in opened and state.get("expand") in opened:
+        if opened[aimed["expand"]] != opened[state["expand"]]:
+            return f"{label} {'expanded' if opened[state['expand']] else 'collapsed'}"
+    if role in SELECT_ROLES and aimed.get("selected") is False and state.get("selected") is True:
+        return f"{label} selected"
+    return ""
+
+
+INVOKED = "invoked: the control reported the click (its result is not read: give expect to check it)"
+
+
+def _seen_change(executor: actions.Executor, before: Probe | None, hwnd: int, do: str = "click") -> Seen:
+    """Après une action sans preuve demandée (UIA Invoke, clic par messages) : pendant SEEN_WINDOW_S au plus, preuve (✓)
+    par l'événement UIA « Invoqué » que l'application émet elle-même pour l'élément visé (écoute ouverte à sa
+    résolution, act_base._arm), ou par la transition attendue pour ce clic sur lui, relue (_own_transition). Tout autre
+    changement (titre, élément apparu ou disparu, valeur, fenêtre ouverte ou fermée) est rapporté, jamais pris pour une
+    preuve : une horloge, une notification, une réponse en flux ou une boîte qui se ferme seule le produisent aussi
+    (relectures de Codex du 22/10 et du 27/10, d'Antigravity du 27/10). before None : lecture d'avant inutilisable,
+    seul l'événement peut prouver."""
+    seen = Seen()
+    aimed = executor.aimed
+    heard = executor.heard
     deadline = time.monotonic() + SEEN_WINDOW_S
     while True:
+        if heard is not None and heard.fired:
+            return Seen(INVOKED, "", True)
         if not w.IsWindow(hwnd):
-            return ""
-        view = executor._rebuild()
-        if _complete(view):
-            after = _fingerprint(view)
-            added = [k for k in after if after[k] > before.get(k, 0)]
-            removed = [k for k in before if before[k] > after.get(k, 0)]
-            if added or removed:
+            return Seen("", "the window closed", seen.readable)
+        if before is not None:
+            view = executor._rebuild()
+            if _provable(view):
+                seen.readable = True
+                if aimed is not None and (proof := _own_transition(do, aimed, view)):
+                    return Seen(proof, "", True)
+                seen.change = _difference(before, _fingerprint(view), w.window_text(hwnd)) or seen.change
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return seen
+        if heard is not None:
+            heard.wait(min(0.15, left))  # réveil dès l'événement
+        else:
+            time.sleep(min(0.15, left))
 
-                def show(k: tuple[str, str, str]) -> str:
-                    label = k[2] or k[1]
-                    return f'{k[0]} "{snapshot.clip(label, 40)}"' if label else k[0]
 
-                parts = [f"+{show(k)}" for k in added[:2]] + [f"-{show(k)}" for k in removed[:2]]
-                more = len(added) + len(removed) - len(parts)
-                return ", ".join(parts) + (f" (+{more})" if more > 0 else "")
-        if time.monotonic() >= deadline:
-            return ""
-        time.sleep(0.15)
+def _listen_windows(executor: actions.Executor) -> uia.Listener | None:
+    """Nouvelles fenêtres de l'application pendant l'étape (observation pour le compte rendu)."""
+    listen = getattr(executor.auto, "listen_windows", None)
+    if listen is None:
+        return None
+    try:
+        return listen(executor.target_pids)
+    except uia.UIAError:
+        return None
 
 
 def _check_of(step: Step) -> dict[str, Any] | None:
@@ -1059,6 +1159,18 @@ def _apply_check(executor: actions.Executor, step: Step, outcome: actions.Outcom
         outcome.verified = None
         outcome.line += f" — postcondition unreadable, unknown outcome: {wanted} ({verdict.detail})"
     return verdict.state
+
+
+def _preuve(symbol: str, auto: str, impossible: bool) -> str | None:
+    """Origine de l'issue pour le journal commun (FORMAT.md, `preuve`) : ✓ obtenu par la relecture automatique
+    (`auto` : état relu ; `invoque` : clic reçu par le contrôle, signalé par l'application) ; ~ faute de preuve (rien
+    demandé, aucun effet attribuable à l'action) ou faute de lecture (preuve demandée illisible, arbre coupé ou
+    périmé)."""
+    if symbol == "✓":
+        return auto or None
+    if symbol == "~":
+        return "impossible" if impossible else "absente"
+    return None
 
 
 def _journal_context(executor: actions.Executor, hwnd: int) -> dict[str, Any]:
@@ -1090,6 +1202,7 @@ def _run_steps(
         executor.gesture = _gesture_of(step)
         executor.step_text = (step.text or "") if step.do in ("type", "set") else ""
         executor.approved = set()
+        executor.aimed = None
         failed = False
         unknown = False
         try:
@@ -1111,19 +1224,42 @@ def _run_steps(
                     continue
             # expect ne prouve l'effet que si le texte était ABSENT avant l'action.
             expected_before = executor.present(step.expect) if step.expect else False
-            shown_before: Fingerprint | None = None
-            if step.do in ("click", "double_click") and not check and not step.expect:
-                view = executor._rebuild() if executor.acted else executor.view
-                shown_before = _fingerprint(view) if _complete(view) else None
+            asked = bool(check or step.expect)  # preuve demandée par le modèle
+            watched = step.do in WATCHED and not asked
+            probe = _probe(executor, hwnd) if watched else None
+            unreadable = watched and probe is None  # relecture impossible : arbre coupé
+            auto = ""  # origine d'un ✓ obtenu par la relecture automatique
+            # « Invoqué » écouté pour tout clic ou menu, expect et check compris : un clic reçu n'est jamais renvoyé par une
+            # autre technique (act_base._acknowledged) ; la preuve automatique, elle, reste réservée aux étapes sans
+            # preuve demandée (relecture de Codex du 27/10).
+            executor.listen = step.do in ("click", "menu")
+            opened = _listen_windows(executor) if watched else None
             try:
-                outcome = _dispatch(executor, step)
-            except actions.Unconfirmed as error:
-                # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après coup.
-                outcome = actions.Outcome(True, f"{step.do} sent ({_short(error)})", "messages")
-            if shown_before is not None and outcome.ok and outcome.symbol == "~":
-                change = _seen_change(executor, shown_before, hwnd)
-                if change:  # observation seulement : l'issue reste inconnue
-                    outcome.line += f" — window changed since: {change} (not proof of the click: give expect or check)"
+                try:
+                    outcome = _dispatch(executor, step)
+                except actions.Unconfirmed as error:
+                    # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après.
+                    outcome = actions.Outcome(True, f"{step.do} sent ({_short(error)})", "messages")
+                if watched and outcome.ok and outcome.symbol == "~":
+                    observed = _seen_change(executor, probe, hwnd, step.do)
+                    unreadable = not observed.readable and not observed.proof
+                    if observed.proof:
+                        outcome.verified = True
+                        auto = "invoque" if observed.proof == INVOKED else "auto"
+                        outcome.line += f" — verified: {observed.proof}"
+                    else:  # observation seulement : l'issue reste inconnue
+                        change = ", ".join(
+                            c for c in (observed.change, "a new window opened" if opened and opened.fired else "") if c
+                        )
+                        if change:
+                            outcome.line += (
+                                f" — window changed since: {change} (not proof of the action: give expect or check)"
+                            )
+            finally:
+                executor.listen = False
+                executor.disarm()
+                if opened is not None:
+                    opened.close()
             check_unreadable = bool(check and outcome.ok and _apply_check(executor, step, outcome) is None)
             if step.expect and outcome.ok:
                 try:
@@ -1149,6 +1285,7 @@ def _run_steps(
             call.step(
                 n=index, do=step.do, target=step.target, ok=outcome.ok, verified=outcome.verified,
                 method=outcome.method, attempts=outcome.attempts, ms=ms,
+                preuve=_preuve(outcome.symbol, auto, asked or unreadable),
             )  # fmt: skip
             failed = not outcome.ok
             unknown = outcome.symbol == "~"
@@ -1156,7 +1293,10 @@ def _run_steps(
             ms = round((time.perf_counter() - t0) * 1000)
             report.append(f"{index}. ~ {step.do}: {_short(error)} [{ms} ms]")
             symbols.append("~")
-            call.step(n=index, do=step.do, target=step.target, ok=True, verified=None, method="read", ms=ms)
+            call.step(
+                n=index, do=step.do, target=step.target, ok=True, verified=None, method="read", ms=ms,
+                preuve="impossible",
+            )  # fmt: skip
             unknown = True
         except STEP_ERRORS as error:
             ms = round((time.perf_counter() - t0) * 1000)
@@ -1307,7 +1447,7 @@ async def act(
     """Act in the background: steps run in order (stops at the first error or unknown outcome), then the updated
     state (then: auto = list + image if a step is not verified; both, image, elements, changes, none).
     Per-step report:
-    ✓ effect verified, = already done (nothing sent), ~ unknown outcome (batch stopped: inspect the state), ✗ failed or
+    ✓ invoked or effect read, = already done (nothing sent), ~ unknown outcome (batch stopped: inspect the state), ✗ failed or
     not reached; then the summary.
     Steps (do): click, double_click, right_click, type (appends text; no target = focused element), set (replaces
     the text), clear, key (keys "ctrl+s", "enter", "alt+f4"), select (option in a list), check, uncheck, toggle,
@@ -1320,7 +1460,7 @@ async def act(
     from the refusal, after the user's own yes.
     target: [N] from the last look, visible name ("Save", "button:OK", "edit:Name") or "x,y" in image pixels.
     Example: steps=[{"do":"set","target":"Name","text":"Alice"},{"do":"click","target":"OK"}].
-    Routines: remember="name" saves the batch if it is fully proven (✓/=, targets by name; {{x}} = variable text, only
+    Routines: remember="name" saves the batch if it is verified (✓/=, targets by name; {{x}} = variable text, only
     in text and check.value/contains; typed text made only of {{x}}); routine="name" (without steps) replays it,
     params={"x": "…"}; remember="name" with steps=[] forgets it; look lists them.
     foreground=true: window kept in front for the whole batch, real mouse/keyboard when the background is impossible
