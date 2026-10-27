@@ -33,12 +33,19 @@ jobs:
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
           version="${TAG#v}"
           mkdir dist
-          # One request per try (the PyPI CDN can answer, then 404 again for a while after an upload).
+          # One request per try (the PyPI CDN can answer, then 404 again for a while after an upload), and only the
+          # COMPLETE release counts: PyPI creates the version with its first file, the others arrive one by one, so a
+          # wheel AND an sdist must both be listed before anything is signed.
+          complete=0
           for i in $(seq 1 60); do
-            if curl -fsS -o release.json "https://pypi.org/pypi/nexus-windows-claude/$version/json"; then break; fi
-            echo "waiting for PyPI to serve nexus-windows-claude $version"; sleep 30
+            if curl -fsS -o release.json "https://pypi.org/pypi/nexus-windows-claude/$version/json" && python3 -c '
+          import json, sys
+          kinds = {f["packagetype"] for f in json.load(open("release.json"))["urls"]}
+          sys.exit(0 if {"bdist_wheel", "sdist"} <= kinds else 1)
+          '; then complete=1; break; fi
+            echo "waiting for PyPI to serve the wheel and the sdist of nexus-windows-claude $version"; sleep 30
           done
-          [ -s release.json ] || { echo "PyPI never served nexus-windows-claude $version"; exit 1; }
+          [ "$complete" = 1 ] || { echo "PyPI never served the complete release nexus-windows-claude $version"; exit 1; }
           # Every file PyPI serves for this version, checked against the SHA-256 that PyPI publishes.
           python3 -c '
           import hashlib, json, pathlib, urllib.request
