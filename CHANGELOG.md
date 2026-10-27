@@ -6,6 +6,14 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-10-27 — Invoked on slow WPF windows
+
+### Fixed
+- On a WPF window that is slow to read (1.6 s per accessibility tree read in our lab), the "Invoked" event arrived
+  during the read that followed the click, after the deadline, and was no longer looked at: buttons stayed `~`. The
+  event is now awaited 0.15 s before any tree read, then checked again before concluding. Lab WPF button: `✓` in
+  1.9 s instead of `~` in 3.9 s.
+
 ## [3.6.0] - 2026-10-27 — Proven clicks
 
 ### Added

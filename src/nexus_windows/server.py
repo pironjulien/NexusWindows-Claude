@@ -1090,6 +1090,7 @@ def _own_transition(do: str, aimed: dict[str, Any], after: snapshot.View) -> str
     return ""
 
 
+INVOKED_FIRST_S = 0.15  # attente de « Invoqué » avant la première relecture de l'arbre
 INVOKED = "invoked: the control reported the click (its result is not read: give expect to check it)"
 
 
@@ -1105,6 +1106,10 @@ def _seen_change(executor: actions.Executor, before: Probe | None, hwnd: int, do
     aimed = executor.aimed
     heard = executor.heard
     deadline = time.monotonic() + SEEN_WINDOW_S
+    # L'événement arrive en quelques ms (WPF, Chromium) : attendu un instant avant toute relecture de l'arbre, qui
+    # occupe l'application (1,6 s pour le labo WPF le 27/10) et le retarde d'autant.
+    if heard is not None and heard.wait(INVOKED_FIRST_S):
+        return Seen(INVOKED, "", True)
     while True:
         if heard is not None and heard.fired:
             return Seen(INVOKED, "", True)
@@ -1119,6 +1124,8 @@ def _seen_change(executor: actions.Executor, before: Probe | None, hwnd: int, do
                 seen.change = _difference(before, _fingerprint(view), w.window_text(hwnd)) or seen.change
         left = deadline - time.monotonic()
         if left <= 0:
+            if heard is not None and heard.fired:  # arrivé pendant la dernière relecture
+                return Seen(INVOKED, "", True)
             return seen
         if heard is not None:
             heard.wait(min(0.15, left))  # réveil dès l'événement

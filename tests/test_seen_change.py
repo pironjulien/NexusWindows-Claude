@@ -448,3 +448,25 @@ def test_a_covered_unredrawn_chromium_window_is_unverifiable_not_ignoring(monkey
         assert wanted in text and (not unwanted or unwanted not in text), text
         if covered:
             assert "Do not send it again" in text and "remedy." in text and "check the image" not in text
+
+
+def test_an_invoked_event_arriving_during_a_slow_tree_read_is_still_proof(monkeypatch):
+    """Labo WPF du 27/10 : une relecture de l'arbre prend 1,6 s et occupe l'application ; « Invoqué » arrive pendant
+    elle, après la fin du délai : il compte encore."""
+    before = view(node("Button", "Valider", has_invoke=True, **rid(1)))
+    ex = Shown(before, before, before.elements[0])
+    clock = [0.0]
+    monkeypatch.setattr(server.time, "monotonic", lambda: clock[0])
+    heard = Heard()
+    ex.heard = heard
+
+    def slow_read() -> snapshot.View:
+        clock[0] += 1.6  # relecture lente : le délai est dépassé quand elle rend la main
+        heard.fired = True  # l'événement est arrivé pendant elle
+        return before
+
+    monkeypatch.setattr(ex, "_rebuild", slow_read)
+    monkeypatch.setattr(server.w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(server.w, "window_text", lambda h: "Test")
+    seen = server._seen_change(cast(actions.Executor, ex), server._probe(cast(actions.Executor, ex), HWND), HWND)
+    assert seen.proof == server.INVOKED, seen
