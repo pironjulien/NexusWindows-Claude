@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "nexus-windows-claude",
   "display_name": "NexusWindows for Claude",
-  "version": "3.3.2",
+  "version": "3.4.0",
   "description": "Windows computer use in the background: see and drive desktop apps without taking your mouse, keyboard or foreground, every action read back.",
   "long_description": "NexusWindows for Claude lets Claude use your Windows desktop applications **in the background**: it reads a window (UI Automation list, image when needed), clicks, types, picks, uses menus and shortcuts and launches apps while you keep working, without taking your mouse, keyboard or foreground. Every action is read back and reported as verified, already done, unknown or failed.\n\n- Win32, WinForms, WPF, UWP/WinUI, Chromium/Electron and Tk, each with the safe technique for it\n- Irreversible or outward gestures (send, pay, publish, delete) need your explicit yes\n- Emergency stop: Ctrl+Alt+Shift+Esc stops every action for two minutes\n- Runs entirely on your PC: no account, no telemetry\n\nSource, safeguards and privacy: https://github.com/pironjulien/NexusWindows-Claude",
   "author": {
