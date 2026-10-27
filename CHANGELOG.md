@@ -6,6 +6,13 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.7.2] - 2026-10-27
+
+### Fixed
+- Guardrails: the lowercase look-alikes в, к, м, н, т (Cyrillic) and β, η (Greek), dropped by mistake from the
+  detection table in the previous release, are back ("Coмmander", "Posтer" are recognised again); a test checks every
+  letter of both tables and that the set can no longer shrink.
+
 ## [3.7.1] - 2026-10-27
 
 ### Fixed
