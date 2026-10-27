@@ -456,9 +456,9 @@ def render(
             sx2, sy2 = frame.to_screen(max(x1, x2), max(y1, y2), view.info.rect)
             ox, oy = view.frame.origin
             crop = raw.crop((sx1 - ox, sy1 - oy, sx2 - ox, sy2 - oy))
-            side = snapshot.MAX_SIDE.get(detail, 1568)
-            pixels = snapshot.MAX_PIXELS.get(detail, 1_150_000)
-            # Côté long ET surface bornés (règle commune) : un zoom carré ne dépasse jamais 1,15 Mpx.
+            side = snapshot.MAX_SIDE.get(detail, snapshot.MAX_SIDE["normal"])
+            pixels = snapshot.MAX_PIXELS.get(detail, snapshot.MAX_PIXELS["normal"])
+            # Côté long ET surface bornés (règle commune) : un zoom carré ne dépasse jamais 2,56 Mpx.
             factor = min(
                 4.0, side / max(crop.width, crop.height, 1), (pixels / max(1, crop.width * crop.height)) ** 0.5
             )
@@ -619,8 +619,8 @@ def _screen_overview(detail: str, call: log.Call | None) -> list[Any]:
         draw = ImageDraw.Draw(shot.image)
         for r in protected:
             draw.rectangle((r.left - ox, r.top - oy, r.right - ox, r.bottom - oy), fill=(0, 0, 0))
-    side = snapshot.MAX_SIDE.get(detail, 1568)
-    pixels = snapshot.MAX_PIXELS.get(detail, 1_150_000)
+    side = snapshot.MAX_SIDE.get(detail, snapshot.MAX_SIDE["normal"])
+    pixels = snapshot.MAX_PIXELS.get(detail, snapshot.MAX_PIXELS["normal"])
     width, height = shot.image.width, shot.image.height
     scale = min(1.0, side / max(width, height), (pixels / (width * height)) ** 0.5)
     image = shot.image.resize((max(1, int(shot.image.width * scale)), max(1, int(shot.image.height * scale))), 3)
@@ -859,7 +859,7 @@ async def look(
     changed since the last list: added "+", changed "~", removed "-", the others keep their [N]), text (text of
     documents, no image), none.
     query: list only the elements containing this text. region [x1,y1,x2,y2]: zoom on an area of the image (fine
-    reading; coordinates stay those of the full image). Images: WebP, at most 1568 px and 1.15 Mpx (detail=high
+    reading; coordinates stay those of the full image). Images: WebP, at most 2000 px and 2.56 Mpx (detail=high
     gives the same size: zoom with region to read small text); an image identical to the last one sent for this window
     is not attached again (show=image always attaches it).
     marks: numbers drawn on the image (auto = unnamed elements; all; none)."""

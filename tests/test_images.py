@@ -1,4 +1,4 @@
-"""Règle image commune des produits Nexus (NexusShared/images.md, 24/10) : WebP, 1568 px / 1,15 Mpx, plafonds, pas de double."""
+"""Règle image commune des produits Nexus (NexusShared/images.md, 27/10) : WebP, 2000 px / 2,56 Mpx, 500 Ko, pas de double."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ def test_ui_capture_is_lossless_webp_with_the_same_size():
     back = Image.open(io.BytesIO(data))
     assert back.format == "WEBP" and back.size == image.size
     assert back.convert("RGB").tobytes() == image.tobytes()  # sans perte
-    assert len(data) <= snapshot.LOSSLESS_BUDGET
+    assert len(data) <= snapshot.IMAGE_LIMIT
 
 
 def test_noisy_capture_falls_back_to_lossy_and_stays_under_the_hard_limit():
     random.seed(3)
-    image = Image.frombytes("RGB", (1568, 733), random.randbytes(1568 * 733 * 3))
+    image = Image.frombytes("RGB", (2000, 1125), random.randbytes(2000 * 1125 * 3))
     data = snapshot.image_bytes(image)
     back = Image.open(io.BytesIO(data))
     assert back.format == "WEBP" and back.size == image.size  # mêmes dimensions : coordonnées inchangées
@@ -38,7 +38,8 @@ def test_noisy_capture_falls_back_to_lossy_and_stays_under_the_hard_limit():
 def test_high_detail_follows_the_common_limit():
     frame = snapshot.frame_for(snapshot.w.Rect(0, 0, 3840, 2160), detail="high")
     width, height = frame.image_size
-    assert max(width, height) <= 1568 and width * height <= 1_150_000
+    assert max(width, height) <= 2000 and width * height <= 2_560_000
+    assert (width, height) == (2000, 1125)  # 16:9 : seul le côté long limite
 
 
 def test_image_print_tells_an_unchanged_screen_from_a_changed_one():

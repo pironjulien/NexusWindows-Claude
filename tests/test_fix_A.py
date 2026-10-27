@@ -415,7 +415,7 @@ def test_square_zoom_stays_under_the_pixel_budget(shifted):
     session.mark_image(before)
     out = server.render(NO_AUTO, HWND, "both", region=[0, 0, 300, 300])
     width, height = Image.open(io.BytesIO(out[1].data)).size
-    assert width * height <= snapshot.MAX_PIXELS["normal"] and max(width, height) <= 1568  # ×4 donnait 1200×1200
+    assert width * height <= snapshot.MAX_PIXELS["normal"] and max(width, height) <= 2000  # ×4 : 1200×1200
 
 
 def test_unchanged_image_is_not_resent_and_keeps_the_frame(shifted):

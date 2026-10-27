@@ -6,6 +6,17 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-10-27 — Sharper images
+
+### Changed
+- Images sent to the AI follow the common Nexus image rule of 27/10: long side up to 2000 px and 2.56 MP (was 1568 px
+  and 1.15 MP), lossless WebP while it fits 500 KB (was 200 KB, so a real screen went lossy), then quality 90, 80,
+  70…; never over 500 KB. Small text is read better (98.8 % of characters instead of 92 % in our benchmark).
+
+### Added
+- `server.json`: `icons` (Nexus family medallion, PNG and SVG) so the MCP Registry and its clients show the
+  product icon.
+
 ## [3.4.0] - 2026-10-27 — Structured output
 
 ### Added
@@ -236,7 +247,6 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 - Reviewed by the Codex agent over three rounds (zoom area over the pixel budget, a suppressed duplicate that could
   replace the coordinate frame, image prints left after a window was evicted, a debug write failure after the image
   was marked as sent, red and green with the same grey).
-
 
 ## [3.0.2] - 2026-10-24 — Tk in the background, scrolling without a wheel
 

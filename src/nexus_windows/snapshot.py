@@ -22,13 +22,13 @@ from PIL import Image, ImageDraw, ImageFont
 from . import capture, cdp, ocr, policy, steam, uia
 from . import win32 as w
 
-# Règle image commune des produits Nexus (NexusShared/images.md, 24/10) : côté long ≤ 1568 px et ≤ 1,15 Mpx (limite standard
-# de Claude, aucune réduction de sa part ; GPT-5.x et Gemini 3 lisent la même), WebP sans perte, > 200 Ko → qualité 85
-# puis 70, jamais > 500 Ko. detail="high" (2000 px auparavant) suit la même limite : pour lire un petit texte, region
-# (zoom) plutôt qu'une grande image.
-MAX_SIDE = {"normal": 1568, "high": 1568}
-MAX_PIXELS = {"normal": 1_150_000, "high": 1_150_000}
-LOSSLESS_BUDGET = 200 * 1024
+# Règle image commune des produits Nexus (NexusShared/images.md, 27/10) : côté long ≤ 2000 px (Claude Code réduit
+# lui-même au-delà ; Claude 4.7+ lit jusqu'à 2576 px) et ≤ 2,56 Mpx (2 500 tuiles GPT en detail high), WebP sans perte
+# tant qu'il tient 500 Ko, sinon la meilleure qualité qui tient (jamais > 500 Ko, plafond d'Antigravity). Banc du 27/10 :
+# petit texte lu à 92 % en 1429×804, 98,8 % en 2000×1125. detail="high" suit la même limite : pour un texte plus petit
+# encore, region (zoom).
+MAX_SIDE = {"normal": 2000, "high": 2000}
+MAX_PIXELS = {"normal": 2_560_000, "high": 2_560_000}
 IMAGE_LIMIT = 500 * 1024
 
 ACTION_ROLES = {
@@ -1171,8 +1171,8 @@ def render_image(view: View, physical: Image.Image, marks: str = "auto") -> Imag
 
 
 def image_bytes(image: Image.Image) -> bytes:
-    """Image envoyée au modèle, en WebP (règle commune) : sans perte si ≤ 200 Ko, sinon qualité 85 puis 70 (jamais
-    au-delà de 500 Ko : qualité 50, 30, 10 puis 0 en dernier recours). Mêmes dimensions : les coordonnées de l'image ne changent pas."""
+    """Image envoyée au modèle, en WebP (règle commune) : sans perte si ≤ 500 Ko, sinon qualité 90, 80, 70… jusqu'à
+    tenir 500 Ko (0 en dernier recours). Mêmes dimensions : les coordonnées de l'image ne changent pas."""
     rgb = image.convert("RGB")
 
     def encode(**options: object) -> bytes:
@@ -1181,19 +1181,12 @@ def image_bytes(image: Image.Image) -> bytes:
         return buffer.getvalue()
 
     data = encode(lossless=True)
-    if len(data) <= LOSSLESS_BUDGET:
+    if len(data) <= IMAGE_LIMIT:
         return data
     # Puis qualité décroissante jusqu'à tenir 500 Ko (image très bruitée : à 0, un écran entier pèse < 100 Ko).
-    for quality, budget in (
-        (85, LOSSLESS_BUDGET),
-        (70, IMAGE_LIMIT),
-        (50, IMAGE_LIMIT),
-        (30, IMAGE_LIMIT),
-        (10, IMAGE_LIMIT),
-        (0, IMAGE_LIMIT),
-    ):
+    for quality in (90, 80, 70, 50, 30, 10, 0):
         data = encode(quality=quality)
-        if len(data) <= budget:
+        if len(data) <= IMAGE_LIMIT:
             return data
     return data
 

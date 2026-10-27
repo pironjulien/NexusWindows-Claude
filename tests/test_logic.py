@@ -46,9 +46,9 @@ def test_cdp_modifier_bits():
 
 # --- Coordonnées ----------------------------------------------------------------------------------------------
 def test_frame_roundtrip_scaled():
-    frame = snapshot.frame_for(w.Rect(100, 50, 3300, 1850), "normal")  # 3200×1800 : limité par 1,15 Mpx
+    frame = snapshot.frame_for(w.Rect(100, 50, 3300, 1850), "normal")  # 3200×1800 : limité à 2000 px de côté
     width, height = frame.image_size
-    assert width <= 1568 and height <= 1568 and width * height <= 1_150_000
+    assert width <= 2000 and height <= 2000 and width * height <= 2_560_000
     assert abs(width / height - 3200 / 1800) < 0.01
     x, y = frame.to_image(1700, 950)
     sx, sy = frame.to_screen(x, y)
@@ -59,9 +59,11 @@ def test_frame_roundtrip_scaled():
 def test_frame_limits_per_detail():
     normal = snapshot.frame_for(w.Rect(0, 0, 1920, 1080), "normal")
     high = snapshot.frame_for(w.Rect(0, 0, 3840, 2160), "high")
-    assert normal.image_size[0] * normal.image_size[1] <= 1_150_000
-    assert max(high.image_size) <= 1568 and high.image_size[0] * high.image_size[1] <= 1_150_000
-    wide = snapshot.frame_for(w.Rect(0, 0, 1568, 300), "normal")  # sous les deux limites : taille réelle
+    assert normal.scale == 1.0  # 1920×1080 : sous les deux limites, envoyé tel quel
+    assert max(high.image_size) <= 2000 and high.image_size[0] * high.image_size[1] <= 2_560_000
+    square = snapshot.frame_for(w.Rect(0, 0, 2400, 2400), "normal")  # carré : limité par la surface
+    assert square.image_size[0] * square.image_size[1] <= 2_560_000 and max(square.image_size) < 2000
+    wide = snapshot.frame_for(w.Rect(0, 0, 2000, 300), "normal")  # sous les deux limites : taille réelle
     assert wide.scale == 1.0
 
 

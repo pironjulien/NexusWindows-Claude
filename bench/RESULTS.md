@@ -73,9 +73,9 @@ de contrat ou de sécurité. Constats mesurés pendant leur correction :
 | DevTools Edge : la page change son titre à chaque événement, la fenêtre suit avec retard → port déclaré mort 30 s | page gardée si visible et titres concordants (avec relecture à 150 ms) ; une ambiguïté n'est plus un port mort |
 | Electron/Edge lancés par `launch(devtools=true)` : <select>, ctrl+k, champ multiligne, éditeur riche | 10/10 en 50–250 ms, sans activation ni vol de focus |
 
-Images limitées alors à 1,15 Mpx (normal) et 3,75 Mpx (high). Règle actuelle : 1568 px de côté et 1,15 Mpx au plus pour
-les deux niveaux de détail (`snapshot.py`, `MAX_SIDE` et `MAX_PIXELS`) : aucun modèle Claude ne les réduit, les
-coordonnées lues restent exactes ; pour un petit texte, zoom par `region` plutôt qu'une grande image.
+Images limitées alors à 1,15 Mpx (normal) et 3,75 Mpx (high). Règle actuelle (27/10) : 2000 px de côté et 2,56 Mpx au plus pour
+les deux niveaux de détail (`snapshot.py`, `MAX_SIDE` et `MAX_PIXELS`) : ni Claude Code ni le modèle ne les réduisent,
+les coordonnées lues restent exactes ; pour un petit texte, zoom par `region` plutôt qu'une grande image.
 
 ## Quatrième passage — avant finalisation (0.4.0 → 0.5.0)
 Mesure indépendante par le vrai serveur MCP, Julien absent (0 entrée physique) : 73 actions, 69 réussies, 5 refus
