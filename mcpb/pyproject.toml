@@ -1,9 +1,9 @@
 [project]
 name = "nexus-windows-claude-extension"
-version = "3.7.0"
+version = "3.7.1"
 description = "Claude Desktop extension (.mcpb) of NexusWindows for Claude: runs the PyPI server pinned below."
 requires-python = ">=3.14,<3.15"
-dependencies = ["nexus-windows-claude==3.7.0"]
+dependencies = ["nexus-windows-claude==3.7.1"]
 
 [tool.uv]
 package = false
