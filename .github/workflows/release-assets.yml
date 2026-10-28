@@ -74,12 +74,15 @@ jobs:
           pinned=$(python3 -c 'import json; print(json.load(open("source/mcpb/manifest.json"))["version"])')
           if [ "$pinned" = "$version" ] && grep -q "nexus-windows-claude==$version\"" source/mcpb/pyproject.toml; then
             npx --yes @anthropic-ai/mcpb@2.1.2 pack source/mcpb "dist/nexus-windows-claude-$version.mcpb"
-          elif gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' \
-              | grep -qx "nexus-windows-claude-$version.mcpb"; then
-            # Older tag run again after mcpb/ moved on: the extension already attached stays in the sums and the bundle.
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p "nexus-windows-claude-$version.mcpb" -D dist
           else
-            echo "mcpb/ on main pins $pinned, not $version: no extension yet (run again by hand once it is bumped)"
+            # Older tag run again after mcpb/ moved on: the extension already attached stays in the sums and the bundle.
+            # The listing is its own command: a failed read stops here, never taken for "no extension attached".
+            attached=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')
+            if grep -qx "nexus-windows-claude-$version.mcpb" <<< "$attached"; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p "nexus-windows-claude-$version.mcpb" -D dist
+            else
+              echo "mcpb/ on main pins $pinned, not $version: no extension yet (run again by hand once it is bumped)"
+            fi
           fi
           (cd dist && sha256sum -- * > SHA256SUMS.txt)
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
