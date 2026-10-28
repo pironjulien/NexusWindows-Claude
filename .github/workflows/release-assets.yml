@@ -66,6 +66,7 @@ jobs:
           persist-credentials: false
       - name: Claude Desktop extension of the release
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           set -euo pipefail
@@ -73,6 +74,10 @@ jobs:
           pinned=$(python3 -c 'import json; print(json.load(open("source/mcpb/manifest.json"))["version"])')
           if [ "$pinned" = "$version" ] && grep -q "nexus-windows-claude==$version\"" source/mcpb/pyproject.toml; then
             npx --yes @anthropic-ai/mcpb@2.1.2 pack source/mcpb "dist/nexus-windows-claude-$version.mcpb"
+          elif gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' \
+              | grep -qx "nexus-windows-claude-$version.mcpb"; then
+            # Older tag run again after mcpb/ moved on: the extension already attached stays in the sums and the bundle.
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p "nexus-windows-claude-$version.mcpb" -D dist
           else
             echo "mcpb/ on main pins $pinned, not $version: no extension yet (run again by hand once it is bumped)"
           fi
