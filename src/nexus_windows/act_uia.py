@@ -492,9 +492,17 @@ class UiaActions(ExecutorBase):
 
         what = f'keys "{spec}"'
         simulated: list[tuple[str, Callable[[], Any]]] = []
-        if fw == "Chromium":
+        closing = (
+            element is None
+            and fw != "Tk"
+            and len(combos) == 1
+            and combos[0].key == 0x73
+            and combos[0].modifiers == (0x12,)
+        )
+        if fw == "Chromium" or (fw == "Explorer" and element is None and not closing):
             # Activation simulée d'abord : touches et raccourcis (état clavier simulé) lus par Chromium sans que le
-            # premier plan de Julien change ; focus de l'élément visé par accSelect, relu.
+            # premier plan de Julien change ; focus de l'élément visé par accSelect, relu. Explorateur : sa vue de
+            # fichiers ignore F2 et Entrée postés tant que son cadre ne se croit pas actif (passe 2 du 28/10, mesuré).
             sim_sent: list[str] = []
 
             def run_simulated() -> str:
@@ -519,13 +527,7 @@ class UiaActions(ExecutorBase):
                     raise
                 except ActionError:
                     pass  # l'application ne s'y prête pas : refus (ou vrai clavier autorisé) ci-dessous
-        if (
-            element is None
-            and fw != "Tk"
-            and len(combos) == 1
-            and combos[0].key == 0x73
-            and combos[0].modifiers == (0x12,)
-        ):
+        if closing:
             # Alt+F4 : la touche postée est ignorée par WPF/UWP/WinUI (passe 2 du 22/10 : Calculatrice, Paramètres) et par
             # les boîtes de dialogue Win32 (24/10 : Table des caractères, « no visible effect »), mais la fermeture
             # qu'elle demande passe par WindowPattern.Close, ou WM_CLOSE, sans premier plan, relue et jamais rejouée.

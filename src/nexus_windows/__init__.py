@@ -1,3 +1,3 @@
 """nexus-windows : pilotage du bureau Windows en arrière-plan pour Claude (serveur MCP)."""
 
-__version__ = "3.7.3"
+__version__ = "3.7.4"

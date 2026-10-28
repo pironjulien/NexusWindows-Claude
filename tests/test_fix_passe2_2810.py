@@ -10,7 +10,7 @@ import pytest
 from test_contract import HWND, make_view, node
 from test_seen_change import Shown, _run, rid, view
 
-from nexus_windows import actions, server, session, snapshot
+from nexus_windows import actions, methods, server, session, snapshot
 
 
 def test_f2_focusing_a_new_rename_field_is_proof(monkeypatch):
@@ -131,3 +131,57 @@ def test_a_point_without_scroll_container_is_a_missing_target(monkeypatch):
         ex.scroll(None, "down", 3)
     assert not isinstance(error.value, actions.NeedsForeground)
     assert "no scrollable container read under this point" in str(error.value)
+
+
+# --- Explorateur : F2 et Entrée postés en activation simulée (passe 2 rejouée du 28/10) ------------------------------
+# Sa vue de fichiers (DirectUIHWND) ignore F2 posté tant que le cadre CabinetWClass ne se croit pas actif ; mesuré :
+# WM_NCACTIVATE/WM_ACTIVATE envoyés au cadre, F2 posté à la vue, champ de renommage ouvert, premier plan inchangé.
+
+
+def test_explorer_frame_accepts_simulated_activation(monkeypatch):
+    from test_simulated import chromium_window  # noqa: F401  (même relevé de messages)
+
+    sent: list[tuple] = []
+    monkeypatch.setattr(methods, "_PRIMED", {7})
+    monkeypatch.setattr(methods, "SIM_SETTLE_S", 0.0)
+    monkeypatch.setattr(methods.w, "IsWindow", lambda h: True)
+    monkeypatch.setattr(methods.w, "class_name", lambda h: "CabinetWClass")
+    monkeypatch.setattr(methods.w, "foreground", lambda: 999)
+    monkeypatch.setattr(methods.w, "root", lambda h: h)
+    monkeypatch.setattr(methods.w, "window_pid", lambda h: 7)
+    monkeypatch.setattr(methods.w, "send_message", lambda h, m, wp=0, lp=0, timeout_ms=1000: sent.append((m, wp)) or 0)
+    monkeypatch.setattr(methods, "post", lambda h, m, wp, lp: sent.append((m, wp)))
+    with methods.simulated_activation(HWND, {HWND}):
+        pass
+    assert sent[:2] == [(methods.WM_NCACTIVATE, 1), (methods.WM_ACTIVATE, methods.WA_ACTIVE)]
+
+
+def test_explorer_f2_goes_to_the_focused_view_under_simulated_activation(monkeypatch):
+    import contextlib
+
+    from test_contract import FakeAuto, executor
+
+    ex = executor(dataclasses.replace(make_view(node("List", "Vue d'éléments")), framework="Explorer"), FakeAuto())
+    monkeypatch.setattr(ex, "_focused_target_element", lambda: None)
+    monkeypatch.setattr(
+        ex, "_sim_activation", lambda e=None: contextlib.nullcontext(type("S", (), {"check": lambda s, c: None})())
+    )
+    monkeypatch.setattr(ex, "_sim_top", lambda e=None: HWND)
+    monkeypatch.setattr(actions.methods, "keyboard_target", lambda top, windows=None: 61869170)
+    posted: list[tuple] = []
+    monkeypatch.setattr(actions.methods, "post_key", lambda h, vk: posted.append((h, vk)))
+    prints = iter([("avant",), ("après",)])
+    monkeypatch.setattr(ex, "_fingerprint", lambda: next(prints))
+    outcome = ex.press("f2")
+    assert outcome.ok and "simulated activation" in outcome.line
+    assert posted == [(61869170, 0x71)]  # la vue qui a le focus du fil, jamais le cadre
+
+
+def test_explorer_alt_f4_keeps_the_proven_close(monkeypatch):
+    from test_contract import FakeAuto, executor
+
+    ex = executor(dataclasses.replace(make_view(node("List", "Vue d'éléments")), framework="Explorer"), FakeAuto())
+    monkeypatch.setattr(ex, "_focused_target_element", lambda: None)
+    monkeypatch.setattr(ex, "_sim_activation", lambda e=None: pytest.fail("Alt+F4 never goes through simulation"))
+    monkeypatch.setattr(ex, "_close_target", lambda what: actions.Outcome(True, f"{what} closed", "UIA", verified=True))
+    assert ex.press("alt+f4").verified

@@ -6,6 +6,14 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.7.4] - 2026-10-28
+
+### Fixed
+- Explorer: F2 and Enter posted to a covered File Explorer window were ignored (its file view only reads them while its
+  frame believes it is active). Keys without a target now go through the same simulated activation as Chromium
+  (activation messages to the frame, keys to the focused file view): F2 opens the rename field and Enter opens the
+  folder in the background, the user's foreground untouched; Alt+F4 keeps its proven close.
+
 ## [3.7.3] - 2026-10-28
 
 ### Fixed

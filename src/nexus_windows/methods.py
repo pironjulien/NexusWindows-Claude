@@ -818,6 +818,9 @@ WA_INACTIVE, WA_ACTIVE = 0, 1
 # Fenêtre de premier niveau d'un navigateur ou d'une application Electron (HWNDMessageHandler de Chromium). Steam
 # (CEF dans un cadre SDL) n'en est pas : ses messages d'activation n'atteignent pas CEF, activation brève inchangée.
 CHROMIUM_TOP_CLASS = "Chrome_WidgetWin_"
+# Fenêtres de premier niveau qui tiennent leur état d'activation des messages qu'elles reçoivent : Chromium, et le cadre
+# de l'Explorateur (sa vue de fichiers ignore F2 posté tant que le cadre ne se croit pas actif ; mesuré le 28/10).
+SIMULATED_ACTIVATION_CLASSES = (CHROMIUM_TOP_CLASS, "CabinetWClass")
 # Tranche de frappe en activation simulée : le premier plan de Julien n'est jamais tenu, la tranche borne seulement
 # ce qui part sans être encore relu. Même cadence que les activations brèves (≈60 caractères au départ, puis selon le
 # débit mesuré) : mesuré sur une page lourde (1 500 éléments reconstruits à chaque caractère), des lots de 200
@@ -884,8 +887,8 @@ def simulated_activation(top: int, windows: set[int] | None = None) -> Iterator[
     (choisie par l'utilisateur) : MethodError, la frappe ordinaire s'applique. Première fois pour ce processus : jeton commun et
     pause de l'utilisateur (son droit de premier plan de lancement peut être utilisé, voir plus haut)."""
     windows = windows or {top}
-    if not w.IsWindow(top) or not w.class_name(top).startswith(CHROMIUM_TOP_CLASS):
-        raise MethodError("not a top-level Chromium window: simulated activation not applicable")
+    if not w.IsWindow(top) or not w.class_name(top).startswith(SIMULATED_ACTIVATION_CLASSES):
+        raise MethodError("not a top-level Chromium or Explorer window: simulated activation not applicable")
     if w.root(w.foreground()) in windows:
         raise MethodError("the window is in the foreground: simulated activation not needed")
     pid = w.window_pid(top)

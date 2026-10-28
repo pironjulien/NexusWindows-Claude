@@ -265,7 +265,12 @@ class Win32Actions(ExecutorBase):
         """simulated : Chromium en activation simulée (clavier à sa fenêtre de premier plan, raccourcis avec état
         clavier simulé : mesuré, Ctrl+K reçu par la page). element : la cible désignée ; ses touches vont à SA fenêtre
         de premier niveau, celle que l'activation simulée vise (dialogue, surgissante : relecture de Codex, W14)."""
-        target_hwnd = self._sim_top(element) if simulated else methods.keyboard_target(self.hwnd, self.windows)
+        # Explorateur en activation simulée : touches à la vue qui a le focus du fil (sa DirectUIHWND), pas au cadre
+        target_hwnd = (
+            self._sim_top(element)
+            if simulated and fw != "Explorer"
+            else methods.keyboard_target(self.hwnd, self.windows)
+        )
         if own:
             # Champ Win32 désigné qui a SA fenêtre, décidé UNE fois par l'appelant (route sans activation) : ses touches
             # vont à lui ; disparu entre-temps, rien n'est envoyé, jamais au focus d'un autre contrôle (relecture de Codex).
