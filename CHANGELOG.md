@@ -6,6 +6,20 @@ Versions follow the server's own version (`nexus_windows.__version__`).
 
 ## [Unreleased]
 
+## [3.7.3] - 2026-10-28
+
+### Fixed
+- A single key with no proof asked for is now verified by an effect that only the key can produce: the keyboard focus
+  on an element or a window that did not exist before (Explorer rename field after F2 or Ctrl+Shift+N, content opened
+  by Enter; in the background the application thread's own focus is read, since a covered window never has the UI
+  Automation focus), or, for Ctrl+A without a target, more items selected than before. A key sequence, a key aimed at
+  a named target (its preparatory focus can create a field or select the target), a title, a value or a newly enabled
+  button never count: the outcome stays unknown and the batch stops, as before.
+- [N] numbers of a dialog seen as a popup of its parent window stay valid when the dialog is then targeted by its own
+  title; the most recently shown list of the two wins.
+- A scroll at a point with no scrollable container read under it (Settings page still loading after a click) is
+  reported as a missing target, not as "impossible in the background".
+
 ## [3.7.2] - 2026-10-27
 
 ### Fixed

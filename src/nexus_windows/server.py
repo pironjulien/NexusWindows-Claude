@@ -997,7 +997,7 @@ def _gesture_of(step: Step) -> str:
 
 Fingerprint = dict[tuple[str, str, str], int]
 SEEN_WINDOW_S = 0.8  # relecture après une action sans preuve demandée
-WATCHED = ("click", "double_click", "right_click", "menu")  # actions relues d'elles-mêmes sans expect ni check
+WATCHED = ("click", "double_click", "right_click", "menu", "key")  # actions relues d'elles-mêmes sans expect ni check
 SELECT_ROLES = {"ListItem", "TreeItem", "DataItem", "TabItem", "RadioButton"}
 
 
@@ -1007,6 +1007,14 @@ class Probe:
 
     shown: Fingerprint
     title: str
+    instances: frozenset = (
+        frozenset()
+    )  # identifiants d'exécution de tout l'arbre (touches : focus sur un NOUVEL élément)
+    selected: int = 0  # éléments sélectionnés dans tout l'arbre (touches : sélection étendue)
+    # Focus propre à l'application et ses fenêtres (touches) : une fenêtre en arrière-plan n'a jamais le focus clavier
+    # UIA, mais son fil garde le sien (champ de renommage de l'Explorateur, vrai contrôle Edit : passe 2 rejouée).
+    focus: int = 0
+    hwnds: frozenset = frozenset()
 
 
 @dataclass
@@ -1045,7 +1053,12 @@ def _probe(executor: actions.Executor, hwnd: int) -> Probe | None:
     view = executor._rebuild() if executor.acted else executor.view
     if not _provable(view):
         return None
-    return Probe(_fingerprint(view), w.window_text(hwnd))
+    nodes = [node.props for root in view.roots.values() for node in root.walk()]
+    instances = frozenset(tuple(r) for p in nodes if (r := uia.runtime_id(p)))
+    hwnds = frozenset(h for top in executor.windows for h in (top, *w.enum_children(top)))
+    focus = methods.keyboard_target(hwnd, executor.windows)
+    selected = sum(1 for p in nodes if p.get("selected"))
+    return Probe(_fingerprint(view), w.window_text(hwnd), instances, selected, focus, hwnds)
 
 
 def _difference(before: Probe, after: Fingerprint, title: str) -> str:
@@ -1091,11 +1104,39 @@ def _own_transition(do: str, aimed: dict[str, Any], after: snapshot.View) -> str
     return ""
 
 
+def _key_transition(before: Probe, after: snapshot.View, keys: str, targeted: bool, focus: int = 0) -> str:
+    """Transition propre à une touche (passe 2 du 28/10 : F2, Entrée, Ctrl+A dans l'Explorateur restaient « ~ » alors que
+    l'arbre montrait l'effet). Seules deux preuves, qu'aucune horloge ni notification ne produit dans la fenêtre :
+    le focus clavier sur un élément qui n'existait pas avant (champ de renommage de F2, contenu ouvert par Entrée) — focus
+    UIA, ou `focus` : celui du fil de l'application, dans une fenêtre qui n'existait pas avant —, ou
+    plus d'éléments sélectionnés qu'avant pour Ctrl+A. Jamais pour une touche à cible désignée : son focus préparatoire
+    peut sélectionner la cible ou créer son champ (relectures de Codex). Une combinaison seule, jamais une séquence
+    (« f2 enter »). Un titre, une valeur ou un bouton activé (Ctrl+C) ne prouvent rien."""
+    if len(keys.split()) != 1:  # séquence : un geste intermédiaire ne prouve pas la suite (relecture de Codex)
+        return ""
+    if targeted:  # la cible reçoit d'abord le focus, qui peut créer son champ ou la sélectionner (relecture de Codex)
+        return ""
+    nodes = [node.props for root in after.roots.values() for node in root.walk()]
+    focused = [p for p in nodes if p.get("focused")]
+    if len(focused) == 1 and (rid := uia.runtime_id(focused[0])) and tuple(rid) not in before.instances:
+        role = uia.CONTROL_TYPES.get(focused[0].get("control_type") or 0, "element")
+        name = snapshot.norm(focused[0].get("name"))
+        return f"keyboard focus on new {role}" + (f' "{snapshot.clip(name, 40)}"' if name else "")
+    if focus and focus != before.focus and before.hwnds and focus not in before.hwnds:
+        return f'keyboard focus on new window "{w.class_name(focus)}"'
+    selected = sum(1 for p in nodes if p.get("selected"))
+    if " ".join(keys.lower().split()) == "ctrl+a" and selected > before.selected:
+        return f"{selected} items selected (before: {before.selected})"
+    return ""
+
+
 INVOKED_FIRST_S = 0.15  # attente de « Invoqué » avant la première relecture de l'arbre
 INVOKED = "invoked: the control reported the click (its result is not read: give expect to check it)"
 
 
-def _seen_change(executor: actions.Executor, before: Probe | None, hwnd: int, do: str = "click") -> Seen:
+def _seen_change(
+    executor: actions.Executor, before: Probe | None, hwnd: int, do: str = "click", step: Step | None = None
+) -> Seen:
     """Après une action sans preuve demandée (UIA Invoke, clic par messages) : pendant SEEN_WINDOW_S au plus, preuve (✓)
     par l'événement UIA « Invoqué » que l'application émet elle-même pour l'élément visé (écoute ouverte à sa
     résolution, act_base._arm), ou par la transition attendue pour ce clic sur lui, relue (_own_transition). Tout autre
@@ -1120,6 +1161,20 @@ def _seen_change(executor: actions.Executor, before: Probe | None, hwnd: int, do
             view = executor._rebuild()
             if _provable(view):
                 seen.readable = True
+                if (
+                    do == "key"
+                    and step is not None
+                    and (
+                        proof := _key_transition(
+                            before,
+                            view,
+                            step.keys or step.text or "",
+                            step.target is not None,
+                            methods.keyboard_target(hwnd, executor.windows),
+                        )
+                    )
+                ):
+                    return Seen(proof, "", True)
                 if aimed is not None and (proof := _own_transition(do, aimed, view)):
                     return Seen(proof, "", True)
                 seen.change = _difference(before, _fingerprint(view), w.window_text(hwnd)) or seen.change
@@ -1249,7 +1304,7 @@ def _run_steps(
                     # Aucun effet visible tout de suite : la postcondition, relue jusqu'au délai, peut le prouver après.
                     outcome = actions.Outcome(True, f"{step.do} sent ({_short(error)})", "messages")
                 if watched and outcome.ok and outcome.symbol == "~":
-                    observed = _seen_change(executor, probe, hwnd, step.do)
+                    observed = _seen_change(executor, probe, hwnd, step.do, step)
                     unreadable = not observed.readable and not observed.proof
                     if observed.proof:
                         outcome.verified = True
@@ -1515,7 +1570,7 @@ async def act(
                 get_view=lambda rebuild: SESSION.view(auto, hwnd, rebuild=rebuild),
                 get_page=lambda title=None: SESSION.page(hwnd, title),
                 allow_foreground=foreground,
-                get_shown=lambda: SESSION.shown.get(hwnd),
+                get_shown=lambda: SESSION.shown_for(hwnd),
                 get_frame=lambda: SESSION.frames.get(hwnd),
                 fresh=fresh,
             )

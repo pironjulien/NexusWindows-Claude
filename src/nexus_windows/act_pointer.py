@@ -640,6 +640,13 @@ class PointerActions(ExecutorBase):
                     self._watched(lambda: methods.post_wheel(self._window_under(*aim), *aim, delta, horizontal)),
                 )
             )
+        if not chain and container is None and not self.allow_foreground:
+            # Aucun conteneur défilable lu sous le point (page de Paramètres en cours de chargement juste après un clic :
+            # passe 2 du 28/10) : le défilement en arrière-plan reste possible, c'est la cible qui manque.
+            raise ActionError(
+                f"scroll {direction}: no scrollable container read under this point: run look again, or target the "
+                "list or page by [N] or by name."
+            )
         return self._try_or_foreground(
             chain, f"scroll {direction} ×{amount}{where}", lambda: realinput.wheel(*aim, delta, horizontal)
         )

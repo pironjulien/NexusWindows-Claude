@@ -157,7 +157,19 @@ class Session:
         # Propriétés telles que montrées (position, valeur, états), copiées : les actions relisent les éléments en
         # place, then="changes" compare toujours à ce que le modèle a vu.
         view.frozen = {i: dict(by_id[i].props) for i in view.displayed}
+        self.shown.pop(view.hwnd, None)  # ordre du dictionnaire = ordre de montre (shown_for prend la plus récente)
         self.shown[view.hwnd] = view
+
+    def shown_for(self, hwnd: int) -> snapshot.View | None:
+        """Numéros [N] valables pour cette fenêtre : sa propre liste, sinon celle de la fenêtre dont elle était une
+        surgissante quand la liste a été montrée (boîte « Enregistrer sous » vue avec Paint, puis visée par son titre :
+        passe 2 du 28/10). La liste montrée LA PLUS RÉCENTE des deux : une ancienne liste propre de la boîte ne prime
+        jamais une liste du parent montrée après (relecture de Codex). Chaque élément est encore relu et comparé à son
+        identité avant toute action."""
+        for view in reversed(self.shown.values()):
+            if view.hwnd == hwnd or (hwnd in view.windows[1:] and w.IsWindow(view.hwnd)):
+                return view
+        return None
 
     def mark_image(self, view: snapshot.View) -> None:
         """Une image de cette vue vient d'être montrée : ses coordonnées sont désormais celles des points "x,y"."""

@@ -579,7 +579,7 @@ class ExecutorBase:
     def _ocr_named(self, spec: str) -> snapshot.Element | None:
         """Texte lu par OCR dans la dernière liste montrée (fenêtre sans élément UIA), désigné par son nom."""
         shown = self.get_shown()
-        if shown is None:
+        if shown is None or shown.hwnd != self.hwnd:  # textes OCR placés dans l'image de LEUR fenêtre seulement
             return None
         texts = [e for e in shown.elements if e.props.get("ocr") and e.id in shown.displayed]
         if not texts:
@@ -598,7 +598,7 @@ class ExecutorBase:
         rect = element.rect
         shown = self.get_shown()
         anchor = shown.frame.anchor if shown is not None else None
-        if rect is None or shown is None or anchor is None:
+        if rect is None or shown is None or anchor is None or shown.hwnd != self.hwnd:
             raise ActionError(f"{element.describe()}: text read by OCR without a position: run look again.")
         current = w.frame_rect(self.hwnd)
         if shown.frame.resized(current):

@@ -45,6 +45,7 @@ class Shown:
         self.heard: Heard | None = None
         self.invoked = False  # l'application émet « Invoqué » quand l'action est faite
         self.target_pids = {7}
+        self.windows = {HWND}
 
     def disarm(self) -> None:
         self.heard = None
@@ -75,7 +76,7 @@ class Steps:
         self.fields.append(fields)
 
 
-def _run(monkeypatch, ex: Shown, closes=False, do="click"):
+def _run(monkeypatch, ex: Shown, closes=False, do="click", keys: str | None = None):
     monkeypatch.setattr(server.w, "IsWindow", lambda h: not (closes and ex.clicked and h == HWND))
     monkeypatch.setattr(server.w, "window_text", lambda h: "Test")
     monkeypatch.setattr(server.time, "sleep", lambda s: None)
@@ -90,7 +91,8 @@ def _run(monkeypatch, ex: Shown, closes=False, do="click"):
         return actions.Outcome(True, f"{step.do} [1]", "UIA Invoke")
 
     monkeypatch.setattr(server, "_dispatch", act)
-    steps = [server.Step.model_validate({"do": do, "target": "x"}), server.Step(do="click", target="y")]
+    first = {"do": do, "target": "x"} if keys is None else {"do": do, "keys": keys}
+    steps = [server.Step.model_validate(first), server.Step(do="click", target="y")]
     call = Steps()
     report, failed = server._run_steps(cast(actions.Executor, ex), steps, HWND, as_call(call))
     return report, failed, call.fields
