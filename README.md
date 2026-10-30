@@ -1,5 +1,8 @@
 # NexusWindows for Claude
 
+> **This repository is archived.** NexusWindows for Claude now lives in the single NexusWindows repository, folder [`claude/`](https://github.com/pironjulien/NexusWindows/tree/main/claude), with the common engine and the other profiles: **https://github.com/pironjulien/NexusWindows**. Install it through [NexusSystem](https://github.com/pironjulien/NexusSystem). This copy is kept read-only for earlier installs.
+
+
 <!-- mcp-name: io.github.pironjulien/nexus-windows-claude -->
 
 <img src="https://raw.githubusercontent.com/pironjulien/NexusWindows-Claude/main/mcpb/icon.png" alt="NexusWindows icon" width="96">
